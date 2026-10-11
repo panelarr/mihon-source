@@ -14,6 +14,8 @@ import com.linecorp.armeria.server.Server
 import com.linecorp.armeria.server.ServiceRequestContext
 import com.linecorp.armeria.server.file.FileService
 import com.linecorp.armeria.server.grpc.GrpcService
+import com.linecorp.armeria.server.grpc.HttpJsonTranscodingOptions
+import com.linecorp.armeria.server.grpc.HttpJsonTranscodingQueryParamMatchRule
 import com.linecorp.armeria.server.grpc.UnframedGrpcErrorHandler
 import com.linecorp.armeria.server.logging.AccessLogWriter
 import io.grpc.BindableService
@@ -54,9 +56,15 @@ class ApiServer(
                 .builder()
                 .addServices(services)
                 .intercept(interceptors)
-                .enableHttpJsonTranscoding(true)
-                .httpJsonTranscodingErrorHandler(ProblemErrorHandler)
-                .build()
+                .enableHttpJsonTranscoding(
+                    HttpJsonTranscodingOptions
+                        .builder()
+                        // Query parameters use the lowerCamelCase names of the OpenAPI document. (Armeria
+                        // matches only one rule when several are set, so snake_case isn't accepted too.)
+                        .queryParamMatchRules(HttpJsonTranscodingQueryParamMatchRule.LOWER_CAMEL_CASE)
+                        .errorHandler(ProblemErrorHandler)
+                        .build(),
+                ).build()
 
         val builder =
             Server

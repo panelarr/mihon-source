@@ -13,6 +13,7 @@ import panelarr.mihonsource.api.ClientsApi
 import panelarr.mihonsource.api.ExtensionsApi
 import panelarr.mihonsource.api.IntegrationsApi
 import panelarr.mihonsource.api.SourcePluginApi
+import panelarr.mihonsource.api.StoresApi
 import panelarr.mihonsource.auth.AdminToken
 import panelarr.mihonsource.auth.AuthInterceptor
 import panelarr.mihonsource.auth.Authenticator
@@ -37,6 +38,8 @@ import panelarr.mihonsource.network.PushedProfiles
 import panelarr.mihonsource.network.SolverClient
 import panelarr.mihonsource.network.SourceNetworks
 import panelarr.mihonsource.secret.SecretBox
+import panelarr.mihonsource.store.StoreManager
+import panelarr.mihonsource.store.StoreReader
 import java.nio.file.Files
 
 /** Name the service reports about itself. */
@@ -80,6 +83,7 @@ class Application(
                 }
             }
         runBlocking { extensions.loadAll() }
+        val stores = StoreManager(dataDir.resolve("stores"), StoreReader(Downloader()), extensions, installer)
 
         val sources = MihonSources(extensions)
         server =
@@ -90,6 +94,7 @@ class Application(
                     listOf(
                         SourcePluginApi(sources, PushedProfiles(integrations, secrets)) { extensions.list().count { !it.loaded } },
                         ExtensionsApi(extensions, installer),
+                        StoresApi(stores),
                         ClientsApi(clients),
                         IntegrationsApi(integrations, resolver, secrets) { extensions.sources().map { it.id } },
                         // Lets tools such as grpcurl discover the API. Needs the admin scope.

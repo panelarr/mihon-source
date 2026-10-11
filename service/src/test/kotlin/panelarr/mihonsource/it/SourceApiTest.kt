@@ -264,6 +264,10 @@ class SourceApiTest {
         val bytes = parts.drop(1).fold(ByteArray(0)) { acc, part -> acc + part.chunk.toByteArray() }
         assertContentEquals(FakeSite.IMAGE_BYTES + "/images/1.png".toByteArray(), bytes)
 
+        // Query parameters work in their lowerCamelCase names, as the OpenAPI document shows.
+        val chaptersOverHttp = String(service.get("/v1/sources/$en/chapters?seriesKey=s1").body())
+        assertTrue("\"c2\"" in chaptersOverHttp, chaptersOverHttp)
+
         val http = service.get("/v1/sources/$en/image?ref=" + java.net.URLEncoder.encode(pages[0].ref, Charsets.UTF_8))
         assertEquals(200, http.statusCode())
         assertEquals("image/png", http.headers().firstValue("content-type").get())
