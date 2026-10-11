@@ -42,3 +42,4 @@ rootProject.name = "mihon-source"
 
 include(":api", ":android-compat", ":extension-api", ":service", ":admin")
 include(":test-extensions:lib14", ":test-extensions:lib16")
+include(":tools:compat-check")

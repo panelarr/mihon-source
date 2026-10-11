@@ -1,0 +1,14 @@
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- The checker prints its own progress; libraries only report problems. -->
+<configuration>
+  <statusListener class="ch.qos.logback.core.status.NopStatusListener" />
+  <appender name="stderr" class="ch.qos.logback.core.ConsoleAppender">
+    <target>System.err</target>
+    <encoder>
+      <pattern>%level %logger{20} - %msg%n</pattern>
+    </encoder>
+  </appender>
+  <root level="WARN">
+    <appender-ref ref="stderr" />
+  </root>
+</configuration>

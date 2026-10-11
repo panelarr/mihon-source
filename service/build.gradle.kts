@@ -38,6 +38,7 @@ dependencies {
     testImplementation(libs.okhttp.mockwebserver)
     testImplementation(libs.r8)
     testImplementation(libs.bouncycastle.pkix)
+    testImplementation(project(":tools:compat-check"))
 
     testExtensions(project(":test-extensions:lib14"))
     testExtensions(project(":test-extensions:lib16"))
