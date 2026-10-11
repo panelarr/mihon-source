@@ -28,7 +28,7 @@ check: ## Lint plus tests: run before every commit or PR
 	$(GRADLE) check
 
 run: ## Run the service locally
-	$(GRADLE) :server:run
+	$(GRADLE) :service:run
 
 docker: ## Build the Docker image
 	$(GRADLE) docker
