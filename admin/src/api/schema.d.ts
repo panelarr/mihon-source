@@ -1107,7 +1107,7 @@ export interface components {
              * Format: enum
              * @enum {string}
              */
-            trigger?: "JOB_TRIGGER_UNSPECIFIED" | "JOB_TRIGGER_SCHEDULE" | "JOB_TRIGGER_MANUAL" | "JOB_TRIGGER_STARTUP";
+            trigger?: "JOB_TRIGGER_UNSPECIFIED" | "JOB_TRIGGER_SCHEDULE" | "JOB_TRIGGER_MANUAL" | "JOB_TRIGGER_STARTUP" | "JOB_TRIGGER_SYSTEM";
             /** Format: date-time */
             startedAt?: string;
             /** Format: date-time */

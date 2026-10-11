@@ -43,6 +43,7 @@ const triggerLabels: Record<JobTrigger, string> = {
   JOB_TRIGGER_SCHEDULE: "Schedule",
   JOB_TRIGGER_MANUAL: "Manual",
   JOB_TRIGGER_STARTUP: "Startup",
+  JOB_TRIGGER_SYSTEM: "System",
 };
 
 export function triggerLabel(run: JobRunSummary): string {
