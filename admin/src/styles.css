@@ -892,3 +892,21 @@ p.success {
 .with-icon > :last-child {
   min-width: 0;
 }
+
+/* Source health on the source page. */
+.health-panel {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+  margin: 0 0 1rem;
+}
+
+.check-steps {
+  flex-basis: 100%;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.25rem;
+}

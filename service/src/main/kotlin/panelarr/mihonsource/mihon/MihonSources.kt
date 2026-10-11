@@ -14,7 +14,9 @@ import panelarr.mihonsource.extension.ExtensionRecord
 import panelarr.mihonsource.metrics.Metrics
 import panelarr.source.v1.ContentRating
 import panelarr.source.v1.SourceCapability
+import panelarr.source.v1.SourceHealthStatus
 import panelarr.source.v1.source
+import panelarr.source.v1.sourceHealth
 import java.time.Duration
 import panelarr.source.v1.Source as ProtoSource
 
@@ -24,6 +26,14 @@ class MihonSources(
     private val metrics: Metrics? = null,
     private val callTimeout: Duration = Duration.ofMinutes(2),
 ) {
+    /** Last health check per source, set once health checking is wired up. */
+    @Volatile
+    var healthOf: (Long) -> SourceHealthService.Health? = { null }
+
+    /** Whether scheduled checks are on for a source, set once health checking is wired up. */
+    @Volatile
+    var checksEnabled: (Long) -> Boolean = { true }
+
     fun all(): List<MihonSource> =
         extensions.sources().filterIsInstance<MihonSource>().sortedWith(
             compareBy({
@@ -66,6 +76,38 @@ class MihonSources(
             source.homeUrl?.let { homeUrl = it }
             if (extensions.icons.has(source.extension.pkgName)) iconUrl = "/v1/sources/${source.id}/icon"
             capabilities += capabilities(source)
+            val enabled = checksEnabled(source.id)
+            if (!enabled) health = sourceHealth { checksDisabled = true }
+            healthOf(source.id)?.let { last ->
+                health =
+                    sourceHealth {
+                        checksDisabled = !enabled
+                        status =
+                            if (last.ok) SourceHealthStatus.SOURCE_HEALTH_STATUS_OK else SourceHealthStatus.SOURCE_HEALTH_STATUS_FAILING
+                        last.reason?.let { reason = it }
+                        last.message?.let { message = it }
+                        latency =
+                            com.google.protobuf.Duration
+                                .newBuilder()
+                                .setSeconds(last.latencyMillis / MILLIS)
+                                .setNanos(
+                                    (
+                                        (
+                                            last.latencyMillis %
+                                                MILLIS
+                                        ) *
+                                            NANOS_PER_MILLI
+                                    ).toInt(),
+                                ).build()
+                        val at = java.time.Instant.parse(last.checkedAt)
+                        checkedAt =
+                            com.google.protobuf.Timestamp
+                                .newBuilder()
+                                .setSeconds(at.epochSecond)
+                                .setNanos(at.nano)
+                                .build()
+                    }
+            }
         }
 
     private fun capabilities(source: MihonSource): List<SourceCapability> =
@@ -96,8 +138,9 @@ class MihonSources(
     suspend fun openImage(
         source: MihonSource,
         ref: String,
+        operation: String = "image",
     ): Response =
-        call(source, "image") { mihon ->
+        call(source, operation) { mihon ->
             val http = mihon.source as? HttpSource ?: throw SourceErrors.unsupported("this source can't fetch images")
             val pageRef = Mapping.decodeRef(ref)
             if (pageRef == null) {
@@ -127,5 +170,7 @@ class MihonSources(
 
     private companion object {
         const val OK = "ok"
+        const val MILLIS = 1000L
+        const val NANOS_PER_MILLI = 1_000_000L
     }
 }

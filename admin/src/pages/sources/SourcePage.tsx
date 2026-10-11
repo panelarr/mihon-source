@@ -1,17 +1,17 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getRouteApi, Link } from "@tanstack/react-router";
 import { api, unwrap } from "../../api/client";
-import type { Source } from "../../api/types";
+import type { Source, SourceHealth } from "../../api/types";
 import { TabList, tabProps } from "../../components/Tabs";
-import { ErrorBox, Loading, Mono, PageHeader } from "../../components/ui";
-import { languageLabel } from "../../lib/format";
+import { Badge, ErrorBox, Loading, Mono, PageHeader } from "../../components/ui";
+import { enumLabel, languageLabel } from "../../lib/format";
 import { sourceQuery } from "./queries";
 import { SearchPanel } from "./SearchPanel";
 import { BrowseList } from "./SeriesGrid";
 import { SettingsPanel } from "./SettingsPanel";
-import { CapabilityBadges, ContentRatingBadge, hasCapability } from "./SourceBadges";
+import { CapabilityBadges, ContentRatingBadge, HealthBadge, hasCapability } from "./SourceBadges";
 
 export type SourceTab = "popular" | "latest" | "search" | "settings";
 
@@ -24,6 +24,66 @@ function availableTabs(source: Source): { tab: SourceTab; label: string }[] {
     { tab: "search", label: "Search" },
     ...(hasCapability(source, "SOURCE_CAPABILITY_SETTINGS") ? [{ tab: "settings" as const, label: "Settings" }] : []),
   ];
+}
+
+/** The source's health, a "Check now" button and the scheduled-checks switch. Plain API calls. */
+function SourceHealthPanel({ sourceId, health }: { sourceId: string; health: SourceHealth | undefined }) {
+  const queryClient = useQueryClient();
+  const refresh = () => queryClient.invalidateQueries({ queryKey: ["sources"] });
+  const check = useMutation({
+    mutationFn: async () =>
+      (
+        await unwrap(
+          api.POST("/v1/admin/checks", {
+            body: { sourceIds: [sourceId], steps: ["CHECK_STEP_POPULAR", "CHECK_STEP_IMAGE"] },
+          }),
+        )
+      ).results?.[0],
+    onSuccess: refresh,
+  });
+  const toggle = useMutation({
+    mutationFn: (enabled: boolean) =>
+      unwrap(
+        api.PUT("/v1/admin/sources/{sourceId}/health-check", {
+          params: { path: { sourceId } },
+          body: { enabled },
+        }),
+      ),
+    onSuccess: refresh,
+  });
+  const result = check.data;
+  return (
+    <section className="health-panel">
+      <span>Health:</span> <HealthBadge health={health} />
+      <button type="button" className="small" onClick={() => check.mutate()} disabled={check.isPending}>
+        {check.isPending ? "Checking…" : "Check now"}
+      </button>
+      <label className="filter-check">
+        <input
+          type="checkbox"
+          checked={!health?.checksDisabled}
+          disabled={toggle.isPending}
+          onChange={(event) => toggle.mutate(event.target.checked)}
+        />
+        <span>Scheduled checks</span>
+      </label>
+      <ErrorBox error={check.error ?? toggle.error} />
+      {result ? (
+        <ul className="check-steps">
+          {(result.steps ?? []).map((step) => (
+            <li key={step.step}>
+              <Badge tone={step.skipped ? "neutral" : step.ok ? "good" : "bad"}>
+                {enumLabel(step.step, "CHECK_STEP_")}
+              </Badge>{" "}
+              <span className="small">
+                {step.skipped ? "skipped" : step.ok ? step.detail : `${step.reason ?? ""} ${step.message ?? ""}`}
+              </span>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </section>
+  );
 }
 
 export function SourcePage() {
@@ -62,6 +122,7 @@ export function SourcePage() {
         <ContentRatingBadge rating={source.data.contentRating} />
         <CapabilityBadges source={source.data} />
       </p>
+      <SourceHealthPanel sourceId={sourceId} health={source.data.health} />
       {hasCapability(source.data, "SOURCE_CAPABILITY_NEEDS_WEBVIEW") ? (
         <p className="notice">This source needs a browser engine the service doesn't have, so most calls will fail.</p>
       ) : null}

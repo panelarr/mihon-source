@@ -45,6 +45,22 @@ describe("sources", () => {
     app.dispose();
   });
 
+  it("shows source health and runs a check", async () => {
+    const list = renderApp("/sources");
+    const failing = (await screen.findByText("Fake Webview Source")).closest("tr") as HTMLElement;
+    expect(within(failing).getByText("Failing: needs webview")).toBeInTheDocument();
+    expect(
+      within(screen.getByText("Sample Comics").closest("tr") as HTMLElement).getByText("Checks off"),
+    ).toBeInTheDocument();
+    list.dispose();
+
+    const app = renderApp("/sources/1001");
+    await userEvent.click(await screen.findByRole("button", { name: "Check now" }));
+    expect(await screen.findByText("20 series")).toBeInTheDocument();
+    expect(screen.getByText("image/webp, 65536 bytes read")).toBeInTheDocument();
+    app.dispose();
+  });
+
   it("hides Latest and Settings for sources without them", async () => {
     const app = renderApp("/sources/2001");
     await screen.findByRole("heading", { name: "Sample Comics" });

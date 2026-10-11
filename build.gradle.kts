@@ -35,8 +35,8 @@ tasks.register("check") {
 
 tasks.register("gen") {
     group = "panelarr"
-    description = "Regenerates generated sources (the OpenAPI document)."
-    dependsOn("bufGenerate")
+    description = "Regenerates generated sources (the OpenAPI document and the admin UI's API types)."
+    dependsOn("bufGenerate", ":admin:genApi")
 }
 
 // `make docker` builds the image for this machine's platform and loads it as

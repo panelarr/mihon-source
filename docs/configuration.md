@@ -13,6 +13,7 @@ mihon-source reads a few environment variables at start. Each one can also be gi
 | `MIHON_LOG_FORMAT` | `json` | `json` (one JSON object per line: `time`, `level`, `logger`, `thread`, `msg`, `error`) or `text`. |
 | `MIHON_LOG_LEVEL` | `INFO` | `TRACE`, `DEBUG`, `INFO`, `WARN` or `ERROR`. |
 | `MIHON_METRICS_PORT` | *(none)* | Also serve `GET /metrics` on this port **without credentials**, e.g. for a scraper on an internal network. Without it, `/metrics` is only on the main port and needs a token with the `metrics` scope. |
+| `MIHON_HEALTH_CHECK_INTERVAL` | *(off)* | Check every source's health this often, e.g. `6h` or `1d`. Each source gets its first page of popular fetched once per interval, at a random moment within it, through its own network profile and rate limits. Off by default; per-source opt-out in the admin UI or with `SetHealthCheck`. |
 | `MIHON_ADMIN_DIR` | *(bundled)* | Serve the admin UI from this directory instead of the copy in the jar. For development. |
 
 ## Network settings: solvers, profiles, assignments

@@ -22,11 +22,32 @@ data class AppConfig(
     val adminDir: Path? = null,
     /** Port for unauthenticated GET /metrics on its own listener. Null means /metrics only on the API port, with a token. */
     val metricsPort: Int? = null,
+    /** How often each source gets a health check. Null means no scheduled checks. */
+    val healthCheckInterval: java.time.Duration? = null,
 ) {
     companion object {
         const val DEFAULT_PORT = 8902
         const val DEFAULT_MAX_EXTENSION_MB = 50L
         private const val MB = 1024L * 1024
+
+        private val SIMPLE_DURATION = Regex("(\\d+)\\s*(s|m|h|d)")
+
+        /** "90s", "30m", "6h", "1d", "0" or ISO-8601 ("PT6H"). */
+        fun duration(text: String): java.time.Duration {
+            val trimmed = text.trim().lowercase()
+            if (trimmed == "0" || trimmed == "off") return java.time.Duration.ZERO
+            SIMPLE_DURATION.matchEntire(trimmed)?.let { match ->
+                val amount = match.groupValues[1].toLong()
+                return when (match.groupValues[2]) {
+                    "s" -> java.time.Duration.ofSeconds(amount)
+                    "m" -> java.time.Duration.ofMinutes(amount)
+                    "h" -> java.time.Duration.ofHours(amount)
+                    else -> java.time.Duration.ofDays(amount)
+                }
+            }
+            return runCatching { java.time.Duration.parse(text.trim().uppercase()) }
+                .getOrElse { error("'$text' isn't a duration (e.g. 30m, 6h, 1d)") }
+        }
 
         fun fromEnv(env: Map<String, String> = System.getenv()): AppConfig {
             // NAME_FILE (a path, e.g. a Docker secret) is read when NAME itself isn't set.
@@ -51,6 +72,7 @@ data class AppConfig(
                 secretKey = value("MIHON_SECRET_KEY"),
                 adminDir = value("MIHON_ADMIN_DIR")?.let(Path::of),
                 metricsPort = number("MIHON_METRICS_PORT")?.toInt(),
+                healthCheckInterval = value("MIHON_HEALTH_CHECK_INTERVAL")?.let(::duration)?.takeIf { !it.isZero },
             )
         }
     }

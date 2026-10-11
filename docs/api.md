@@ -99,6 +99,17 @@ curl -H "Authorization: Bearer $KEY" "localhost:8902/v1/sources/$SOURCE/pages?ch
 - **Filters** have no stable names, so a `FilterValue` addresses a filter by its position in `GetFilters`: `[index]`, or `[group index, child index]` inside a group. Filters you don't send keep their defaults.
 - **Settings** come as a JSON Schema (`GET .../settings/schema`). The display order is in `x-order`. Choices use `enum` with labels in `x-enumNames`. Change values with `PATCH .../settings`; only the keys you send change, and a source may refuse a value.
 
+## Checking sources
+
+`CheckSources` (`POST /v1/admin/checks`, admin scope) runs checks now, on chosen sources or all of them. Steps: `POPULAR` (the default), `LATEST`, `SEARCH` (with `searchQuery`, or the first popular title), `DETAILS`, `CHAPTERS`, `PAGES`, `IMAGE`. Each step feeds the next (a series from the list, its last chapter, that chapter's first page), and steps a requested one needs are added. Each step reports `ok`, `skipped`, the error `reason`, a `detail` such as "20 series", and its duration.
+
+```sh
+curl -H "Authorization: Bearer $ADMIN" -X POST localhost:8902/v1/admin/checks \
+  -d '{"sourceIds": ["123"], "steps": ["CHECK_STEP_IMAGE"]}'
+```
+
+The result becomes the source's health: `Source.health` in `ListSources`/`GetSource` has the status (`OK` or `FAILING` with a reason such as `SOURCE_DOWN`, `CLOUDFLARE_CHALLENGE` or `NEEDS_WEBVIEW`), the latency, when it was checked, and whether scheduled checks are off for it. Scheduled checks (see `MIHON_HEALTH_CHECK_INTERVAL` in [configuration](configuration.md)) record the same. `SetHealthCheck` (`PUT /v1/admin/sources/{sourceId}/health-check`) turns them off or on per source. The metric `mihon_source_health{source}` is 1 for OK and 0 for failing.
+
 ## Errors
 
 Failures use gRPC status codes. When the source (not the request) is the problem, the status carries a `google.rpc.ErrorInfo` with domain `source.panelarr` and one of these reasons:

@@ -39,6 +39,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/admin/checks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * @description CheckSources runs checks against sources now: by default the first page of popular,
+         *      or the steps asked for, each feeding the next (a series from the list, a chapter of
+         *      the series, a page of the chapter). It records the result as each source's health.
+         */
+        post: operations["MihonAdminService_CheckSources"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/admin/clients": {
         parameters: {
             query?: never;
@@ -276,6 +297,26 @@ export interface paths {
         post?: never;
         /** @description DeleteSolver fails while a profile still uses the solver. */
         delete: operations["MihonIntegrationsService_DeleteSolver"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/sources/{sourceId}/health-check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * @description SetHealthCheck turns scheduled health checks on or off for one source. They're on for
+         *      every source by default, when the service runs them at all.
+         */
+        put: operations["MihonAdminService_SetHealthCheck"];
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -720,6 +761,21 @@ export interface components {
             lang?: string;
             homeUrl?: string;
         };
+        "panelarr.mihon.v1.CheckSourcesRequest": {
+            /** @description Sources to check. Empty means every loaded source. */
+            sourceIds?: string[];
+            /** @description Steps to run. Empty means CHECK_STEP_POPULAR only. */
+            steps?: ("CHECK_STEP_UNSPECIFIED" | "CHECK_STEP_POPULAR" | "CHECK_STEP_LATEST" | "CHECK_STEP_SEARCH" | "CHECK_STEP_DETAILS" | "CHECK_STEP_CHAPTERS" | "CHECK_STEP_PAGES" | "CHECK_STEP_IMAGE")[];
+            searchQuery?: string;
+            /**
+             * Format: uint32
+             * @description Sources checked at the same time. 0 means 4.
+             */
+            concurrency?: number;
+        };
+        "panelarr.mihon.v1.CheckSourcesResponse": {
+            results?: components["schemas"]["panelarr.mihon.v1.SourceCheck"][];
+        };
         "panelarr.mihon.v1.Client": {
             id?: string;
             name?: string;
@@ -935,6 +991,11 @@ export interface components {
             profileId?: string;
         };
         "panelarr.mihon.v1.SetDefaultProfileResponse": Record<string, never>;
+        "panelarr.mihon.v1.SetHealthCheckRequest": {
+            sourceId?: string;
+            enabled?: boolean;
+        };
+        "panelarr.mihon.v1.SetHealthCheckResponse": Record<string, never>;
         "panelarr.mihon.v1.Solver": {
             /** @description Identifier chosen by the admin: lowercase letters, digits and dashes. */
             id?: string;
@@ -952,6 +1013,32 @@ export interface components {
             maxTimeout?: string;
             /** @description Use the solver's own response body when a fresh request still fails. */
             asResponseFallback?: boolean;
+        };
+        "panelarr.mihon.v1.SourceCheck": {
+            sourceId?: string;
+            sourceName?: string;
+            lang?: string;
+            pkgName?: string;
+            ok?: boolean;
+            steps?: components["schemas"]["panelarr.mihon.v1.StepResult"][];
+            /** Format: date-time */
+            checkedAt?: string;
+        };
+        "panelarr.mihon.v1.StepResult": {
+            /**
+             * Format: enum
+             * @enum {string}
+             */
+            step?: "CHECK_STEP_UNSPECIFIED" | "CHECK_STEP_POPULAR" | "CHECK_STEP_LATEST" | "CHECK_STEP_SEARCH" | "CHECK_STEP_DETAILS" | "CHECK_STEP_CHAPTERS" | "CHECK_STEP_PAGES" | "CHECK_STEP_IMAGE";
+            ok?: boolean;
+            /** @description Not run: an earlier step it needs failed or found nothing, or the source can't do it. */
+            skipped?: boolean;
+            /** @description Error reason (e.g. "SOURCE_DOWN") or gRPC code name when it failed. */
+            reason?: string;
+            message?: string;
+            duration?: string;
+            /** @description What the step found, e.g. "20 series" or "image/webp, 350 KB". */
+            detail?: string;
         };
         "panelarr.mihon.v1.Store": {
             /** @description Identifier derived from the store URL. */
@@ -1328,6 +1415,29 @@ export interface components {
             capabilities?: ("SOURCE_CAPABILITY_UNSPECIFIED" | "SOURCE_CAPABILITY_LATEST" | "SOURCE_CAPABILITY_SEARCH" | "SOURCE_CAPABILITY_FILTERS" | "SOURCE_CAPABILITY_RESOLVE_URL" | "SOURCE_CAPABILITY_SETTINGS" | "SOURCE_CAPABILITY_NEEDS_WEBVIEW" | "SOURCE_CAPABILITY_NSFW")[];
             /** @description Web address of the source, for display. */
             homeUrl?: string;
+            /** @description The result of the plugin's last check of this source, when it checks sources. */
+            health?: components["schemas"]["panelarr.source.v1.SourceHealth"];
+        };
+        /** @description SourceHealth is what a plugin last saw when it checked a source itself. */
+        "panelarr.source.v1.SourceHealth": {
+            /**
+             * Format: enum
+             * @enum {string}
+             */
+            status?: "SOURCE_HEALTH_STATUS_UNSPECIFIED" | "SOURCE_HEALTH_STATUS_OK" | "SOURCE_HEALTH_STATUS_FAILING";
+            /**
+             * @description ErrorReason name without the prefix (e.g. "SOURCE_DOWN"), or "NEEDS_WEBVIEW", when
+             *      failing. Empty when OK.
+             */
+            reason?: string;
+            /** @description Detail for humans. */
+            message?: string;
+            /** @description How long the check took. */
+            latency?: string;
+            /** Format: date-time */
+            checkedAt?: string;
+            /** @description Scheduled checks are turned off for this source. */
+            checksDisabled?: boolean;
         };
         "panelarr.source.v1.TextFilter": {
             value?: string;
@@ -1404,6 +1514,30 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["panelarr.mihon.v1.AssignProfileResponse"];
+                };
+            };
+        };
+    };
+    MihonAdminService_CheckSources: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["panelarr.mihon.v1.CheckSourcesRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["panelarr.mihon.v1.CheckSourcesResponse"];
                 };
             };
         };
@@ -1799,6 +1933,32 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["panelarr.mihon.v1.DeleteSolverResponse"];
+                };
+            };
+        };
+    };
+    MihonAdminService_SetHealthCheck: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sourceId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["panelarr.mihon.v1.SetHealthCheckRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["panelarr.mihon.v1.SetHealthCheckResponse"];
                 };
             };
         };

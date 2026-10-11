@@ -7,7 +7,7 @@ import { AuthIcon } from "../../components/AuthIcon";
 import { Empty, ErrorBox, Field, Loading, Mono, PageHeader } from "../../components/ui";
 import { languageLabel } from "../../lib/format";
 import { sourcesQuery } from "./queries";
-import { CapabilityBadges, ContentRatingBadge } from "./SourceBadges";
+import { CapabilityBadges, ContentRatingBadge, HealthBadge } from "./SourceBadges";
 
 const route = getRouteApi("/_app/sources");
 
@@ -79,6 +79,7 @@ export function SourcesPage() {
               <th>Language</th>
               <th>ID</th>
               <th>Rating</th>
+              <th>Health</th>
               <th>Capabilities</th>
             </tr>
           </thead>
@@ -109,6 +110,9 @@ export function SourcesPage() {
                 </td>
                 <td>
                   <ContentRatingBadge rating={source.contentRating} />
+                </td>
+                <td>
+                  <HealthBadge health={source.health} />
                 </td>
                 <td>
                   <CapabilityBadges source={source} />

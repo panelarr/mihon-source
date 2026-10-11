@@ -252,6 +252,30 @@ message Source {
   repeated SourceCapability capabilities = 6;
   // Web address of the source, for display.
   string home_url = 7;
+  // The result of the plugin's last check of this source, when it checks sources.
+  SourceHealth health = 8;
+}
+
+// SourceHealth is what a plugin last saw when it checked a source itself.
+message SourceHealth {
+  SourceHealthStatus status = 1;
+  // ErrorReason name without the prefix (e.g. "SOURCE_DOWN"), or "NEEDS_WEBVIEW", when
+  // failing. Empty when OK.
+  string reason = 2;
+  // Detail for humans.
+  string message = 3;
+  // How long the check took.
+  google.protobuf.Duration latency = 4;
+  google.protobuf.Timestamp checked_at = 5;
+  // Scheduled checks are turned off for this source.
+  bool checks_disabled = 6;
+}
+
+enum SourceHealthStatus {
+  // Not checked (yet), or checks are off for this source.
+  SOURCE_HEALTH_STATUS_UNSPECIFIED = 0;
+  SOURCE_HEALTH_STATUS_OK = 1;
+  SOURCE_HEALTH_STATUS_FAILING = 2;
 }
 
 enum SourceCapability {

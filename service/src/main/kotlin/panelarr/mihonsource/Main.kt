@@ -35,6 +35,8 @@ import panelarr.mihonsource.metrics.Metrics
 import panelarr.mihonsource.mihon.MihonHost
 import panelarr.mihonsource.mihon.MihonInstantiator
 import panelarr.mihonsource.mihon.MihonSources
+import panelarr.mihonsource.mihon.SourceHealthService
+import panelarr.mihonsource.mihon.SourceProber
 import panelarr.mihonsource.net.Downloader
 import panelarr.mihonsource.network.FileIntegrationsStore
 import panelarr.mihonsource.network.ProfileResolver
@@ -63,6 +65,7 @@ class Application(
     val extensions: ExtensionManager
     val networks: SourceNetworks
     val metrics = Metrics()
+    private val health: SourceHealthService
     private val server: ApiServer
 
     @Volatile
@@ -108,6 +111,10 @@ class Application(
             sources = { extensions.sources().size },
         )
         val sources = MihonSources(extensions, metrics)
+        val prober = SourceProber(sources)
+        health = SourceHealthService(dataDir.resolve("config/source-health.json"), sources, prober, metrics, config.healthCheckInterval)
+        sources.healthOf = health::get
+        sources.checksEnabled = health::enabled
         val metricsService = OpsService.metrics(metrics::scrape)
         server =
             ApiServer(
@@ -116,7 +123,7 @@ class Application(
                 services =
                     listOf(
                         SourcePluginApi(sources, PushedProfiles(integrations, secrets)) { extensions.list().count { !it.loaded } },
-                        ExtensionsApi(extensions, installer),
+                        ExtensionsApi(extensions, installer, sources, prober, health),
                         StoresApi(stores),
                         ClientsApi(clients),
                         IntegrationsApi(integrations, resolver, secrets) { extensions.sources().map { it.id } },
@@ -148,12 +155,17 @@ class Application(
     }
 
     /** Starts serving and returns the bound port. */
-    fun start(): Int = server.start().also { ready = true }
+    fun start(): Int =
+        server.start().also {
+            ready = true
+            health.start(scope)
+        }
 
     /** The bound separate metrics port, if one was configured. */
     fun metricsPort(): Int? = server.metricsLocalPort()
 
     fun stop() {
+        health.stop()
         server.stop().join()
         extensions.close()
         scope.cancel()

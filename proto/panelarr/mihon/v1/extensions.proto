@@ -5,6 +5,7 @@ syntax = "proto3";
 package panelarr.mihon.v1;
 
 import "google/api/annotations.proto";
+import "google/protobuf/duration.proto";
 import "google/protobuf/timestamp.proto";
 
 option java_multiple_files = true;
@@ -36,6 +37,25 @@ service MihonAdminService {
   // settings and cookies are kept unless `delete_data` is set.
   rpc UninstallExtension(UninstallExtensionRequest) returns (UninstallExtensionResponse) {
     option (google.api.http) = {delete: "/v1/admin/extensions/{pkg_name}"};
+  }
+
+  // CheckSources runs checks against sources now: by default the first page of popular,
+  // or the steps asked for, each feeding the next (a series from the list, a chapter of
+  // the series, a page of the chapter). It records the result as each source's health.
+  rpc CheckSources(CheckSourcesRequest) returns (CheckSourcesResponse) {
+    option (google.api.http) = {
+      post: "/v1/admin/checks"
+      body: "*"
+    };
+  }
+
+  // SetHealthCheck turns scheduled health checks on or off for one source. They're on for
+  // every source by default, when the service runs them at all.
+  rpc SetHealthCheck(SetHealthCheckRequest) returns (SetHealthCheckResponse) {
+    option (google.api.http) = {
+      put: "/v1/admin/sources/{source_id}/health-check"
+      body: "*"
+    };
   }
 
   // ReloadExtension unloads an extension and loads it again from its installed file.
@@ -151,6 +171,63 @@ message UninstallExtensionRequest {
 }
 
 message UninstallExtensionResponse {}
+
+enum CheckStep {
+  CHECK_STEP_UNSPECIFIED = 0;
+  CHECK_STEP_POPULAR = 1;
+  CHECK_STEP_LATEST = 2;
+  // Searches with search_query, or with the title of the first popular series.
+  CHECK_STEP_SEARCH = 3;
+  CHECK_STEP_DETAILS = 4;
+  CHECK_STEP_CHAPTERS = 5;
+  CHECK_STEP_PAGES = 6;
+  // Downloads the first page's image (only its first bytes).
+  CHECK_STEP_IMAGE = 7;
+}
+
+message CheckSourcesRequest {
+  // Sources to check. Empty means every loaded source.
+  repeated string source_ids = 1;
+  // Steps to run. Empty means CHECK_STEP_POPULAR only.
+  repeated CheckStep steps = 2;
+  string search_query = 3;
+  // Sources checked at the same time. 0 means 4.
+  uint32 concurrency = 4;
+}
+
+message CheckSourcesResponse {
+  repeated SourceCheck results = 1;
+}
+
+message SourceCheck {
+  string source_id = 1;
+  string source_name = 2;
+  string lang = 3;
+  string pkg_name = 4;
+  bool ok = 5;
+  repeated StepResult steps = 6;
+  google.protobuf.Timestamp checked_at = 7;
+}
+
+message StepResult {
+  CheckStep step = 1;
+  bool ok = 2;
+  // Not run: an earlier step it needs failed or found nothing, or the source can't do it.
+  bool skipped = 3;
+  // Error reason (e.g. "SOURCE_DOWN") or gRPC code name when it failed.
+  string reason = 4;
+  string message = 5;
+  google.protobuf.Duration duration = 6;
+  // What the step found, e.g. "20 series" or "image/webp, 350 KB".
+  string detail = 7;
+}
+
+message SetHealthCheckRequest {
+  string source_id = 1;
+  bool enabled = 2;
+}
+
+message SetHealthCheckResponse {}
 
 message ReloadExtensionRequest {
   string pkg_name = 1;

@@ -46,6 +46,7 @@ export const mockSources: Source[] = [
       "SOURCE_CAPABILITY_FILTERS",
       "SOURCE_CAPABILITY_SETTINGS",
     ],
+    health: { status: "SOURCE_HEALTH_STATUS_OK", latency: "0.420s", checkedAt: "2026-01-30T10:00:00Z" },
   },
   {
     id: "1002",
@@ -62,6 +63,7 @@ export const mockSources: Source[] = [
     contentRating: "CONTENT_RATING_MIXED",
     homeUrl: "https://comics.example.org",
     capabilities: ["SOURCE_CAPABILITY_SEARCH", "SOURCE_CAPABILITY_FILTERS"],
+    health: { checksDisabled: true },
   },
   {
     id: "3001",
@@ -70,6 +72,12 @@ export const mockSources: Source[] = [
     contentRating: "CONTENT_RATING_NSFW",
     homeUrl: "https://webview.example.net",
     capabilities: ["SOURCE_CAPABILITY_SEARCH", "SOURCE_CAPABILITY_NEEDS_WEBVIEW", "SOURCE_CAPABILITY_NSFW"],
+    health: {
+      status: "SOURCE_HEALTH_STATUS_FAILING",
+      reason: "NEEDS_WEBVIEW",
+      message: "the source needs a browser engine",
+      checkedAt: "2026-01-30T10:05:00Z",
+    },
   },
 ];
 

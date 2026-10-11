@@ -86,5 +86,24 @@ class Metrics {
             .register(registry)
     }
 
+    private val health = java.util.concurrent.ConcurrentHashMap<Long, java.util.concurrent.atomic.AtomicInteger>()
+
+    /** The last health check of a source: 1 ok, 0 failing. */
+    fun sourceHealth(
+        sourceId: Long,
+        ok: Boolean,
+    ) {
+        health
+            .computeIfAbsent(sourceId) { id ->
+                java.util.concurrent.atomic.AtomicInteger().also { value ->
+                    Gauge
+                        .builder("mihon_source_health", value) { it.get().toDouble() }
+                        .description("Result of the last health check of a source: 1 ok, 0 failing")
+                        .tag("source", id.toString())
+                        .register(registry)
+                }
+            }.set(if (ok) 1 else 0)
+    }
+
     fun scrape(): String = registry.scrape()
 }

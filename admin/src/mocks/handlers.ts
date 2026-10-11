@@ -219,6 +219,42 @@ export function createHandlers(db: Db = createDb(), latency = 0) {
       return source ? ok({ source }) : grpcError("NOT_FOUND", `no source with id ${params.sourceId}`);
     }),
 
+    http.post(`${base}/admin/checks`, async ({ request }) => {
+      await wait();
+      const denied = guard(request, true);
+      if (denied) return denied;
+      const body = (await request.json()) as { sourceIds?: string[] };
+      const ids = body.sourceIds?.length ? body.sourceIds : mockSources.map((s) => s.id ?? "");
+      return ok({
+        results: ids.map((id) => {
+          const failing = failingSourceIds.has(id);
+          return {
+            sourceId: id,
+            ok: !failing,
+            checkedAt: now(),
+            steps: [
+              failing
+                ? {
+                    step: "CHECK_STEP_POPULAR",
+                    ok: false,
+                    reason: "SOURCE_DOWN",
+                    message: "the source answered HTTP 503",
+                  }
+                : { step: "CHECK_STEP_POPULAR", ok: true, detail: "20 series", duration: "0.300s" },
+              failing
+                ? { step: "CHECK_STEP_IMAGE", skipped: true }
+                : { step: "CHECK_STEP_IMAGE", ok: true, detail: "image/webp, 65536 bytes read", duration: "0.200s" },
+            ],
+          };
+        }),
+      });
+    }),
+
+    http.put(`${base}/admin/sources/:sourceId/health-check`, async ({ request }) => {
+      await wait();
+      return guard(request, true) ?? ok({});
+    }),
+
     http.get(`${base}/sources/:sourceId/filters`, async ({ request }) => {
       await wait();
       return guard(request, false) ?? ok({ filters: mockFilters });

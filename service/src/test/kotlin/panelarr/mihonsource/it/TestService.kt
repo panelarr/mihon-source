@@ -23,8 +23,19 @@ import java.nio.file.Path
 class TestService(
     val dataDir: Path,
     metricsPort: Int? = null,
+    healthCheckInterval: java.time.Duration? = null,
 ) : AutoCloseable {
-    val app = Application(AppConfig(dataDir = dataDir, host = "127.0.0.1", port = 0, adminToken = ADMIN, metricsPort = metricsPort))
+    val app =
+        Application(
+            AppConfig(
+                dataDir = dataDir,
+                host = "127.0.0.1",
+                port = 0,
+                adminToken = ADMIN,
+                metricsPort = metricsPort,
+                healthCheckInterval = healthCheckInterval,
+            ),
+        )
     val base = "http://127.0.0.1:${app.start()}"
     private val http = HttpClient.newHttpClient()
 

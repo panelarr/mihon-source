@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-import type { Source, SourceCapability } from "../../api/types";
+import type { Source, SourceCapability, SourceHealth } from "../../api/types";
 import { Badge, type Tone } from "../../components/ui";
+import { formatDate } from "../../lib/format";
 
 const capabilityLabels: Partial<Record<SourceCapability, [string, Tone]>> = {
   SOURCE_CAPABILITY_LATEST: ["Latest", "neutral"],
@@ -37,4 +38,26 @@ export function CapabilityBadges({ source }: { source: Source }) {
       })}
     </span>
   );
+}
+
+/** The last health check of a source: OK, failing with its reason, not checked, or checks off. */
+export function HealthBadge({ health }: { health: SourceHealth | undefined }) {
+  const checked = health?.checkedAt ? `Checked ${formatDate(health.checkedAt)}` : undefined;
+  if (health?.status === "SOURCE_HEALTH_STATUS_OK") {
+    return (
+      <Badge tone="good" title={checked}>
+        OK
+      </Badge>
+    );
+  }
+  if (health?.status === "SOURCE_HEALTH_STATUS_FAILING") {
+    const reason = health.reason ? health.reason.replaceAll("_", " ").toLowerCase() : "failing";
+    return (
+      <Badge tone="bad" title={[checked, health.message].filter(Boolean).join(": ")}>
+        {`Failing: ${reason}`}
+      </Badge>
+    );
+  }
+  if (health?.checksDisabled) return <span className="muted small">Checks off</span>;
+  return <span className="muted small">Not checked</span>;
 }

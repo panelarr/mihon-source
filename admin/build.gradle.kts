@@ -81,6 +81,8 @@ tasks.register<NpmTask>("genApi") {
     group = "panelarr"
     description = "Regenerates the typed API client from the OpenAPI document."
     dependsOn(tasks.npmInstall)
+    // When both run (make gen), the OpenAPI document must be regenerated first.
+    mustRunAfter(":bufGenerate")
     npmCommand = listOf("run", "gen:api")
 }
 

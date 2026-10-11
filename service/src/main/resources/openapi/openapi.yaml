@@ -47,6 +47,28 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/panelarr.mihon.v1.AssignProfileResponse'
+    /v1/admin/checks:
+        post:
+            tags:
+                - MihonAdminService
+            description: |-
+                CheckSources runs checks against sources now: by default the first page of popular,
+                 or the steps asked for, each feeding the next (a series from the list, a chapter of
+                 the series, a page of the chapter). It records the result as each source's health.
+            operationId: MihonAdminService_CheckSources
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/panelarr.mihon.v1.CheckSourcesRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/panelarr.mihon.v1.CheckSourcesResponse'
     /v1/admin/clients:
         get:
             tags:
@@ -388,6 +410,33 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/panelarr.mihon.v1.DeleteSolverResponse'
+    /v1/admin/sources/{sourceId}/health-check:
+        put:
+            tags:
+                - MihonAdminService
+            description: |-
+                SetHealthCheck turns scheduled health checks on or off for one source. They're on for
+                 every source by default, when the service runs them at all.
+            operationId: MihonAdminService_SetHealthCheck
+            parameters:
+                - name: sourceId
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/panelarr.mihon.v1.SetHealthCheckRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/panelarr.mihon.v1.SetHealthCheckResponse'
     /v1/admin/stores:
         get:
             tags:
@@ -990,6 +1039,42 @@ components:
                     type: string
                 homeUrl:
                     type: string
+        panelarr.mihon.v1.CheckSourcesRequest:
+            type: object
+            properties:
+                sourceIds:
+                    type: array
+                    items:
+                        type: string
+                    description: Sources to check. Empty means every loaded source.
+                steps:
+                    type: array
+                    items:
+                        enum:
+                            - CHECK_STEP_UNSPECIFIED
+                            - CHECK_STEP_POPULAR
+                            - CHECK_STEP_LATEST
+                            - CHECK_STEP_SEARCH
+                            - CHECK_STEP_DETAILS
+                            - CHECK_STEP_CHAPTERS
+                            - CHECK_STEP_PAGES
+                            - CHECK_STEP_IMAGE
+                        type: string
+                        format: enum
+                    description: Steps to run. Empty means CHECK_STEP_POPULAR only.
+                searchQuery:
+                    type: string
+                concurrency:
+                    type: integer
+                    description: Sources checked at the same time. 0 means 4.
+                    format: uint32
+        panelarr.mihon.v1.CheckSourcesResponse:
+            type: object
+            properties:
+                results:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/panelarr.mihon.v1.SourceCheck'
         panelarr.mihon.v1.Client:
             type: object
             properties:
@@ -1351,6 +1436,16 @@ components:
         panelarr.mihon.v1.SetDefaultProfileResponse:
             type: object
             properties: {}
+        panelarr.mihon.v1.SetHealthCheckRequest:
+            type: object
+            properties:
+                sourceId:
+                    type: string
+                enabled:
+                    type: boolean
+        panelarr.mihon.v1.SetHealthCheckResponse:
+            type: object
+            properties: {}
         panelarr.mihon.v1.Solver:
             type: object
             properties:
@@ -1380,6 +1475,57 @@ components:
                 asResponseFallback:
                     type: boolean
                     description: Use the solver's own response body when a fresh request still fails.
+        panelarr.mihon.v1.SourceCheck:
+            type: object
+            properties:
+                sourceId:
+                    type: string
+                sourceName:
+                    type: string
+                lang:
+                    type: string
+                pkgName:
+                    type: string
+                ok:
+                    type: boolean
+                steps:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/panelarr.mihon.v1.StepResult'
+                checkedAt:
+                    type: string
+                    format: date-time
+        panelarr.mihon.v1.StepResult:
+            type: object
+            properties:
+                step:
+                    enum:
+                        - CHECK_STEP_UNSPECIFIED
+                        - CHECK_STEP_POPULAR
+                        - CHECK_STEP_LATEST
+                        - CHECK_STEP_SEARCH
+                        - CHECK_STEP_DETAILS
+                        - CHECK_STEP_CHAPTERS
+                        - CHECK_STEP_PAGES
+                        - CHECK_STEP_IMAGE
+                    type: string
+                    format: enum
+                ok:
+                    type: boolean
+                skipped:
+                    type: boolean
+                    description: 'Not run: an earlier step it needs failed or found nothing, or the source can''t do it.'
+                reason:
+                    type: string
+                    description: Error reason (e.g. "SOURCE_DOWN") or gRPC code name when it failed.
+                message:
+                    type: string
+                duration:
+                    pattern: ^-?(?:0|[1-9][0-9]{0,11})(?:\.[0-9]{1,9})?s$
+                    type: string
+                detail:
+                    type: string
+                    description: What the step found, e.g. "20 series" or "image/webp, 350 KB".
         panelarr.mihon.v1.Store:
             type: object
             properties:
@@ -2003,6 +2149,39 @@ components:
                 homeUrl:
                     type: string
                     description: Web address of the source, for display.
+                health:
+                    allOf:
+                        - $ref: '#/components/schemas/panelarr.source.v1.SourceHealth'
+                    description: The result of the plugin's last check of this source, when it checks sources.
+        panelarr.source.v1.SourceHealth:
+            type: object
+            properties:
+                status:
+                    enum:
+                        - SOURCE_HEALTH_STATUS_UNSPECIFIED
+                        - SOURCE_HEALTH_STATUS_OK
+                        - SOURCE_HEALTH_STATUS_FAILING
+                    type: string
+                    format: enum
+                reason:
+                    type: string
+                    description: |-
+                        ErrorReason name without the prefix (e.g. "SOURCE_DOWN"), or "NEEDS_WEBVIEW", when
+                         failing. Empty when OK.
+                message:
+                    type: string
+                    description: Detail for humans.
+                latency:
+                    pattern: ^-?(?:0|[1-9][0-9]{0,11})(?:\.[0-9]{1,9})?s$
+                    type: string
+                    description: How long the check took.
+                checkedAt:
+                    type: string
+                    format: date-time
+                checksDisabled:
+                    type: boolean
+                    description: Scheduled checks are turned off for this source.
+            description: SourceHealth is what a plugin last saw when it checked a source itself.
         panelarr.source.v1.TextFilter:
             type: object
             properties:
