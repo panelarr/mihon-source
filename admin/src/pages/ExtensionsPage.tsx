@@ -207,22 +207,10 @@ function InstallPanel() {
       <header className="card-header">
         <h2>Install</h2>
         <div className="segmented" role="tablist">
-          <button
-            type="button"
-            role="tab"
-            aria-selected={mode === "url"}
-            className={mode === "url" ? "active" : ""}
-            onClick={() => setMode("url")}
-          >
+          <button type="button" role="tab" aria-selected={mode === "url"} onClick={() => setMode("url")}>
             From URL
           </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={mode === "upload"}
-            className={mode === "upload" ? "active" : ""}
-            onClick={() => setMode("upload")}
-          >
+          <button type="button" role="tab" aria-selected={mode === "upload"} onClick={() => setMode("upload")}>
             Upload a file
           </button>
         </div>

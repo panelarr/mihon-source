@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { getRouteApi, Link } from "@tanstack/react-router";
 import { api, unwrap } from "../../api/client";
 import type { Source } from "../../api/types";
+import { TabList, tabProps } from "../../components/Tabs";
 import { ErrorBox, Loading, Mono, PageHeader } from "../../components/ui";
 import { languageLabel } from "../../lib/format";
 import { sourceQuery } from "./queries";
@@ -65,20 +66,19 @@ export function SourcePage() {
         <p className="notice">This source needs a browser engine the service doesn't have, so most calls will fail.</p>
       ) : null}
 
-      <nav className="tabs" aria-label="Source views">
+      <TabList label="Source views">
         {tabs.map((item) => (
           <Link
             key={item.tab}
             to="/sources/$sourceId"
             params={{ sourceId }}
             search={{ tab: item.tab === "popular" ? undefined : item.tab }}
-            className={item.tab === tab ? "tab active" : "tab"}
-            aria-current={item.tab === tab ? "page" : undefined}
+            {...tabProps(item.tab === tab)}
           >
             {item.label}
           </Link>
         ))}
-      </nav>
+      </TabList>
 
       <section className="tab-panel">
         {tab === "popular" ? (

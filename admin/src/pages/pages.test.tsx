@@ -36,7 +36,7 @@ describe("sources", () => {
     const app = renderApp("/sources/1001");
     expect(await screen.findByText(/\(Example 1\)$/)).toBeInTheDocument();
     for (const tab of ["Popular", "Latest", "Search", "Settings"]) {
-      expect(screen.getByRole("link", { name: tab })).toBeInTheDocument();
+      expect(screen.getByRole("tab", { name: tab })).toBeInTheDocument();
     }
     await userEvent.click(screen.getByRole("button", { name: "Load more" }));
     expect(await screen.findByText(/\(Example 21\)$/)).toBeInTheDocument();
@@ -48,8 +48,8 @@ describe("sources", () => {
   it("hides Latest and Settings for sources without them", async () => {
     const app = renderApp("/sources/2001");
     await screen.findByRole("heading", { name: "Sample Comics" });
-    expect(screen.queryByRole("link", { name: "Latest" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: "Settings" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "Latest" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "Settings" })).not.toBeInTheDocument();
     app.dispose();
   });
 
@@ -174,8 +174,12 @@ describe("stores", () => {
     ).toBeInTheDocument();
 
     const demo = screen.getByText("Demo Reader").closest("tr") as HTMLElement;
+    expect(within(demo).getByText("Not installed")).toBeInTheDocument();
     await userEvent.click(within(demo).getByRole("button", { name: "Install" }));
-    await waitFor(() => expect(within(demo).getByText("Installed", { selector: "span.muted" })).toBeInTheDocument());
+    await waitFor(() => expect(within(demo).getByText("Installed")).toBeInTheDocument());
+    expect(within(demo).queryByRole("button", { name: "Install" })).not.toBeInTheDocument();
+    // The format is a detail of the version, not a state.
+    expect(within(demo).getByText(/lib 1\.\d/)).toBeInTheDocument();
 
     await userEvent.click(screen.getByLabelText("Updates only"));
     await waitFor(() => expect(screen.queryByText("Demo Reader")).not.toBeInTheDocument());
@@ -267,6 +271,29 @@ describe("integrations", () => {
     await userEvent.click(within(row).getByRole("button", { name: "Delete" }));
     await userEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Delete solver" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("profile via-proxy still uses solver solver-main");
+    app.dispose();
+  });
+});
+
+describe("tabs", () => {
+  const routes = [
+    ["/stores", "Stores"],
+    ["/stores?view=available", "Available extensions"],
+    ["/sources/1001", "Popular"],
+    ["/sources/1001?tab=latest", "Latest"],
+    ["/sources/1001?tab=search", "Search"],
+    ["/sources/1001?tab=settings", "Settings"],
+    ["/extensions", "From URL"],
+  ] as const;
+
+  it.each(routes)("on %s exactly one tab per tab list is selected", async (path, selected) => {
+    const app = renderApp(path);
+    const lists = await screen.findAllByRole("tablist");
+    for (const list of lists) {
+      const tabs = within(list).getAllByRole("tab");
+      expect(tabs.filter((tab) => tab.getAttribute("aria-selected") === "true")).toHaveLength(1);
+    }
+    expect(screen.getByRole("tab", { name: selected })).toHaveAttribute("aria-selected", "true");
     app.dispose();
   });
 });

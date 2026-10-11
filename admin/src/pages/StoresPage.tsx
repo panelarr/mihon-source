@@ -6,6 +6,7 @@ import { type FormEvent, type ReactNode, useMemo, useState } from "react";
 import { api, unwrap } from "../api/client";
 import type { AvailableExtension, Store } from "../api/types";
 import { ConfirmDialog } from "../components/Dialog";
+import { TabList, tabProps } from "../components/Tabs";
 import { Badge, Empty, ErrorBox, Field, Loading, Mono, PageHeader } from "../components/ui";
 import { enumLabel, formatDate, languageLabel, shortHash } from "../lib/format";
 import { ContentWarningBadge } from "./ExtensionsPage";
@@ -32,14 +33,14 @@ export function StoresPage() {
   return (
     <>
       <PageHeader title="Extension stores" />
-      <nav className="tabs" aria-label="Store views">
-        <Link to="/stores" search={{}} className={view ? "tab" : "tab active"}>
+      <TabList label="Store views">
+        <Link to="/stores" search={{}} {...tabProps(!view)}>
           Stores
         </Link>
-        <Link to="/stores" search={{ view: "available" }} className={view === "available" ? "tab active" : "tab"}>
+        <Link to="/stores" search={{ view: "available" }} {...tabProps(view === "available")}>
           Available extensions
         </Link>
-      </nav>
+      </TabList>
       <section className="tab-panel">{view === "available" ? <AvailableView /> : <StoresView />}</section>
     </>
   );
@@ -330,6 +331,31 @@ function AvailableView() {
   );
 }
 
+/** Whether the extension is installed, and how its installed version compares. */
+function AvailableState({ ext }: { ext: AvailableExtension }) {
+  if (ext.updateAvailable) {
+    return (
+      <>
+        <Badge tone="info">Update available</Badge>
+        <div className="muted small">
+          {ext.installedVersionName} → {ext.versionName}
+        </div>
+      </>
+    );
+  }
+  if (ext.installed) {
+    const other = ext.installedVersionName && ext.installedVersionName !== ext.versionName;
+    return (
+      <>
+        <Badge tone="good">Installed</Badge>
+        {other ? <div className="muted small">version {ext.installedVersionName}</div> : null}
+      </>
+    );
+  }
+  if (!ext.supported) return <Badge tone="bad">Unsupported</Badge>;
+  return <span className="muted">Not installed</span>;
+}
+
 function AvailableRow({ ext, store }: { ext: AvailableExtension; store: Store | undefined }) {
   const queryClient = useQueryClient();
   const install = useMutation({
@@ -357,7 +383,7 @@ function AvailableRow({ ext, store }: { ext: AvailableExtension; store: Store | 
         {install.isPending ? "Updating…" : "Update"}
       </button>
     );
-  else if (ext.installed) action = <span className="muted small">Installed</span>;
+  else if (ext.installed) action = null;
   else
     action = (
       <button type="button" className="small" onClick={() => install.mutate()} disabled={install.isPending}>
@@ -374,10 +400,11 @@ function AvailableRow({ ext, store }: { ext: AvailableExtension; store: Store | 
         <ErrorBox error={install.error} />
       </td>
       <td>
-        {ext.versionName} <span className="muted small">lib {ext.libVersion || "?"}</span>
-        {ext.installed && ext.installedVersionName && ext.installedVersionName !== ext.versionName ? (
-          <div className="muted small">installed {ext.installedVersionName}</div>
-        ) : null}
+        {ext.versionName}
+        <div className="muted small">
+          lib {ext.libVersion || "?"}
+          {ext.hasJar ? <span title="The store offers a jar: no APK conversion needed"> · jar</span> : " · apk"}
+        </div>
       </td>
       <td className="small">{langs.join(", ") || "—"}</td>
       <td>
@@ -387,11 +414,8 @@ function AvailableRow({ ext, store }: { ext: AvailableExtension; store: Store | 
           <span className="small">{store?.name ?? ext.storeId}</span>
         )}
       </td>
-      <td className="badges">
-        {ext.updateAvailable ? <Badge tone="info">Update</Badge> : null}
-        {ext.installed && !ext.updateAvailable ? <Badge tone="good">Installed</Badge> : null}
-        {!ext.supported ? <Badge tone="bad">Unsupported</Badge> : null}
-        {ext.hasJar ? <Badge title="The store offers a jar: no APK conversion needed">jar</Badge> : null}
+      <td>
+        <AvailableState ext={ext} />
       </td>
       <td>{action}</td>
     </tr>

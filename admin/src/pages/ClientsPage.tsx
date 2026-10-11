@@ -68,12 +68,14 @@ export function ClientsPage() {
                     <Mono>{client.id}</Mono>
                   </div>
                 </td>
-                <td className="badges">
-                  {(client.scopes ?? []).map((scope) => (
-                    <Badge key={scope} tone={scope === "admin" ? "warn" : "neutral"}>
-                      {scope}
-                    </Badge>
-                  ))}
+                <td>
+                  <div className="badges">
+                    {(client.scopes ?? []).map((scope) => (
+                      <Badge key={scope} tone={scope === "admin" ? "warn" : "neutral"}>
+                        {scope}
+                      </Badge>
+                    ))}
+                  </div>
                 </td>
                 <td>
                   <Mono>{client.keyPrefix}…</Mono>

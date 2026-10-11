@@ -58,10 +58,12 @@ export function SeriesPage() {
               <dt>Artists</dt>
               <dd>{series.data.artists?.join(", ") || "—"}</dd>
               <dt>Genres</dt>
-              <dd className="badges">
-                {series.data.genres?.length
-                  ? series.data.genres.map((genre) => <Badge key={genre}>{genre}</Badge>)
-                  : "—"}
+              <dd>
+                <div className="badges">
+                  {series.data.genres?.length
+                    ? series.data.genres.map((genre) => <Badge key={genre}>{genre}</Badge>)
+                    : "—"}
+                </div>
               </dd>
               <dt>Key</dt>
               <dd>
