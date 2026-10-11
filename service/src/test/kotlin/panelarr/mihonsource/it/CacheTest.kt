@@ -11,6 +11,7 @@ import org.junit.jupiter.api.io.TempDir
 import panelarr.mihonsource.config.AppConfig
 import panelarr.mihonsource.fixtures.FakeSite
 import panelarr.mihonsource.fixtures.TestExtensions
+import panelarr.source.v1.listChaptersRequest
 import panelarr.source.v1.listSourcesRequest
 import panelarr.source.v1.popularRequest
 import panelarr.source.v1.searchRequest
@@ -116,5 +117,30 @@ class CacheTest {
         search("one")
         search("two")
         assertEquals(listOf("one", "two"), site.requestsTo("/api/search").map { it.url.queryParameter("q") })
+    }
+
+    @Test
+    fun `refresh loads chapters fresh and updates the cached list`() {
+        val series = popular().seriesList.first().key
+
+        fun chapters(refresh: Boolean) =
+            runBlocking {
+                service.sources.listChapters(
+                    listChaptersRequest {
+                        sourceId = en
+                        seriesKey = series
+                        this.refresh = refresh
+                    },
+                )
+            }
+        val before = site.requests.size
+        chapters(refresh = false)
+        chapters(refresh = false)
+        assertEquals(1, site.requests.size - before)
+        chapters(refresh = true)
+        assertEquals(2, site.requests.size - before)
+        // The refreshed result is what later plain calls get.
+        chapters(refresh = false)
+        assertEquals(2, site.requests.size - before)
     }
 }

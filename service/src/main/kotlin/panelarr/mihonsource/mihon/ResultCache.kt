@@ -18,7 +18,8 @@ import java.util.concurrent.ConcurrentHashMap
  * share one call. Errors aren't cached. Keys are the source, the operation and a hash of
  * the request; they hold no credentials or caller identity.
  *
- * A caller can bypass it (`Cache-Control: no-cache`); the fresh result then replaces the
+ * A caller can bypass it (`Cache-Control: no-cache`, or `refresh` on requests that
+ * have it, which callers leave out of the key); the fresh result then replaces the
  * cached one. Everything for a source is dropped when its settings, network profile or
  * extension change.
  */
@@ -48,11 +49,12 @@ class ResultCache(
         operation: String,
         kind: Kind,
         request: MessageLite,
+        refresh: Boolean = false,
         load: suspend () -> T,
     ): T {
         val ttl = ttls[kind]?.takeIf { !it.isZero && !it.isNegative } ?: return load()
         val key = "$sourceId:$operation:${digest(request)}"
-        val bypass = BYPASS.get() == true
+        val bypass = refresh || BYPASS.get() == true
         if (!bypass) {
             lookup(key)?.let { cached ->
                 metrics?.cache(operation, "hit")

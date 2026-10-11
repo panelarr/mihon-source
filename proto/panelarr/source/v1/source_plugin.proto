@@ -497,6 +497,9 @@ message ResolveUrlResponse {
 message GetSeriesRequest {
   string source_id = 1;
   string key = 2;
+  // Load from the source even if the plugin has a recent result cached, e.g. to check
+  // for new chapters now. The fresh result replaces the cached one.
+  bool refresh = 3;
 }
 
 message GetSeriesResponse {
@@ -526,6 +529,9 @@ message Chapter {
 message ListChaptersRequest {
   string source_id = 1;
   string series_key = 2;
+  // Load from the source even if the plugin has a recent result cached, e.g. to check
+  // for new chapters now. The fresh result replaces the cached one.
+  bool refresh = 3;
 }
 
 message ListChaptersResponse {

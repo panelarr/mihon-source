@@ -236,7 +236,7 @@ class SourcePluginApi(
         rpc {
             require(request.key.isNotEmpty()) { "key is required" }
             val source = sources.get(request.sourceId)
-            cache.get(source.id, "series", ResultCache.Kind.DETAILS, request) {
+            cache.get(source.id, "series", ResultCache.Kind.DETAILS, request.toBuilder().clearRefresh().build(), request.refresh) {
                 val update =
                     sources.call(
                         source,
@@ -257,7 +257,7 @@ class SourcePluginApi(
         rpc {
             require(request.seriesKey.isNotEmpty()) { "series_key is required" }
             val source = sources.get(request.sourceId)
-            cache.get(source.id, "chapters", ResultCache.Kind.DETAILS, request) {
+            cache.get(source.id, "chapters", ResultCache.Kind.DETAILS, request.toBuilder().clearRefresh().build(), request.refresh) {
                 val update =
                     sources.call(
                         source,
