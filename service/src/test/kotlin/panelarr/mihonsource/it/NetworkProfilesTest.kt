@@ -361,6 +361,32 @@ class NetworkProfilesTest {
         assertEquals(1, runBlocking { service.integrations.listProfiles(listProfilesRequest {}) }.profilesCount)
     }
 
+    @Test
+    fun `an authenticated SOCKS5 proxy gets the credentials and resolves names`() {
+        val socks =
+            panelarr.mihonsource.fixtures.TestSocks5Server(
+                "sock-user",
+                "sock-pass",
+                java.net.InetSocketAddress("127.0.0.1", proxyA.server.port),
+            )
+        socks.use {
+            putProfile("s", "socks5://127.0.0.1:${socks.port}", username = "sock-user", password = "sock-pass")
+            assign(en, "s")
+            popular(en)
+            // The host name reached the proxy unresolved, and the request reached the site.
+            assertEquals(listOf("catalog.test"), socks.requestedHosts.distinct())
+            assertEquals("catalog.test", proxyA.requests.single().headers["Host"])
+
+            putProfile("s", "socks5://127.0.0.1:${socks.port}", username = "sock-user", password = "wrong")
+            val error = kotlin.test.assertFailsWith<io.grpc.StatusException> { popular(en) }
+            assertEquals(io.grpc.Status.Code.UNAVAILABLE, error.status.code)
+            assertTrue(socks.rejectedLogins.isNotEmpty())
+        }
+        // Nothing JVM-wide was set for this.
+        assertNull(java.net.Authenticator.getDefault())
+        listOf("socksProxyHost", "java.net.socks.username").forEach { assertNull(System.getProperty(it), it) }
+    }
+
     private companion object {
         const val SOLVE_MILLIS = 500L
     }

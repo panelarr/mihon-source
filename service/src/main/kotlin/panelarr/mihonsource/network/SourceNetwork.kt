@@ -102,6 +102,9 @@ class SourceNetwork(
             .connectionPool(pool)
             .proxySelector(ProfileProxySelector())
             .proxyAuthenticator(ProxyAuth())
+            // Authenticated SOCKS5 is done by our own sockets (see Socks5), the rest by OkHttp.
+            .socketFactory(Socks5.SocketFactory { profile().proxy })
+            .dns(Socks5.ProxyDns { profile().proxy })
             .cookieJar(cookieJar)
             .addInterceptor(UncaughtExceptionInterceptor())
             .addInterceptor(TimeoutInterceptor())
@@ -292,6 +295,8 @@ class SourceNetwork(
     private inner class ProfileProxySelector : ProxySelector() {
         override fun select(uri: URI?): List<java.net.Proxy> {
             val proxy = profile().proxy ?: return listOf(java.net.Proxy.NO_PROXY)
+            // Our sockets tunnel through an authenticated SOCKS5 proxy themselves.
+            if (Socks5.handles(proxy)) return listOf(java.net.Proxy.NO_PROXY)
             return listOf(java.net.Proxy(proxy.type, InetSocketAddress.createUnresolved(proxy.host, proxy.port)))
         }
 
