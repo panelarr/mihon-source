@@ -9,6 +9,16 @@ plugins {
 
 dependencies {
     implementation(libs.serialization.json)
+    // Dispatchers.Main on a plain JVM (MainDispatcherFactory service).
+    implementation(libs.coroutines.core)
+    // android.text.Html parses with jsoup.
+    implementation(libs.jsoup)
+    // BitmapFactory: WebP decoding, and CMYK/odd JPEGs the JDK decoder rejects.
+    implementation(libs.twelvemonkeys.webp)
+    implementation(libs.twelvemonkeys.jpeg)
+    // QuickJs and Duktape run on GraalJS. Nothing starts until a script engine is created.
+    implementation(libs.graalvm.polyglot)
+    implementation(libs.graalvm.js)
 }
 
 tasks.withType<JavaCompile>().configureEach {
