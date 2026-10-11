@@ -14,9 +14,21 @@ dependencyResolutionManagement {
     repositoriesMode = RepositoriesMode.FAIL_ON_PROJECT_REPOS
     repositories {
         mavenCentral()
+        // Node.js for the admin SPA (admin/), downloaded by the node-gradle plugin.
+        exclusiveContent {
+            forRepository {
+                ivy {
+                    name = "Node.js"
+                    setUrl("https://nodejs.org/dist/")
+                    patternLayout { artifact("v[revision]/[artifact](-v[revision]-[classifier]).[ext]") }
+                    metadataSources { artifact() }
+                }
+            }
+            filter { includeModule("org.nodejs", "node") }
+        }
     }
 }
 
 rootProject.name = "mihon-source"
 
-include(":api", ":service")
+include(":api", ":service", ":admin")
