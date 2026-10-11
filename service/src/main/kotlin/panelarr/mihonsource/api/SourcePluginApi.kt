@@ -20,6 +20,7 @@ import panelarr.mihonsource.mihon.MihonSource
 import panelarr.mihonsource.mihon.MihonSources
 import panelarr.mihonsource.mihon.SourceErrors
 import panelarr.mihonsource.mihon.SourceSettings
+import panelarr.mihonsource.mihon.UrlMatch
 import panelarr.mihonsource.network.PushedProfiles
 import panelarr.source.v1.CommonService
 import panelarr.source.v1.FetchImageRequest
@@ -168,22 +169,58 @@ class SourcePluginApi(
     override suspend fun resolveUrl(request: ResolveUrlRequest): ResolveUrlResponse =
         rpc {
             val url = request.url.trim()
-            require(url.toHttpUrlOrNull() != null) { "url must be an absolute http(s) URL" }
+            val parsed = url.toHttpUrlOrNull() ?: throw IllegalArgumentException("url must be an absolute http(s) URL")
             val candidates =
-                if (request.sourceId.isNotEmpty()) listOf(sources.get(request.sourceId)) else sources.all().filter { it.resolvable }
-            for (source in candidates) {
-                val resolvable = source.source as? ResolvableSource ?: continue
-                val manga =
-                    sources.call(source, "resolve_url") {
-                        if (resolvable.getUriType(url) == UriType.Manga) resolvable.getManga(url) else null
-                    } ?: continue
-                return@rpc resolveUrlResponse {
-                    sourceId = source.id.toString()
-                    series = Mapping.withUrl(Mapping.series(manga), webUrl(source) { http -> http.getMangaUrl(manga) })
+                if (request.sourceId.isNotEmpty()) {
+                    listOf(sources.get(request.sourceId))
+                } else {
+                    sources.all().filter { it.resolvable || UrlMatch.sameSite(it.homeUrl, parsed) }
                 }
+            for (source in candidates) {
+                val resolved =
+                    if (source.resolvable) native(source, url) else bySearch(source, url)
+                if (resolved != null) return@rpc resolved
             }
             throw SourceErrors.notFound("no source recognizes this URL")
         }
+
+    /** The source's own resolver. */
+    private suspend fun native(
+        source: MihonSource,
+        url: String,
+    ): ResolveUrlResponse? {
+        val resolvable = source.source as ResolvableSource
+        val manga =
+            sources.call(source, "resolve_url") { if (resolvable.getUriType(url) == UriType.Manga) resolvable.getManga(url) else null }
+                ?: return null
+        return resolveUrlResponse {
+            sourceId = source.id.toString()
+            series = Mapping.withUrl(Mapping.series(manga), webUrl(source) { http -> http.getMangaUrl(manga) })
+        }
+    }
+
+    /**
+     * Best effort for sources without a resolver: many extensions accept a pasted URL as a
+     * search query. A result counts when its web URL is the given one, or when it's the
+     * only result.
+     */
+    private suspend fun bySearch(
+        source: MihonSource,
+        url: String,
+    ): ResolveUrlResponse? {
+        val page =
+            runCatching { sources.call(source, "resolve_url") { it.source.getSearchManga(1, url, it.source.getFilterList()) } }
+                .getOrNull() ?: return null
+        val match =
+            page.mangas.firstOrNull { manga -> webUrl(source) { http -> http.getMangaUrl(manga) }?.let { UrlMatch.same(it, url) } == true }
+                ?: page.mangas.singleOrNull()
+                ?: return null
+        return resolveUrlResponse {
+            sourceId = source.id.toString()
+            series = Mapping.withUrl(Mapping.series(match), webUrl(source) { http -> http.getMangaUrl(match) })
+            bestEffort = true
+        }
+    }
 
     override suspend fun getSeries(request: GetSeriesRequest): GetSeriesResponse =
         rpc {

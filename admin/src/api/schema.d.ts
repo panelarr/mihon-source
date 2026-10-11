@@ -459,7 +459,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description ResolveUrl turns a web URL into a series. Needs the RESOLVE_URL capability. */
+        /**
+         * @description ResolveUrl turns a web URL into a series. Sources with the RESOLVE_URL capability do
+         *      it themselves; a plugin may also try others and mark the answer best_effort.
+         */
         post: operations["SourcePluginService_ResolveUrl"];
         delete?: never;
         options?: never;
@@ -1298,12 +1301,17 @@ export interface components {
         };
         "panelarr.source.v1.ResolveUrlRequest": {
             url?: string;
-            /** @description Source to ask. Empty means every source that has the RESOLVE_URL capability. */
+            /** @description Source to ask. Empty means every source that may know the URL. */
             sourceId?: string;
         };
         "panelarr.source.v1.ResolveUrlResponse": {
             sourceId?: string;
             series?: components["schemas"]["panelarr.source.v1.Series"];
+            /**
+             * @description The source has no URL resolver of its own and the plugin found the series another
+             *      way (e.g. by searching for the URL). The match may be wrong.
+             */
+            bestEffort?: boolean;
         };
         "panelarr.source.v1.SearchRequest": {
             sourceId?: string;

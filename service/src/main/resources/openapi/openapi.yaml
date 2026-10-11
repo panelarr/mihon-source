@@ -611,7 +611,9 @@ paths:
         post:
             tags:
                 - SourcePluginService
-            description: ResolveUrl turns a web URL into a series. Needs the RESOLVE_URL capability.
+            description: |-
+                ResolveUrl turns a web URL into a series. Sources with the RESOLVE_URL capability do
+                 it themselves; a plugin may also try others and mark the answer best_effort.
             operationId: SourcePluginService_ResolveUrl
             requestBody:
                 content:
@@ -1943,7 +1945,7 @@ components:
                     type: string
                 sourceId:
                     type: string
-                    description: Source to ask. Empty means every source that has the RESOLVE_URL capability.
+                    description: Source to ask. Empty means every source that may know the URL.
         panelarr.source.v1.ResolveUrlResponse:
             type: object
             properties:
@@ -1951,6 +1953,11 @@ components:
                     type: string
                 series:
                     $ref: '#/components/schemas/panelarr.source.v1.Series'
+                bestEffort:
+                    type: boolean
+                    description: |-
+                        The source has no URL resolver of its own and the plugin found the series another
+                         way (e.g. by searching for the URL). The match may be wrong.
         panelarr.source.v1.SearchRequest:
             type: object
             properties:

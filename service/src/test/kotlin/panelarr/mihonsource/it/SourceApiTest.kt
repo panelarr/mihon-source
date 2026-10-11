@@ -35,6 +35,7 @@ import panelarr.source.v1.listChaptersRequest
 import panelarr.source.v1.listPagesRequest
 import panelarr.source.v1.listSourcesRequest
 import panelarr.source.v1.popularRequest
+import panelarr.source.v1.resolveUrlRequest
 import panelarr.source.v1.searchRequest
 import panelarr.source.v1.setSettingsRequest
 import panelarr.source.v1.sortSelection
@@ -274,6 +275,20 @@ class SourceApiTest {
         assertEquals(200, http.statusCode())
         assertEquals("image/png", http.headers().firstValue("content-type").get())
         assertContentEquals(FakeSite.IMAGE_BYTES + "/images/0.png".toByteArray(), http.body())
+    }
+
+    @Test
+    fun `pasted URLs resolve through search, as best effort`() {
+        // The test sources have no resolver; their search accepts a URL, and their series
+        // URLs look like <base>/series/<key>.
+        val resolved =
+            runBlocking { api.resolveUrl(resolveUrlRequest { url = site.baseUrl + "/series/search-en-1-1/" }) }
+        assertEquals(en, resolved.sourceId)
+        assertEquals("search-en-1-1", resolved.series.key)
+        assertTrue(resolved.bestEffort)
+
+        val http = service.send("POST", "/v1/resolve-url", "{\"url\": \"https://unrelated.example.org/series/x\"}")
+        assertEquals(404, http.statusCode())
     }
 
     @Test
