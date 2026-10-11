@@ -9,13 +9,9 @@ The v0 plan, in slices. Each slice works end to end, has tests and ends with `ma
 - [x] **5. Source API:** popular/latest/search with filters, series, chapters, pages, images, settings.
 - [x] **6. Per-source networking and integrations:** OkHttp per source from network profiles, solvers, cookies, rate limits.
 - [x] **7. Extension stores:** add, refresh, list available, install and update, signing-key pinning.
-- [ ] **8. Admin SPA:** React + TanStack admin served at `/`.
+- [x] **8. Admin SPA:** React + TanStack admin served at `/`.
 - [ ] **9. Image and docs:** multi-arch Docker image, quick start, configuration and API docs.
 
-Slices 3–7 are working and tested (54 service tests) on `feat/extension-loader`, not yet merged into `main`. Slice 8: the SPA is merged into `main`, and serving it at `/` with a CSP is on `feat/extension-loader`.
+Slices 3–7 are merged into `main` (one squash commit). Slice 8: the admin UI is merged and served at `/` with a strict CSP.
 
-**Next:**
-- Merge the remaining Android shims from `feat/android-compat-shims` (graphics, webkit, os, JS engines).
-- Finish `docs/architecture.md` and add `docs/extensions.md`.
-- Squash-merge `feat/extension-loader` into `main`.
-- Slice 9: Docker image and quick start.
+**Next:** slice 9, the multi-arch Docker image (`make docker`) and the quick start with it.
