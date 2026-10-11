@@ -26,4 +26,4 @@ A source's settings come from its preference screen and are stored like on Andro
 - **WebView:** there's no browser engine. Sources that drive a WebView report the `needs_webview` capability and most of their calls fail.
 - **JavaScript:** QuickJS and Duktape are emulated on GraalJS, started on first use. Scripts get no host access and a 30-second limit per evaluation.
 - **Images:** WebP is decoded but not encoded. Extensions that re-encode images as WebP get JPEG or PNG instead.
-- **Untrusted code:** extensions run inside the service's JVM. Their classloader hides the service's own classes, but it's not a sandbox. Install only extensions you trust, verify fingerprints, and run the service in its own container.
+- **Untrusted code:** extensions run inside the service's JVM. Their classloader hides the service's own classes, but it's not a sandbox. Install only extensions you trust, verify fingerprints, and run the service in its own hardened container ([deployment](deployment.md)).

@@ -1,6 +1,6 @@
 # Configuration
 
-mihon-source reads a few environment variables at start. Everything else (extensions, stores, network profiles, API clients) is managed through the API or the admin UI, and kept as files in the data directory.
+mihon-source reads a few environment variables at start. Each one can also be given as a file: `NAME_FILE` holds the path of a file with the value (for Docker secrets), used when `NAME` itself isn't set. Everything else (extensions, stores, network profiles, API clients) is managed through the API or the admin UI, and kept as files in the data directory.
 
 | Variable | Default | Meaning |
 |---|---|---|

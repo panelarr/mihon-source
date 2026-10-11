@@ -29,7 +29,15 @@ data class AppConfig(
         private const val MB = 1024L * 1024
 
         fun fromEnv(env: Map<String, String> = System.getenv()): AppConfig {
-            fun value(name: String): String? = env[name]?.trim()?.takeIf { it.isNotEmpty() }
+            // NAME_FILE (a path, e.g. a Docker secret) is read when NAME itself isn't set.
+            fun value(name: String): String? =
+                env[name]?.trim()?.takeIf { it.isNotEmpty() }
+                    ?: env["${name}_FILE"]?.trim()?.takeIf { it.isNotEmpty() }?.let { file ->
+                        java.nio.file.Files
+                            .readString(Path.of(file))
+                            .trim()
+                            .takeIf { it.isNotEmpty() }
+                    }
 
             fun number(name: String): Long? = value(name)?.let { raw -> raw.toLongOrNull() ?: error("$name must be a number, got '$raw'") }
 

@@ -1,0 +1,43 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# An example deployment of mihon-source with an optional challenge solver, hardened as
+# described in docs/deployment.md. Copy it, adjust it, and start it with
+#   docker compose -f compose.example.yaml up -d
+
+services:
+  mihon-source:
+    image: panelarr/mihon-source:latest
+    restart: unless-stopped
+    ports:
+      - "8902:8902"            # API and admin UI. Put a TLS reverse proxy in front for remote access.
+    environment:
+      MIHON_ADMIN_TOKEN_FILE: /run/secrets/mihon_admin_token
+      MIHON_LOG_FORMAT: json
+      # MIHON_METRICS_PORT: "9902"   # unauthenticated /metrics, keep it on an internal network
+    secrets:
+      - mihon_admin_token
+    volumes:
+      - mihon-data:/data
+    # Hardening: nothing but /data and a small /tmp is writable, no extra privileges.
+    read_only: true
+    tmpfs:
+      - /tmp:rw,size=64m
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 1g
+    pids_limit: 512
+
+  # Optional: a FlareSolverr-compatible solver. It needs internet access, but its port is
+  # not published, so only containers on this network reach it. Add it in the admin UI
+  # (Integrations) as http://flaresolverr:8191.
+  flaresolverr:
+    image: ghcr.io/flaresolverr/flaresolverr:latest
+    restart: unless-stopped
+
+secrets:
+  mihon_admin_token:
+    file: ./mihon_admin_token.txt   # one line, a long random string
+
+volumes:
+  mihon-data:

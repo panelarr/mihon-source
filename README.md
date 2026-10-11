@@ -39,6 +39,7 @@ Notes:
 - All state is in `/data`. The image runs as user 10001. With a bind mount instead of a named volume, make the directory writable for that user, or run with `--user "$(id -u):$(id -g)"`.
 - Set `MIHON_ADMIN_TOKEN` to choose the admin token yourself.
 - The image has no browser engine, so sources that need a WebView don't work.
+- Extensions are untrusted code that runs inside the service. See [docs/deployment.md](docs/deployment.md) for a hardened setup (read-only container, no capabilities, secrets, VPNs) and [compose.example.yaml](compose.example.yaml).
 
 ### From source
 
