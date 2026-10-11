@@ -2,6 +2,7 @@
 
 package panelarr.mihonsource.http
 
+import com.linecorp.armeria.common.AggregatedHttpResponse
 import com.linecorp.armeria.common.HttpHeaderNames
 import com.linecorp.armeria.common.HttpMethod
 import com.linecorp.armeria.common.HttpRequest
@@ -13,11 +14,17 @@ import com.linecorp.armeria.server.Server
 import com.linecorp.armeria.server.ServiceRequestContext
 import com.linecorp.armeria.server.file.FileService
 import com.linecorp.armeria.server.grpc.GrpcService
+import com.linecorp.armeria.server.grpc.HttpJsonTranscodingOptions
+import com.linecorp.armeria.server.grpc.HttpJsonTranscodingQueryParamMatchRule
+import com.linecorp.armeria.server.grpc.UnframedGrpcErrorHandler
 import com.linecorp.armeria.server.logging.AccessLogWriter
 import io.grpc.BindableService
+import io.grpc.Metadata
 import io.grpc.ServerInterceptor
+import io.grpc.Status
 import panelarr.mihonsource.BuildInfo
 import java.net.InetSocketAddress
+import java.util.Base64
 import java.util.concurrent.CompletableFuture
 
 /**
@@ -26,13 +33,20 @@ import java.util.concurrent.CompletableFuture
  * without touching them.
  *
  * Serves every service over gRPC (also gRPC-Web) and over HTTP/JSON transcoded from
- * the `google.api.http` annotations, plus the OpenAPI document and Swagger UI.
+ * the `google.api.http` annotations, plus the OpenAPI document, Swagger UI, a few plain
+ * HTTP routes and the admin SPA at `/`.
  */
 class ApiServer(
     private val host: String,
     private val port: Int,
     private val services: List<BindableService>,
     private val interceptors: List<ServerInterceptor>,
+    /** Plain HTTP routes (path pattern to service, auth already applied). */
+    private val routes: Map<String, HttpService> = emptyMap(),
+    /** Largest request body accepted, in bytes. Uploads need more than Armeria's default. */
+    private val maxRequestLength: Long = DEFAULT_MAX_REQUEST_LENGTH,
+    /** The admin SPA's files, or null when it isn't bundled. */
+    private val spa: SpaFiles? = null,
 ) {
     private var server: Server? = null
 
@@ -42,18 +56,32 @@ class ApiServer(
                 .builder()
                 .addServices(services)
                 .intercept(interceptors)
-                .enableHttpJsonTranscoding(true)
-                .build()
+                .enableHttpJsonTranscoding(
+                    HttpJsonTranscodingOptions
+                        .builder()
+                        // Query parameters use the lowerCamelCase names of the OpenAPI document. (Armeria
+                        // matches only one rule when several are set, so snake_case isn't accepted too.)
+                        .queryParamMatchRules(HttpJsonTranscodingQueryParamMatchRule.LOWER_CAMEL_CASE)
+                        .errorHandler(ProblemErrorHandler)
+                        .build(),
+                ).build()
 
-        val built =
+        val builder =
             Server
                 .builder()
                 .http(InetSocketAddress(host, port))
+                .maxRequestLength(maxRequestLength)
+                .requestTimeoutMillis(REQUEST_TIMEOUT_MILLIS)
+        routes.forEach { (path, service) -> builder.service(path, service) }
+        val built =
+            builder
                 .service(grpc)
                 .service("/openapi.yaml", openApiDocument())
                 .service("/docs") { _, _ -> HttpResponse.ofRedirect(HttpStatus.MOVED_PERMANENTLY, "/docs/") }
                 .service("/docs/swagger-initializer.js", swaggerInitializer())
                 .serviceUnder("/docs/", swaggerUi())
+                .serviceUnder("/v1/", NotFound)
+                .serviceUnder("/", spa?.service() ?: NotFound)
                 .decorator(SecurityHeaders::decorate)
                 .decorator(JsonByDefault::decorate)
                 .accessLogWriter(AccessLogWriter.common(), true)
@@ -92,6 +120,36 @@ class ApiServer(
         return HttpService { _, _ ->
             HttpResponse.of(HttpStatus.OK, MediaType.JAVASCRIPT_UTF_8, script)
         }
+    }
+
+    /** Unknown API paths answer with a problem document rather than a plain-text 404. */
+    private object NotFound : HttpService {
+        override fun serve(
+            ctx: ServiceRequestContext,
+            req: HttpRequest,
+        ): HttpResponse = Problems.response(Status.NOT_FOUND.withDescription("no such endpoint: ${ctx.path()}"), null, null)
+    }
+
+    /** Errors of transcoded (HTTP/JSON) calls as problem+json, with the ErrorInfo reason. */
+    private object ProblemErrorHandler : UnframedGrpcErrorHandler {
+        override fun handle(
+            ctx: ServiceRequestContext,
+            status: Status,
+            response: AggregatedHttpResponse,
+        ): HttpResponse {
+            val trailers = Metadata()
+            val raw = response.trailers().get(DETAILS) ?: response.headers().get(DETAILS)
+            if (raw != null) {
+                runCatching { Base64.getDecoder().decode(raw.padEnd((raw.length + BASE64_BLOCK - 1) / BASE64_BLOCK * BASE64_BLOCK, '=')) }
+                    .getOrNull()
+                    ?.let { trailers.put(DETAILS_KEY, it) }
+            }
+            return Problems.fromStatus(status, trailers)
+        }
+
+        private const val BASE64_BLOCK = 4
+        private const val DETAILS = "grpc-status-details-bin"
+        private val DETAILS_KEY: Metadata.Key<ByteArray> = Metadata.Key.of(DETAILS, Metadata.BINARY_BYTE_MARSHALLER)
     }
 
     /**
@@ -133,7 +191,15 @@ class ApiServer(
         ): HttpResponse {
             ctx.addAdditionalResponseHeader(HttpHeaderNames.X_CONTENT_TYPE_OPTIONS, "nosniff")
             ctx.addAdditionalResponseHeader(HttpHeaderNames.REFERRER_POLICY, "no-referrer")
+            ctx.addAdditionalResponseHeader(HttpHeaderNames.X_FRAME_OPTIONS, "DENY")
             return delegate.serve(ctx, req)
         }
+    }
+
+    companion object {
+        const val DEFAULT_MAX_REQUEST_LENGTH: Long = 10L * 1024 * 1024
+
+        /** Source calls can be slow (solvers, rate limits); they have their own timeout. */
+        private const val REQUEST_TIMEOUT_MILLIS = 5L * 60 * 1000
     }
 }

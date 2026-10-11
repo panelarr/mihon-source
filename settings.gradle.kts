@@ -16,6 +16,13 @@ dependencyResolutionManagement {
     repositoriesMode = RepositoriesMode.FAIL_ON_PROJECT_REPOS
     repositories {
         mavenCentral()
+        // Android build tools (apksig for APK signatures, D8 for test fixtures) live only here.
+        google {
+            content {
+                includeGroup("com.android.tools.build")
+                includeGroup("com.android.tools")
+            }
+        }
         // Node.js for the admin SPA (admin/), downloaded by the node-gradle plugin.
         exclusiveContent {
             forRepository {
@@ -33,4 +40,5 @@ dependencyResolutionManagement {
 
 rootProject.name = "mihon-source"
 
-include(":api", ":service", ":admin")
+include(":api", ":android-compat", ":extension-api", ":service", ":admin")
+include(":test-extensions:lib14", ":test-extensions:lib16")

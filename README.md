@@ -1,6 +1,6 @@
 # mihon-source
 
-> **Status: early development.** Nothing here works yet. See [PROGRESS.md](PROGRESS.md).
+> **Status: early development.** The service works end to end; the Docker image is next. See [PROGRESS.md](PROGRESS.md).
 
 mihon-source is a small, self-hosted service that runs [Mihon](https://mihon.app) extensions on a plain JVM and serves their sources over a typed API. It is part of the Panelarr project, but it runs fine on its own.
 
@@ -30,7 +30,7 @@ curl -H "Authorization: Bearer $ADMIN" -X POST localhost:8902/v1/admin/clients \
 curl -H "Authorization: Bearer $KEY" localhost:8902/v1/sources
 ```
 
-API docs are at `http://localhost:8902/docs/` (OpenAPI document at `/openapi.yaml`). See [docs/api.md](docs/api.md) and [docs/configuration.md](docs/configuration.md).
+The admin UI is at `http://localhost:8902/` (sign in with the admin token). API docs are at `http://localhost:8902/docs/` (OpenAPI document at `/openapi.yaml`). See [docs/api.md](docs/api.md), [docs/extensions.md](docs/extensions.md) and [docs/configuration.md](docs/configuration.md).
 
 ## Development
 

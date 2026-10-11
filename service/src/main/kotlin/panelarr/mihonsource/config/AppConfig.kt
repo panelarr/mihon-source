@@ -14,19 +14,32 @@ data class AppConfig(
     val port: Int,
     /** Admin token from the environment. Null means use (or generate) the stored one. */
     val adminToken: String?,
+    /** Largest extension file accepted (download or upload), in bytes. */
+    val maxExtensionBytes: Long = DEFAULT_MAX_EXTENSION_MB * MB,
+    /** Base64 AES-256 key for secrets at rest. Null means use (or generate) `secret.key`. */
+    val secretKey: String? = null,
+    /** Directory with a built admin SPA, overriding the one bundled in the jar (development). */
+    val adminDir: Path? = null,
 ) {
     companion object {
         const val DEFAULT_PORT = 8902
+        const val DEFAULT_MAX_EXTENSION_MB = 50L
+        private const val MB = 1024L * 1024
 
         fun fromEnv(env: Map<String, String> = System.getenv()): AppConfig {
             fun value(name: String): String? = env[name]?.trim()?.takeIf { it.isNotEmpty() }
 
-            val port = value("MIHON_PORT")?.let { raw -> raw.toIntOrNull() ?: error("MIHON_PORT must be a number, got '$raw'") }
+            fun number(name: String): Long? = value(name)?.let { raw -> raw.toLongOrNull() ?: error("$name must be a number, got '$raw'") }
+
+            val port = number("MIHON_PORT")?.toInt()
             return AppConfig(
                 dataDir = Path.of(value("MIHON_DATA_DIR") ?: "/data").toAbsolutePath().normalize(),
                 host = value("MIHON_HOST") ?: "0.0.0.0",
                 port = port ?: DEFAULT_PORT,
                 adminToken = value("MIHON_ADMIN_TOKEN"),
+                maxExtensionBytes = (number("MIHON_MAX_EXTENSION_MB") ?: DEFAULT_MAX_EXTENSION_MB) * MB,
+                secretKey = value("MIHON_SECRET_KEY"),
+                adminDir = value("MIHON_ADMIN_DIR")?.let(Path::of),
             )
         }
     }

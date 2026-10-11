@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- A test extension for mihon-source's own tests. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="panelarr.testext.lib14"
+    android:versionCode="104003"
+    android:versionName="1.4.3">
+    <uses-feature android:name="tachiyomi.extension" />
+    <application android:label="Tachiyomi: Lib14 Test">
+        <meta-data android:name="tachiyomi.extension.class" android:value="panelarr.testext.lib14.Lib14Source" />
+        <meta-data android:name="tachiyomi.extension.nsfw" android:value="1" />
+    </application>
+</manifest>
