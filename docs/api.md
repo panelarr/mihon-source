@@ -99,6 +99,7 @@ curl -H "Authorization: Bearer $KEY" "localhost:8902/v1/sources/$SOURCE/pages?ch
 - **Keys** (series keys, chapter keys, page refs) are opaque: store them and pass them back unchanged.
 - **Filters** have no stable names, so a `FilterValue` addresses a filter by its position in `GetFilters`: `[index]`, or `[group index, child index]` inside a group. Filters you don't send keep their defaults.
 - **Settings** come as a JSON Schema (`GET .../settings/schema`). The display order is in `x-order`. Choices use `enum` with labels in `x-enumNames`. Change values with `PATCH .../settings`; only the keys you send change, and a source may refuse a value.
+- **Caching:** results are kept for a short time, so repeating a call doesn't hit the site again: lists (popular, latest, search) for 5 minutes, series and chapters for 10, pages for 30, filters for an hour. Identical calls made at the same time share one site request. Errors and images are never cached. Send `Cache-Control: no-cache` (an HTTP header or gRPC metadata) to fetch fresh; the fresh result replaces the cached one. Changing a source's settings or network profile, or reinstalling, updating or removing its extension, drops its cached results. Lifetimes and the size limit are in [configuration](configuration.md).
 
 ## Checking sources
 

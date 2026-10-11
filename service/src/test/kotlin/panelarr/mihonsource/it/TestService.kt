@@ -25,6 +25,8 @@ class TestService(
     metricsPort: Int? = null,
     healthCheckInterval: java.time.Duration? = null,
     storeRefreshInterval: java.time.Duration = java.time.Duration.ZERO,
+    /** Tests see fresh results unless they test caching. */
+    cacheTtls: Map<String, java.time.Duration> = AppConfig.DEFAULT_CACHE_TTLS.mapValues { java.time.Duration.ZERO },
 ) : AutoCloseable {
     val app =
         Application(
@@ -36,6 +38,7 @@ class TestService(
                 metricsPort = metricsPort,
                 healthCheckInterval = healthCheckInterval,
                 storeRefreshInterval = storeRefreshInterval,
+                cacheTtls = cacheTtls,
             ),
         )
     val base = "http://127.0.0.1:${app.start()}"

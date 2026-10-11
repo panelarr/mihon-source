@@ -18,6 +18,7 @@ import panelarr.mihonsource.mihon.FilterMapping
 import panelarr.mihonsource.mihon.Mapping
 import panelarr.mihonsource.mihon.MihonSource
 import panelarr.mihonsource.mihon.MihonSources
+import panelarr.mihonsource.mihon.ResultCache
 import panelarr.mihonsource.mihon.SourceErrors
 import panelarr.mihonsource.mihon.SourceSettings
 import panelarr.mihonsource.mihon.UrlMatch
@@ -86,6 +87,7 @@ import panelarr.source.v1.setSettingsResponse
 class SourcePluginApi(
     private val sources: MihonSources,
     private val pushed: PushedProfiles,
+    private val cache: ResultCache = ResultCache(emptyMap(), 0),
     /** Number of installed extensions that failed to load, for Health. */
     private val failedExtensions: () -> Int = { 0 },
 ) : SourcePluginServiceGrpcKt.SourcePluginServiceCoroutineImplBase() {
@@ -127,17 +129,21 @@ class SourcePluginApi(
     override suspend fun getFilters(request: GetFiltersRequest): GetFiltersResponse =
         rpc {
             val source = sources.get(request.sourceId)
-            val list = sources.call(source, "filters") { it.source.getFilterList() }
-            getFiltersResponse { filters += FilterMapping.filters(list) }
+            cache.get(source.id, "filters", ResultCache.Kind.FILTERS, request) {
+                val list = sources.call(source, "filters") { it.source.getFilterList() }
+                getFiltersResponse { filters += FilterMapping.filters(list) }
+            }
         }
 
     override suspend fun popular(request: PopularRequest): PopularResponse =
         rpc {
             val source = sources.get(request.sourceId)
-            val page = sources.call(source, "popular") { it.source.getPopularManga(pageNumber(request.page)) }
-            popularResponse {
-                series += seriesList(page)
-                hasNextPage = page.hasNextPage
+            cache.get(source.id, "popular", ResultCache.Kind.LIST, request) {
+                val page = sources.call(source, "popular") { it.source.getPopularManga(pageNumber(request.page)) }
+                popularResponse {
+                    series += seriesList(page)
+                    hasNextPage = page.hasNextPage
+                }
             }
         }
 
@@ -145,24 +151,28 @@ class SourcePluginApi(
         rpc {
             val source = sources.get(request.sourceId)
             if (!source.supportsLatest) throw SourceErrors.unsupported("this source has no latest list")
-            val page = sources.call(source, "latest") { it.source.getLatestUpdates(pageNumber(request.page)) }
-            latestResponse {
-                series += seriesList(page)
-                hasNextPage = page.hasNextPage
+            cache.get(source.id, "latest", ResultCache.Kind.LIST, request) {
+                val page = sources.call(source, "latest") { it.source.getLatestUpdates(pageNumber(request.page)) }
+                latestResponse {
+                    series += seriesList(page)
+                    hasNextPage = page.hasNextPage
+                }
             }
         }
 
     override suspend fun search(request: SearchRequest): SearchResponse =
         rpc {
             val source = sources.get(request.sourceId)
-            val page =
-                sources.call(source, "search") {
-                    val filters = FilterMapping.applyFilters(it.source.getFilterList(), request.filtersList)
-                    it.source.getSearchManga(pageNumber(request.page), request.query, filters)
+            cache.get(source.id, "search", ResultCache.Kind.LIST, request) {
+                val page =
+                    sources.call(source, "search") {
+                        val filters = FilterMapping.applyFilters(it.source.getFilterList(), request.filtersList)
+                        it.source.getSearchManga(pageNumber(request.page), request.query, filters)
+                    }
+                searchResponse {
+                    series += seriesList(page)
+                    hasNextPage = page.hasNextPage
                 }
-            searchResponse {
-                series += seriesList(page)
-                hasNextPage = page.hasNextPage
             }
         }
 
@@ -226,18 +236,20 @@ class SourcePluginApi(
         rpc {
             require(request.key.isNotEmpty()) { "key is required" }
             val source = sources.get(request.sourceId)
-            val update =
-                sources.call(
-                    source,
-                    "series",
-                ) { it.source.getMangaUpdate(Mapping.mangaFor(request.key), emptyList(), true, false) }
-            val manga = update.manga
-            getSeriesResponse {
-                series =
-                    Mapping.withUrl(
-                        Mapping.series(manga, key = request.key, detailsLoaded = true),
-                        webUrl(source) { http -> http.getMangaUrl(Mapping.mangaFor(request.key)) },
-                    )
+            cache.get(source.id, "series", ResultCache.Kind.DETAILS, request) {
+                val update =
+                    sources.call(
+                        source,
+                        "series",
+                    ) { it.source.getMangaUpdate(Mapping.mangaFor(request.key), emptyList(), true, false) }
+                val manga = update.manga
+                getSeriesResponse {
+                    series =
+                        Mapping.withUrl(
+                            Mapping.series(manga, key = request.key, detailsLoaded = true),
+                            webUrl(source) { http -> http.getMangaUrl(Mapping.mangaFor(request.key)) },
+                        )
+                }
             }
         }
 
@@ -245,14 +257,16 @@ class SourcePluginApi(
         rpc {
             require(request.seriesKey.isNotEmpty()) { "series_key is required" }
             val source = sources.get(request.sourceId)
-            val update =
-                sources.call(
-                    source,
-                    "chapters",
-                ) { it.source.getMangaUpdate(Mapping.mangaFor(request.seriesKey), emptyList(), false, true) }
-            listChaptersResponse {
-                chapters +=
-                    update.chapters.map { chapter -> Mapping.chapter(chapter, webUrl(source) { http -> http.getChapterUrl(chapter) }) }
+            cache.get(source.id, "chapters", ResultCache.Kind.DETAILS, request) {
+                val update =
+                    sources.call(
+                        source,
+                        "chapters",
+                    ) { it.source.getMangaUpdate(Mapping.mangaFor(request.seriesKey), emptyList(), false, true) }
+                listChaptersResponse {
+                    chapters +=
+                        update.chapters.map { chapter -> Mapping.chapter(chapter, webUrl(source) { http -> http.getChapterUrl(chapter) }) }
+                }
             }
         }
 
@@ -260,8 +274,10 @@ class SourcePluginApi(
         rpc {
             require(request.chapterKey.isNotEmpty()) { "chapter_key is required" }
             val source = sources.get(request.sourceId)
-            val pages = sources.call(source, "pages") { it.source.getPageList(Mapping.chapterFor(request.chapterKey)) }
-            listPagesResponse { this.pages += pages.map(Mapping::page) }
+            cache.get(source.id, "pages", ResultCache.Kind.PAGES, request) {
+                val pages = sources.call(source, "pages") { it.source.getPageList(Mapping.chapterFor(request.chapterKey)) }
+                listPagesResponse { this.pages += pages.map(Mapping::page) }
+            }
         }
 
     override fun fetchImage(request: FetchImageRequest): Flow<FetchImageResponse> =
@@ -305,13 +321,17 @@ class SourcePluginApi(
     override suspend fun setSettings(request: SetSettingsRequest): SetSettingsResponse =
         rpc {
             val source = configurable(request.sourceId)
-            setSettingsResponse { values = sources.call(source, "set_settings") { SourceSettings(it).set(request.values) } }
+            val values = sources.call(source, "set_settings") { SourceSettings(it).set(request.values) }
+            // Results may depend on settings (e.g. a mirror or content preference).
+            cache.invalidate(source.id)
+            setSettingsResponse { this.values = values }
         }
 
     override suspend fun setNetworkProfile(request: SetNetworkProfileRequest): SetNetworkProfileResponse =
         rpc {
             val source = sources.get(request.sourceId)
             pushed.push(source.id, if (request.hasProfile()) request.profile else null)
+            cache.invalidate(source.id)
             setNetworkProfileResponse {}
         }
 

@@ -15,6 +15,11 @@ mihon-source reads a few environment variables at start. Each one can also be gi
 | `MIHON_METRICS_PORT` | *(none)* | Also serve `GET /metrics` on this port **without credentials**, e.g. for a scraper on an internal network. Without it, `/metrics` is only on the main port and needs a token with the `metrics` scope. |
 | `MIHON_HEALTH_CHECK_INTERVAL` | *(off)* | Check every source's health this often, e.g. `6h` or `1d`. Each source gets its first page of popular fetched once per interval, at a random moment within it, through its own network profile and rate limits. Off by default; per-source opt-out in the admin UI or with `SetHealthCheck`. |
 | `MIHON_STORE_REFRESH_INTERVAL` | `12h` | How often every store's index is refreshed (plus up to 10% random delay), so updates show up. Refreshing never installs anything. `0` or `off` turns it off; stores can always be refreshed by hand. |
+| `MIHON_CACHE_TTL_LIST` | `5m` | How long popular, latest and search results are reused. `0` or `off` turns caching off for them. |
+| `MIHON_CACHE_TTL_DETAILS` | `10m` | The same for series details and chapter lists. |
+| `MIHON_CACHE_TTL_PAGES` | `30m` | The same for a chapter's page list. Images themselves are never cached. |
+| `MIHON_CACHE_TTL_FILTERS` | `1h` | The same for a source's filters. |
+| `MIHON_CACHE_MAX_MB` | `64` | Memory the result cache may use; the least recently used results go first. `0` turns the cache off. |
 | `MIHON_ADMIN_DIR` | *(bundled)* | Serve the admin UI from this directory instead of the copy in the jar. For development. |
 
 ## Network settings: solvers, profiles, assignments

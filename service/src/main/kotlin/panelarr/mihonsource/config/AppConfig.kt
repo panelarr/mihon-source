@@ -26,6 +26,9 @@ data class AppConfig(
     val healthCheckInterval: java.time.Duration? = null,
     /** How often store indexes are refreshed. Zero means never (refresh by hand only). */
     val storeRefreshInterval: java.time.Duration = DEFAULT_STORE_REFRESH,
+    /** Result cache lifetimes per kind of result; zero turns caching off for that kind. */
+    val cacheTtls: Map<String, java.time.Duration> = DEFAULT_CACHE_TTLS,
+    val cacheMaxBytes: Long = DEFAULT_CACHE_MB * MB,
 ) {
     companion object {
         const val DEFAULT_PORT = 8902
@@ -33,6 +36,16 @@ data class AppConfig(
         private const val MB = 1024L * 1024
 
         val DEFAULT_STORE_REFRESH: java.time.Duration = java.time.Duration.ofHours(12)
+        const val DEFAULT_CACHE_MB = 64L
+
+        /** Lists change often, pages rarely. Keys match ResultCache.Kind names. */
+        val DEFAULT_CACHE_TTLS: Map<String, java.time.Duration> =
+            mapOf(
+                "list" to java.time.Duration.ofMinutes(5),
+                "details" to java.time.Duration.ofMinutes(10),
+                "pages" to java.time.Duration.ofMinutes(30),
+                "filters" to java.time.Duration.ofHours(1),
+            )
         private val SIMPLE_DURATION = Regex("(\\d+)\\s*(s|m|h|d)")
 
         /** "90s", "30m", "6h", "1d", "0" or ISO-8601 ("PT6H"). */
@@ -77,6 +90,11 @@ data class AppConfig(
                 metricsPort = number("MIHON_METRICS_PORT")?.toInt(),
                 healthCheckInterval = value("MIHON_HEALTH_CHECK_INTERVAL")?.let(::duration)?.takeIf { !it.isZero },
                 storeRefreshInterval = value("MIHON_STORE_REFRESH_INTERVAL")?.let(::duration) ?: DEFAULT_STORE_REFRESH,
+                cacheTtls =
+                    DEFAULT_CACHE_TTLS.mapValues { (kind, default) ->
+                        value("MIHON_CACHE_TTL_${kind.uppercase()}")?.let(::duration) ?: default
+                    },
+                cacheMaxBytes = (number("MIHON_CACHE_MAX_MB") ?: DEFAULT_CACHE_MB) * MB,
             )
         }
     }

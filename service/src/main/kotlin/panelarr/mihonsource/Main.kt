@@ -24,8 +24,11 @@ import panelarr.mihonsource.config.AppConfig
 import panelarr.mihonsource.extension.DateFormatRewriter
 import panelarr.mihonsource.extension.ExtensionIcons
 import panelarr.mihonsource.extension.ExtensionInstaller
+import panelarr.mihonsource.extension.ExtensionListener
 import panelarr.mihonsource.extension.ExtensionManager
+import panelarr.mihonsource.extension.HostedSource
 import panelarr.mihonsource.http.ApiServer
+import panelarr.mihonsource.http.CacheControlInterceptor
 import panelarr.mihonsource.http.HttpAuth
 import panelarr.mihonsource.http.IconService
 import panelarr.mihonsource.http.ImageService
@@ -36,6 +39,7 @@ import panelarr.mihonsource.metrics.Metrics
 import panelarr.mihonsource.mihon.MihonHost
 import panelarr.mihonsource.mihon.MihonInstantiator
 import panelarr.mihonsource.mihon.MihonSources
+import panelarr.mihonsource.mihon.ResultCache
 import panelarr.mihonsource.mihon.SourceHealthService
 import panelarr.mihonsource.mihon.SourceProber
 import panelarr.mihonsource.net.Downloader
@@ -120,13 +124,28 @@ class Application(
         sources.healthOf = health::get
         sources.checksEnabled = health::enabled
         val metricsService = OpsService.metrics(metrics::scrape)
+        val cache =
+            ResultCache(
+                ttls = config.cacheTtls.mapKeys { ResultCache.Kind.valueOf(it.key.uppercase()) },
+                maxBytes = config.cacheMaxBytes,
+                metrics = metrics,
+            )
+        // A profile or assignment change can change any source's results.
+        integrations.addListener(cache::clear)
+        extensions.addListener(
+            object : ExtensionListener {
+                override fun onSourcesAdded(sources: List<HostedSource>) = sources.forEach { cache.invalidate(it.id) }
+
+                override fun onSourcesRemoved(sources: List<HostedSource>) = sources.forEach { cache.invalidate(it.id) }
+            },
+        )
         server =
             ApiServer(
                 host = config.host,
                 port = config.port,
                 services =
                     listOf(
-                        SourcePluginApi(sources, PushedProfiles(integrations, secrets)) { extensions.list().count { !it.loaded } },
+                        SourcePluginApi(sources, PushedProfiles(integrations, secrets), cache) { extensions.list().count { !it.loaded } },
                         ExtensionsApi(extensions, installer, sources, prober, health),
                         StoresApi(stores),
                         ClientsApi(clients),
@@ -134,7 +153,7 @@ class Application(
                         // Lets tools such as grpcurl discover the API. Needs the admin scope.
                         ProtoReflectionServiceV1.newInstance(),
                     ),
-                interceptors = listOf(AuthInterceptor(authenticator)),
+                interceptors = listOf(AuthInterceptor(authenticator), CacheControlInterceptor()),
                 routes =
                     mapOf(
                         "/healthz" to OpsService.liveness(),

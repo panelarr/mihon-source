@@ -105,5 +105,18 @@ class Metrics {
             }.set(if (ok) 1 else 0)
     }
 
+    /** A result cache lookup: [result] is hit, miss, shared or bypass. */
+    fun cache(
+        operation: String,
+        result: String,
+    ) {
+        Counter
+            .builder("mihon_cache_lookups")
+            .description("Result cache lookups")
+            .tags("operation", operation, "result", result)
+            .register(registry)
+            .increment()
+    }
+
     fun scrape(): String = registry.scrape()
 }
