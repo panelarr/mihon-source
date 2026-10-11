@@ -33,6 +33,11 @@ jobs:
       - name: Build
         run: make build
 
+      - name: Generated files are up to date
+        run: |
+          make gen
+          git diff --exit-code -- service/src/main/resources/openapi
+
       - name: Upload test reports
         if: failure()
         uses: actions/upload-artifact@v5

@@ -1,0 +1,20 @@
+# `make gen` (Gradle task bufGenerate) writes the OpenAPI document served by the service.
+version: v2
+managed:
+  enabled: true
+  disable:
+    - module: buf.build/googleapis/googleapis
+    - module: buf.build/gnostic/gnostic
+  override:
+    # The OpenAPI generator is a Go protoc plugin and wants a Go package; it doesn't
+    # affect the output.
+    - file_option: go_package_prefix
+      value: example.invalid/gen
+plugins:
+  - remote: buf.build/community/google-gnostic-openapi:v0.7.1
+    out: service/src/main/resources/openapi
+    opt:
+      - naming=json
+      - enum_type=string
+      - fq_schema_naming=true
+      - default_response=false

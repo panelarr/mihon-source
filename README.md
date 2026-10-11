@@ -17,9 +17,20 @@ mihon-source ships with **no extensions and no extension stores**. You choose an
 The Docker image doesn't exist yet. Until then, run from source:
 
 ```sh
-make setup   # downloads Gradle, a JDK 21 toolchain and dependencies
-make run
+make setup   # downloads Gradle, a JDK 21 toolchain, buf and dependencies
+make run     # listens on :8080, keeps its state in ./data
 ```
+
+On first start an admin token is printed once. Use it to create an API key and call the API:
+
+```sh
+curl localhost:8080/v1/health
+curl -H "Authorization: Bearer $ADMIN" -X POST localhost:8080/v1/admin/clients \
+  -d '{"name": "me", "scopes": ["sources:read"]}'
+curl -H "Authorization: Bearer $KEY" localhost:8080/v1/sources
+```
+
+API docs are at `http://localhost:8080/docs/` (OpenAPI document at `/openapi.yaml`). See [docs/api.md](docs/api.md) and [docs/configuration.md](docs/configuration.md).
 
 ## Development
 

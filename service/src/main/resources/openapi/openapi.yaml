@@ -1,0 +1,2092 @@
+# Generated with protoc-gen-openapi
+# https://github.com/google/gnostic/tree/master/cmd/protoc-gen-openapi
+
+openapi: 3.0.3
+info:
+    title: mihon-source API
+    description: 'Runs Mihon extensions and serves their sources. `panelarr.source.v1` is the source API and `panelarr.mihon.v1` is the admin API. Every endpoint except /v1/health needs `Authorization: Bearer <token>`: the admin token, or a client API key with the right scope. Images are served by `GET /v1/sources/{sourceId}/image?ref=...`, and extensions can be uploaded as multipart form data to `POST /v1/admin/extensions/upload` (field `file`).'
+    version: v1
+paths:
+    /v1/admin/assignments:
+        get:
+            tags:
+                - MihonIntegrationsService
+            description: ListAssignments lists which profile each source uses and why.
+            operationId: MihonIntegrationsService_ListAssignments
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/panelarr.mihon.v1.ListAssignmentsResponse'
+    /v1/admin/assignments/{sourceId}:
+        put:
+            tags:
+                - MihonIntegrationsService
+            description: |-
+                AssignProfile sets the profile of one source. An empty profile_id removes the
+                 assignment, so the source falls back to the default profile.
+            operationId: MihonIntegrationsService_AssignProfile
+            parameters:
+                - name: sourceId
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/panelarr.mihon.v1.AssignProfileRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/panelarr.mihon.v1.AssignProfileResponse'
+    /v1/admin/clients:
+        get:
+            tags:
+                - MihonClientsService
+            operationId: MihonClientsService_ListClients
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/panelarr.mihon.v1.ListClientsResponse'
+        post:
+            tags:
+                - MihonClientsService
+            description: |-
+                CreateClient creates a client and returns its API key. The key is never shown
+                 again.
+            operationId: MihonClientsService_CreateClient
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/panelarr.mihon.v1.CreateClientRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/panelarr.mihon.v1.CreateClientResponse'
+    /v1/admin/clients/{clientId}:
+        delete:
+            tags:
+                - MihonClientsService
+            operationId: MihonClientsService_DeleteClient
+            parameters:
+                - name: clientId
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/panelarr.mihon.v1.DeleteClientResponse'
+        patch:
+            tags:
+                - MihonClientsService
+            description: UpdateClient changes a client's name or scopes. The key stays the same.
+            operationId: MihonClientsService_UpdateClient
+            parameters:
+                - name: clientId
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/panelarr.mihon.v1.UpdateClientRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/panelarr.mihon.v1.UpdateClientResponse'
+    /v1/admin/clients/{clientId}/rotate:
+        post:
+            tags:
+                - MihonClientsService
+            description: RotateClientKey replaces a client's API key. The old key stops working at once.
+            operationId: MihonClientsService_RotateClientKey
+            parameters:
+                - name: clientId
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/panelarr.mihon.v1.RotateClientKeyRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/panelarr.mihon.v1.RotateClientKeyResponse'
+    /v1/admin/default-profile:
+        put:
+            tags:
+                - MihonIntegrationsService
+            description: |-
+                SetDefaultProfile sets the profile used by sources without an assignment. An
+                 empty profile_id means a direct connection.
+            operationId: MihonIntegrationsService_SetDefaultProfile
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/panelarr.mihon.v1.SetDefaultProfileRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/panelarr.mihon.v1.SetDefaultProfileResponse'
+    /v1/admin/extensions:
+        get:
+            tags:
+                - MihonAdminService
+            description: ListExtensions lists installed extensions, including ones that failed to load.
+            operationId: MihonAdminService_ListExtensions
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/panelarr.mihon.v1.ListExtensionsResponse'
+        post:
+            tags:
+                - MihonAdminService
+            description: |-
+                InstallExtension installs (or replaces) an extension from a URL or from uploaded
+                 bytes. A jar is used as is; an APK is converted to a jar first. When an expected
+                 SHA-256 or signing fingerprint is given and doesn't match, nothing is installed.
+            operationId: MihonAdminService_InstallExtension
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/panelarr.mihon.v1.InstallExtensionRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/panelarr.mihon.v1.InstallExtensionResponse'
+    /v1/admin/extensions/{pkgName}:
+        get:
+            tags:
+                - MihonAdminService
+            description: GetExtension returns one installed extension.
+            operationId: MihonAdminService_GetExtension
+            parameters:
+                - name: pkgName
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/panelarr.mihon.v1.GetExtensionResponse'
+        delete:
+            tags:
+                - MihonAdminService
+            description: |-
+                UninstallExtension removes an extension, its sources and its files. Source
+                 settings and cookies are kept unless `delete_data` is set.
+            operationId: MihonAdminService_UninstallExtension
+            parameters:
+                - name: pkgName
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+                - name: deleteData
+                  in: query
+                  description: Also delete the settings and cookies of the extension's sources.
+                  schema:
+                    type: boolean
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/panelarr.mihon.v1.UninstallExtensionResponse'
+    /v1/admin/extensions/{pkgName}/reload:
+        post:
+            tags:
+                - MihonAdminService
+            description: ReloadExtension unloads an extension and loads it again from its installed file.
+            operationId: MihonAdminService_ReloadExtension
+            parameters:
+                - name: pkgName
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/panelarr.mihon.v1.ReloadExtensionRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/panelarr.mihon.v1.ReloadExtensionResponse'
+    /v1/admin/profiles:
+        get:
+            tags:
+                - MihonIntegrationsService
+            operationId: MihonIntegrationsService_ListProfiles
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/panelarr.mihon.v1.ListProfilesResponse'
+    /v1/admin/profiles/{profile.id}:
+        put:
+            tags:
+                - MihonIntegrationsService
+            description: |-
+                PutProfile creates or replaces a profile. A proxy password left empty keeps the
+                 stored one.
+            operationId: MihonIntegrationsService_PutProfile
+            parameters:
+                - name: profile.id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/panelarr.mihon.v1.NetworkProfile'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/panelarr.mihon.v1.PutProfileResponse'
+    /v1/admin/profiles/{profileId}:
+        delete:
+            tags:
+                - MihonIntegrationsService
+            description: DeleteProfile also removes the profile's assignments.
+            operationId: MihonIntegrationsService_DeleteProfile
+            parameters:
+                - name: profileId
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/panelarr.mihon.v1.DeleteProfileResponse'
+    /v1/admin/solvers:
+        get:
+            tags:
+                - MihonIntegrationsService
+            operationId: MihonIntegrationsService_ListSolvers
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/panelarr.mihon.v1.ListSolversResponse'
+    /v1/admin/solvers/{solver.id}:
+        put:
+            tags:
+                - MihonIntegrationsService
+            description: PutSolver creates or replaces a solver.
+            operationId: MihonIntegrationsService_PutSolver
+            parameters:
+                - name: solver.id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/panelarr.mihon.v1.Solver'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/panelarr.mihon.v1.PutSolverResponse'
+    /v1/admin/solvers/{solverId}:
+        delete:
+            tags:
+                - MihonIntegrationsService
+            description: DeleteSolver fails while a profile still uses the solver.
+            operationId: MihonIntegrationsService_DeleteSolver
+            parameters:
+                - name: solverId
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/panelarr.mihon.v1.DeleteSolverResponse'
+    /v1/admin/stores:
+        get:
+            tags:
+                - MihonStoresService
+            operationId: MihonStoresService_ListStores
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/panelarr.mihon.v1.ListStoresResponse'
+        post:
+            tags:
+                - MihonStoresService
+            description: AddStore fetches the store's descriptor and index and pins its signing key.
+            operationId: MihonStoresService_AddStore
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/panelarr.mihon.v1.AddStoreRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/panelarr.mihon.v1.AddStoreResponse'
+    /v1/admin/stores/available:
+        get:
+            tags:
+                - MihonStoresService
+            description: |-
+                ListAvailable lists the extensions offered by the stores, with their install and
+                 update state.
+            operationId: MihonStoresService_ListAvailable
+            parameters:
+                - name: storeId
+                  in: query
+                  description: Only this store. Empty means all stores.
+                  schema:
+                    type: string
+                - name: lang
+                  in: query
+                  description: Only extensions with a source in this language.
+                  schema:
+                    type: string
+                - name: query
+                  in: query
+                  description: Case-insensitive match on the extension or source name.
+                  schema:
+                    type: string
+                - name: updatesOnly
+                  in: query
+                  description: Only installed extensions that have an update.
+                  schema:
+                    type: boolean
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/panelarr.mihon.v1.ListAvailableResponse'
+    /v1/admin/stores/{storeId}:
+        delete:
+            tags:
+                - MihonStoresService
+            operationId: MihonStoresService_RemoveStore
+            parameters:
+                - name: storeId
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/panelarr.mihon.v1.RemoveStoreResponse'
+    /v1/admin/stores/{storeId}/extensions/{pkgName}/install:
+        post:
+            tags:
+                - MihonStoresService
+            description: |-
+                InstallFromStore installs or updates an extension from a store. The jar is used
+                 when the store offers one, else the APK. The signing key (and the SHA-256, when
+                 the store publishes one) are verified.
+            operationId: MihonStoresService_InstallFromStore
+            parameters:
+                - name: storeId
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+                - name: pkgName
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/panelarr.mihon.v1.InstallFromStoreRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/panelarr.mihon.v1.InstallFromStoreResponse'
+    /v1/admin/stores/{storeId}/refresh:
+        post:
+            tags:
+                - MihonStoresService
+            description: RefreshStore downloads the store's index again.
+            operationId: MihonStoresService_RefreshStore
+            parameters:
+                - name: storeId
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/panelarr.mihon.v1.RefreshStoreRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/panelarr.mihon.v1.RefreshStoreResponse'
+    /v1/health:
+        get:
+            tags:
+                - SourcePluginService
+            description: Health reports whether the plugin can serve requests. It needs no credentials.
+            operationId: SourcePluginService_Health
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/panelarr.source.v1.HealthResponse'
+    /v1/info:
+        get:
+            tags:
+                - SourcePluginService
+            description: |-
+                GetInfo describes the plugin: identity, version, capabilities, declared limits,
+                 the configuration it expects and the common services it can use.
+            operationId: SourcePluginService_GetInfo
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/panelarr.source.v1.GetInfoResponse'
+    /v1/resolve-url:
+        post:
+            tags:
+                - SourcePluginService
+            description: ResolveUrl turns a web URL into a series. Needs the RESOLVE_URL capability.
+            operationId: SourcePluginService_ResolveUrl
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/panelarr.source.v1.ResolveUrlRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/panelarr.source.v1.ResolveUrlResponse'
+    /v1/sources:
+        get:
+            tags:
+                - SourcePluginService
+            description: ListSources lists the sources the plugin serves.
+            operationId: SourcePluginService_ListSources
+            parameters:
+                - name: lang
+                  in: query
+                  description: Only sources in this language. Empty means all.
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/panelarr.source.v1.ListSourcesResponse'
+    /v1/sources/{sourceId}:
+        get:
+            tags:
+                - SourcePluginService
+            description: GetSource returns one source.
+            operationId: SourcePluginService_GetSource
+            parameters:
+                - name: sourceId
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/panelarr.source.v1.GetSourceResponse'
+    /v1/sources/{sourceId}/chapters:
+        get:
+            tags:
+                - SourcePluginService
+            description: ListChapters lists the chapters of a series, newest first.
+            operationId: SourcePluginService_ListChapters
+            parameters:
+                - name: sourceId
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+                - name: seriesKey
+                  in: query
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/panelarr.source.v1.ListChaptersResponse'
+    /v1/sources/{sourceId}/filters:
+        get:
+            tags:
+                - SourcePluginService
+            description: GetFilters returns the search filters of a source with their default values.
+            operationId: SourcePluginService_GetFilters
+            parameters:
+                - name: sourceId
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/panelarr.source.v1.GetFiltersResponse'
+    /v1/sources/{sourceId}/latest:
+        get:
+            tags:
+                - SourcePluginService
+            description: Latest lists a page of recently updated series. Needs the LATEST capability.
+            operationId: SourcePluginService_Latest
+            parameters:
+                - name: sourceId
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+                - name: page
+                  in: query
+                  description: 1-based page number.
+                  schema:
+                    type: integer
+                    format: uint32
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/panelarr.source.v1.LatestResponse'
+    /v1/sources/{sourceId}/network-profile:
+        put:
+            tags:
+                - SourcePluginService
+            description: |-
+                SetNetworkProfile is how a host pushes the network profile a source must use.
+                 A pushed profile overrides anything the plugin configured locally. Leaving
+                 `profile` unset removes the override.
+            operationId: SourcePluginService_SetNetworkProfile
+            parameters:
+                - name: sourceId
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/panelarr.source.v1.SetNetworkProfileRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/panelarr.source.v1.SetNetworkProfileResponse'
+    /v1/sources/{sourceId}/pages:
+        get:
+            tags:
+                - SourcePluginService
+            description: ListPages lists the pages of a chapter in reading order.
+            operationId: SourcePluginService_ListPages
+            parameters:
+                - name: sourceId
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+                - name: chapterKey
+                  in: query
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/panelarr.source.v1.ListPagesResponse'
+    /v1/sources/{sourceId}/popular:
+        get:
+            tags:
+                - SourcePluginService
+            description: Popular lists a page of the source's popular series.
+            operationId: SourcePluginService_Popular
+            parameters:
+                - name: sourceId
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+                - name: page
+                  in: query
+                  description: 1-based page number.
+                  schema:
+                    type: integer
+                    format: uint32
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/panelarr.source.v1.PopularResponse'
+    /v1/sources/{sourceId}/search:
+        post:
+            tags:
+                - SourcePluginService
+            description: Search lists a page of series matching a query and filter values.
+            operationId: SourcePluginService_Search
+            parameters:
+                - name: sourceId
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/panelarr.source.v1.SearchRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/panelarr.source.v1.SearchResponse'
+    /v1/sources/{sourceId}/series:
+        get:
+            tags:
+                - SourcePluginService
+            description: GetSeries returns the full details of a series.
+            operationId: SourcePluginService_GetSeries
+            parameters:
+                - name: sourceId
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+                - name: key
+                  in: query
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/panelarr.source.v1.GetSeriesResponse'
+    /v1/sources/{sourceId}/settings:
+        get:
+            tags:
+                - SourcePluginService
+            description: GetSettings returns a source's current setting values.
+            operationId: SourcePluginService_GetSettings
+            parameters:
+                - name: sourceId
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/panelarr.source.v1.GetSettingsResponse'
+        patch:
+            tags:
+                - SourcePluginService
+            description: |-
+                SetSettings changes some of a source's settings. Keys that are left out keep
+                 their value. It returns all values after the change.
+            operationId: SourcePluginService_SetSettings
+            parameters:
+                - name: sourceId
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/panelarr.source.v1.SetSettingsRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/panelarr.source.v1.SetSettingsResponse'
+    /v1/sources/{sourceId}/settings/schema:
+        get:
+            tags:
+                - SourcePluginService
+            description: GetSettingsSchema returns the JSON Schema of a source's settings.
+            operationId: SourcePluginService_GetSettingsSchema
+            parameters:
+                - name: sourceId
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/panelarr.source.v1.GetSettingsSchemaResponse'
+    /v1/whoami:
+        get:
+            tags:
+                - MihonClientsService
+            description: WhoAmI describes the caller's credentials. Useful to check a key or token.
+            operationId: MihonClientsService_WhoAmI
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/panelarr.mihon.v1.WhoAmIResponse'
+components:
+    schemas:
+        panelarr.mihon.v1.AddStoreRequest:
+            type: object
+            properties:
+                url:
+                    type: string
+                    description: URL of the store's repo.json, or of a legacy index.min.json.
+                expectedSigningKeyFingerprint:
+                    type: string
+                    description: When set, the store's announced signing key fingerprint must match.
+        panelarr.mihon.v1.AddStoreResponse:
+            type: object
+            properties:
+                store:
+                    $ref: '#/components/schemas/panelarr.mihon.v1.Store'
+        panelarr.mihon.v1.AssignProfileRequest:
+            type: object
+            properties:
+                sourceId:
+                    type: string
+                profileId:
+                    type: string
+        panelarr.mihon.v1.AssignProfileResponse:
+            type: object
+            properties:
+                assignment:
+                    $ref: '#/components/schemas/panelarr.mihon.v1.Assignment'
+        panelarr.mihon.v1.Assignment:
+            type: object
+            properties:
+                sourceId:
+                    type: string
+                profileId:
+                    type: string
+                    description: Profile assigned here. Empty when none.
+                pushedProfileName:
+                    type: string
+                    description: Name of the profile pushed by a host, when there is one. It wins over profile_id.
+                effective:
+                    enum:
+                        - PROFILE_ORIGIN_UNSPECIFIED
+                        - PROFILE_ORIGIN_NONE
+                        - PROFILE_ORIGIN_DEFAULT
+                        - PROFILE_ORIGIN_ASSIGNED
+                        - PROFILE_ORIGIN_PUSHED
+                    type: string
+                    description: Where the effective settings come from.
+                    format: enum
+                effectiveProfileId:
+                    type: string
+                    description: The profile in effect when it's a local one (assigned or default).
+        panelarr.mihon.v1.AvailableExtension:
+            type: object
+            properties:
+                storeId:
+                    type: string
+                pkgName:
+                    type: string
+                name:
+                    type: string
+                versionName:
+                    type: string
+                versionCode:
+                    type: string
+                libVersion:
+                    type: string
+                contentWarning:
+                    enum:
+                        - CONTENT_WARNING_UNSPECIFIED
+                        - CONTENT_WARNING_SAFE
+                        - CONTENT_WARNING_MIXED
+                        - CONTENT_WARNING_NSFW
+                    type: string
+                    format: enum
+                iconUrl:
+                    type: string
+                sources:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/panelarr.mihon.v1.AvailableSource'
+                supported:
+                    type: boolean
+                    description: Whether this service can load the extension's lib version.
+                hasJar:
+                    type: boolean
+                    description: Whether the store offers a jar (no APK conversion needed).
+                installed:
+                    type: boolean
+                installedVersionName:
+                    type: string
+                installedVersionCode:
+                    type: string
+                updateAvailable:
+                    type: boolean
+                    description: Installed from this store and the store has a newer version.
+        panelarr.mihon.v1.AvailableSource:
+            type: object
+            properties:
+                id:
+                    type: string
+                name:
+                    type: string
+                lang:
+                    type: string
+                homeUrl:
+                    type: string
+        panelarr.mihon.v1.Client:
+            type: object
+            properties:
+                id:
+                    type: string
+                name:
+                    type: string
+                scopes:
+                    type: array
+                    items:
+                        type: string
+                keyPrefix:
+                    type: string
+                    description: First characters of the key, to tell keys apart. Not enough to use it.
+                createdAt:
+                    type: string
+                    format: date-time
+                rotatedAt:
+                    type: string
+                    format: date-time
+                lastUsedAt:
+                    type: string
+                    format: date-time
+        panelarr.mihon.v1.CreateClientRequest:
+            type: object
+            properties:
+                name:
+                    type: string
+                scopes:
+                    type: array
+                    items:
+                        type: string
+        panelarr.mihon.v1.CreateClientResponse:
+            type: object
+            properties:
+                client:
+                    $ref: '#/components/schemas/panelarr.mihon.v1.Client'
+                apiKey:
+                    type: string
+                    description: The API key. Shown only in this response.
+        panelarr.mihon.v1.DeleteClientResponse:
+            type: object
+            properties: {}
+        panelarr.mihon.v1.DeleteProfileResponse:
+            type: object
+            properties: {}
+        panelarr.mihon.v1.DeleteSolverResponse:
+            type: object
+            properties: {}
+        panelarr.mihon.v1.Extension:
+            type: object
+            properties:
+                pkgName:
+                    type: string
+                    description: Package name, the extension's unique identifier.
+                name:
+                    type: string
+                versionName:
+                    type: string
+                versionCode:
+                    type: string
+                libVersion:
+                    type: string
+                    description: extensions-lib version the extension was built against, e.g. "1.4".
+                format:
+                    enum:
+                        - EXTENSION_FORMAT_UNSPECIFIED
+                        - EXTENSION_FORMAT_JAR
+                        - EXTENSION_FORMAT_APK
+                    type: string
+                    format: enum
+                contentWarning:
+                    enum:
+                        - CONTENT_WARNING_UNSPECIFIED
+                        - CONTENT_WARNING_SAFE
+                        - CONTENT_WARNING_MIXED
+                        - CONTENT_WARNING_NSFW
+                    type: string
+                    format: enum
+                status:
+                    enum:
+                        - EXTENSION_STATUS_UNSPECIFIED
+                        - EXTENSION_STATUS_LOADED
+                        - EXTENSION_STATUS_ERROR
+                    type: string
+                    format: enum
+                loadError:
+                    type: string
+                    description: Why the extension failed to load. Empty when it loaded.
+                sources:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/panelarr.mihon.v1.ExtensionSource'
+                    description: Sources the extension provides. Empty when it failed to load.
+                signingFingerprint:
+                    type: string
+                    description: SHA-256 (hex, lowercase) of the signing certificate. Empty when unsigned.
+                sha256:
+                    type: string
+                    description: SHA-256 (hex, lowercase) of the file as downloaded or uploaded.
+                origin:
+                    allOf:
+                        - $ref: '#/components/schemas/panelarr.mihon.v1.ExtensionOrigin'
+                    description: Where the extension came from.
+                installedAt:
+                    type: string
+                    format: date-time
+        panelarr.mihon.v1.ExtensionOrigin:
+            type: object
+            properties:
+                url:
+                    type: string
+                    description: Installed from this URL.
+                upload:
+                    type: string
+                    description: Installed from uploaded bytes; the original file name.
+                storeId:
+                    type: string
+                    description: Installed from an extension store.
+        panelarr.mihon.v1.ExtensionSource:
+            type: object
+            properties:
+                id:
+                    type: string
+                name:
+                    type: string
+                lang:
+                    type: string
+        panelarr.mihon.v1.GetExtensionResponse:
+            type: object
+            properties:
+                extension:
+                    $ref: '#/components/schemas/panelarr.mihon.v1.Extension'
+        panelarr.mihon.v1.InstallExtensionRequest:
+            type: object
+            properties:
+                url:
+                    type: string
+                    description: http(s) URL of a .jar or .apk.
+                data:
+                    type: string
+                    description: |-
+                        The file itself. Over HTTP/JSON this is base64; large files can also be sent to
+                         the multipart upload endpoint described in the service docs.
+                    format: bytes
+                fileName:
+                    type: string
+                    description: |-
+                        Original file name of uploaded data. Used to tell a jar from an APK and shown in
+                         the extension's origin.
+                expectedSha256:
+                    type: string
+                    description: When set, the file's SHA-256 (hex) must match.
+                expectedSigningFingerprint:
+                    type: string
+                    description: When set, the signing certificate's SHA-256 (hex) must match.
+        panelarr.mihon.v1.InstallExtensionResponse:
+            type: object
+            properties:
+                extension:
+                    $ref: '#/components/schemas/panelarr.mihon.v1.Extension'
+        panelarr.mihon.v1.InstallFromStoreRequest:
+            type: object
+            properties:
+                storeId:
+                    type: string
+                pkgName:
+                    type: string
+        panelarr.mihon.v1.InstallFromStoreResponse:
+            type: object
+            properties:
+                extension:
+                    $ref: '#/components/schemas/panelarr.mihon.v1.Extension'
+        panelarr.mihon.v1.ListAssignmentsResponse:
+            type: object
+            properties:
+                assignments:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/panelarr.mihon.v1.Assignment'
+                    description: One entry per installed source.
+                defaultProfileId:
+                    type: string
+        panelarr.mihon.v1.ListAvailableResponse:
+            type: object
+            properties:
+                extensions:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/panelarr.mihon.v1.AvailableExtension'
+        panelarr.mihon.v1.ListClientsResponse:
+            type: object
+            properties:
+                clients:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/panelarr.mihon.v1.Client'
+        panelarr.mihon.v1.ListExtensionsResponse:
+            type: object
+            properties:
+                extensions:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/panelarr.mihon.v1.Extension'
+        panelarr.mihon.v1.ListProfilesResponse:
+            type: object
+            properties:
+                profiles:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/panelarr.mihon.v1.NetworkProfile'
+                defaultProfileId:
+                    type: string
+                    description: Profile used by sources without an assignment. Empty means none.
+        panelarr.mihon.v1.ListSolversResponse:
+            type: object
+            properties:
+                solvers:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/panelarr.mihon.v1.Solver'
+        panelarr.mihon.v1.ListStoresResponse:
+            type: object
+            properties:
+                stores:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/panelarr.mihon.v1.Store'
+        panelarr.mihon.v1.NetworkProfile:
+            type: object
+            properties:
+                id:
+                    type: string
+                    description: 'Identifier chosen by the admin: lowercase letters, digits and dashes.'
+                name:
+                    type: string
+                proxy:
+                    allOf:
+                        - $ref: '#/components/schemas/panelarr.mihon.v1.Proxy'
+                    description: Unset means a direct connection.
+                solverId:
+                    type: string
+                    description: Solver to use. Empty means none.
+                rateLimit:
+                    allOf:
+                        - $ref: '#/components/schemas/panelarr.mihon.v1.RateLimit'
+                    description: Unset means no rate limit.
+                concurrency:
+                    type: integer
+                    description: Maximum parallel requests per source. 0 means no limit.
+                    format: uint32
+                userAgentMode:
+                    enum:
+                        - USER_AGENT_MODE_UNSPECIFIED
+                        - USER_AGENT_MODE_FIXED
+                        - USER_AGENT_MODE_RANDOM_DESKTOP
+                        - USER_AGENT_MODE_FROM_SOLVER
+                    type: string
+                    format: enum
+                userAgent:
+                    type: string
+                    description: Used when user_agent_mode is FIXED.
+                headers:
+                    type: object
+                    additionalProperties:
+                        type: string
+                    description: Extra headers added to every request.
+                sharedCookieJar:
+                    type: string
+                    description: |-
+                        Name of a cookie jar shared by every source using it. Empty means each source
+                         keeps its own jar.
+                connectTimeout:
+                    pattern: ^-?(?:0|[1-9][0-9]{0,11})(?:\.[0-9]{1,9})?s$
+                    type: string
+                readTimeout:
+                    pattern: ^-?(?:0|[1-9][0-9]{0,11})(?:\.[0-9]{1,9})?s$
+                    type: string
+                callTimeout:
+                    pattern: ^-?(?:0|[1-9][0-9]{0,11})(?:\.[0-9]{1,9})?s$
+                    type: string
+        panelarr.mihon.v1.Proxy:
+            type: object
+            properties:
+                url:
+                    type: string
+                    description: http://, https:// or socks5:// URL without credentials.
+                username:
+                    type: string
+                password:
+                    type: string
+                    description: Write-only. Never returned; has_password says whether one is stored.
+                hasPassword:
+                    type: boolean
+        panelarr.mihon.v1.PutProfileResponse:
+            type: object
+            properties:
+                profile:
+                    $ref: '#/components/schemas/panelarr.mihon.v1.NetworkProfile'
+        panelarr.mihon.v1.PutSolverResponse:
+            type: object
+            properties:
+                solver:
+                    $ref: '#/components/schemas/panelarr.mihon.v1.Solver'
+        panelarr.mihon.v1.RateLimit:
+            type: object
+            properties:
+                requests:
+                    type: integer
+                    description: Requests allowed per period.
+                    format: uint32
+                period:
+                    pattern: ^-?(?:0|[1-9][0-9]{0,11})(?:\.[0-9]{1,9})?s$
+                    type: string
+                perHost:
+                    type: boolean
+                    description: Count requests per target host instead of per source.
+        panelarr.mihon.v1.RefreshStoreRequest:
+            type: object
+            properties:
+                storeId:
+                    type: string
+        panelarr.mihon.v1.RefreshStoreResponse:
+            type: object
+            properties:
+                store:
+                    $ref: '#/components/schemas/panelarr.mihon.v1.Store'
+        panelarr.mihon.v1.ReloadExtensionRequest:
+            type: object
+            properties:
+                pkgName:
+                    type: string
+        panelarr.mihon.v1.ReloadExtensionResponse:
+            type: object
+            properties:
+                extension:
+                    $ref: '#/components/schemas/panelarr.mihon.v1.Extension'
+        panelarr.mihon.v1.RemoveStoreResponse:
+            type: object
+            properties: {}
+        panelarr.mihon.v1.RotateClientKeyRequest:
+            type: object
+            properties:
+                clientId:
+                    type: string
+        panelarr.mihon.v1.RotateClientKeyResponse:
+            type: object
+            properties:
+                client:
+                    $ref: '#/components/schemas/panelarr.mihon.v1.Client'
+                apiKey:
+                    type: string
+                    description: The new API key. Shown only in this response.
+        panelarr.mihon.v1.SetDefaultProfileRequest:
+            type: object
+            properties:
+                profileId:
+                    type: string
+        panelarr.mihon.v1.SetDefaultProfileResponse:
+            type: object
+            properties: {}
+        panelarr.mihon.v1.Solver:
+            type: object
+            properties:
+                id:
+                    type: string
+                    description: 'Identifier chosen by the admin: lowercase letters, digits and dashes.'
+                name:
+                    type: string
+                type:
+                    enum:
+                        - SOLVER_TYPE_UNSPECIFIED
+                        - SOLVER_TYPE_FLARESOLVERR
+                        - SOLVER_TYPE_BYPARR
+                    type: string
+                    format: enum
+                url:
+                    type: string
+                    description: Base URL, e.g. http://flaresolverr:8191.
+                sessionTtl:
+                    pattern: ^-?(?:0|[1-9][0-9]{0,11})(?:\.[0-9]{1,9})?s$
+                    type: string
+                    description: How long clearance cookies from one solve are reused.
+                maxTimeout:
+                    pattern: ^-?(?:0|[1-9][0-9]{0,11})(?:\.[0-9]{1,9})?s$
+                    type: string
+                    description: Upper bound for one solve.
+                asResponseFallback:
+                    type: boolean
+                    description: Use the solver's own response body when a fresh request still fails.
+        panelarr.mihon.v1.Store:
+            type: object
+            properties:
+                id:
+                    type: string
+                    description: Identifier derived from the store URL.
+                url:
+                    type: string
+                    description: URL the store was added with.
+                name:
+                    type: string
+                badgeLabel:
+                    type: string
+                    description: Short label the store wants shown next to its extensions.
+                contact:
+                    type: string
+                    description: Contact or website the store announces.
+                signingKeyFingerprint:
+                    type: string
+                    description: |-
+                        Pinned SHA-256 (hex, lowercase) of the store's signing certificate. Empty for a
+                         legacy index, which announces no key.
+                format:
+                    enum:
+                        - STORE_FORMAT_UNSPECIFIED
+                        - STORE_FORMAT_EXTENSION_STORE
+                        - STORE_FORMAT_LEGACY_INDEX
+                    type: string
+                    format: enum
+                addedAt:
+                    type: string
+                    format: date-time
+                refreshedAt:
+                    type: string
+                    format: date-time
+                lastError:
+                    type: string
+                    description: Error of the last refresh. Empty when it worked.
+                extensionCount:
+                    type: integer
+                    format: uint32
+        panelarr.mihon.v1.UninstallExtensionResponse:
+            type: object
+            properties: {}
+        panelarr.mihon.v1.UpdateClientRequest:
+            type: object
+            properties:
+                clientId:
+                    type: string
+                name:
+                    type: string
+                    description: New name. Empty keeps the current one.
+                scopes:
+                    type: array
+                    items:
+                        type: string
+                    description: New scopes. Empty keeps the current ones.
+        panelarr.mihon.v1.UpdateClientResponse:
+            type: object
+            properties:
+                client:
+                    $ref: '#/components/schemas/panelarr.mihon.v1.Client'
+        panelarr.mihon.v1.WhoAmIResponse:
+            type: object
+            properties:
+                kind:
+                    enum:
+                        - PRINCIPAL_KIND_UNSPECIFIED
+                        - PRINCIPAL_KIND_ADMIN
+                        - PRINCIPAL_KIND_CLIENT
+                    type: string
+                    format: enum
+                clientId:
+                    type: string
+                    description: Set for clients.
+                name:
+                    type: string
+                scopes:
+                    type: array
+                    items:
+                        type: string
+        panelarr.source.v1.Chapter:
+            type: object
+            properties:
+                key:
+                    type: string
+                    description: Opaque key of the chapter within its source.
+                name:
+                    type: string
+                number:
+                    type: number
+                    description: Chapter number, when the source knows it.
+                    format: double
+                volume:
+                    type: string
+                    description: Volume, when the source knows it.
+                scanlator:
+                    type: string
+                uploadedAt:
+                    type: string
+                    format: date-time
+                lang:
+                    type: string
+                    description: Language as a BCP 47 tag, when it differs from the source's language.
+                url:
+                    type: string
+                    description: Web address of the chapter.
+        panelarr.source.v1.CheckboxFilter:
+            type: object
+            properties:
+                value:
+                    type: boolean
+        panelarr.source.v1.Filter:
+            type: object
+            properties:
+                name:
+                    type: string
+                    description: Label shown to users.
+                header:
+                    $ref: '#/components/schemas/panelarr.source.v1.HeaderFilter'
+                separator:
+                    $ref: '#/components/schemas/panelarr.source.v1.SeparatorFilter'
+                text:
+                    $ref: '#/components/schemas/panelarr.source.v1.TextFilter'
+                checkbox:
+                    $ref: '#/components/schemas/panelarr.source.v1.CheckboxFilter'
+                triState:
+                    $ref: '#/components/schemas/panelarr.source.v1.TriStateFilter'
+                select:
+                    $ref: '#/components/schemas/panelarr.source.v1.SelectFilter'
+                sort:
+                    $ref: '#/components/schemas/panelarr.source.v1.SortFilter'
+                group:
+                    $ref: '#/components/schemas/panelarr.source.v1.GroupFilter'
+            description: |-
+                Filter is one search filter. Filters have no stable keys: they are addressed by
+                 their position (see FilterValue.path).
+        panelarr.source.v1.FilterValue:
+            type: object
+            properties:
+                path:
+                    type: array
+                    items:
+                        type: integer
+                        format: uint32
+                    description: |-
+                        Position of the filter: [index] for a top-level filter, [group index, child index]
+                         for a filter inside a group.
+                text:
+                    type: string
+                checkbox:
+                    type: boolean
+                triState:
+                    enum:
+                        - TRI_STATE_UNSPECIFIED
+                        - TRI_STATE_IGNORE
+                        - TRI_STATE_INCLUDE
+                        - TRI_STATE_EXCLUDE
+                    type: string
+                    format: enum
+                select:
+                    type: integer
+                    format: uint32
+                sort:
+                    $ref: '#/components/schemas/panelarr.source.v1.SortSelection'
+            description: FilterValue sets the value of one filter for a search.
+        panelarr.source.v1.GetFiltersResponse:
+            type: object
+            properties:
+                filters:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/panelarr.source.v1.Filter'
+                    description: Filters in display order, with their default values.
+        panelarr.source.v1.GetInfoResponse:
+            type: object
+            properties:
+                info:
+                    $ref: '#/components/schemas/panelarr.source.v1.PluginInfo'
+        panelarr.source.v1.GetSeriesResponse:
+            type: object
+            properties:
+                series:
+                    $ref: '#/components/schemas/panelarr.source.v1.Series'
+        panelarr.source.v1.GetSettingsResponse:
+            type: object
+            properties:
+                values:
+                    type: object
+        panelarr.source.v1.GetSettingsSchemaResponse:
+            type: object
+            properties:
+                schema:
+                    type: object
+                    description: JSON Schema (draft 2020-12) describing the settings object.
+        panelarr.source.v1.GetSourceResponse:
+            type: object
+            properties:
+                source:
+                    $ref: '#/components/schemas/panelarr.source.v1.Source'
+        panelarr.source.v1.GroupFilter:
+            type: object
+            properties:
+                filters:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/panelarr.source.v1.Filter'
+            description: GroupFilter holds child filters (usually checkboxes, tri-states, texts or selects).
+        panelarr.source.v1.HeaderFilter:
+            type: object
+            properties: {}
+            description: HeaderFilter is a label with no value.
+        panelarr.source.v1.HealthResponse:
+            type: object
+            properties:
+                status:
+                    enum:
+                        - HEALTH_STATUS_UNSPECIFIED
+                        - HEALTH_STATUS_SERVING
+                        - HEALTH_STATUS_DEGRADED
+                        - HEALTH_STATUS_NOT_SERVING
+                    type: string
+                    format: enum
+                message:
+                    type: string
+                    description: Optional detail for humans.
+        panelarr.source.v1.LatestResponse:
+            type: object
+            properties:
+                series:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/panelarr.source.v1.Series'
+                hasNextPage:
+                    type: boolean
+        panelarr.source.v1.Limits:
+            type: object
+            properties:
+                maxConcurrencyPerSource:
+                    type: integer
+                    description: Maximum parallel requests the plugin wants per source. 0 means no limit declared.
+                    format: uint32
+                defaultRateLimit:
+                    allOf:
+                        - $ref: '#/components/schemas/panelarr.source.v1.RateLimit'
+                    description: Default request rate per source. Unset means no limit declared.
+        panelarr.source.v1.ListChaptersResponse:
+            type: object
+            properties:
+                chapters:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/panelarr.source.v1.Chapter'
+        panelarr.source.v1.ListPagesResponse:
+            type: object
+            properties:
+                pages:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/panelarr.source.v1.Page'
+        panelarr.source.v1.ListSourcesResponse:
+            type: object
+            properties:
+                sources:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/panelarr.source.v1.Source'
+        panelarr.source.v1.NetworkProfile:
+            type: object
+            properties:
+                name:
+                    type: string
+                    description: Name of the profile on the host, for display and logs.
+                proxy:
+                    allOf:
+                        - $ref: '#/components/schemas/panelarr.source.v1.Proxy'
+                    description: Unset means a direct connection.
+                solver:
+                    allOf:
+                        - $ref: '#/components/schemas/panelarr.source.v1.Solver'
+                    description: Unset means no challenge solver.
+                rateLimit:
+                    allOf:
+                        - $ref: '#/components/schemas/panelarr.source.v1.RateLimit'
+                    description: Unset means the plugin's default.
+                concurrency:
+                    type: integer
+                    description: Maximum parallel requests. 0 means the plugin's default.
+                    format: uint32
+                userAgent:
+                    allOf:
+                        - $ref: '#/components/schemas/panelarr.source.v1.UserAgent'
+                    description: Unset means the plugin's default user agent.
+                dohUrl:
+                    type: string
+                    description: DNS-over-HTTPS resolver URL. Empty means the system resolver.
+                headers:
+                    type: object
+                    additionalProperties:
+                        type: string
+                    description: Extra headers added to every request.
+                sharedCookieJar:
+                    type: string
+                    description: Name of a cookie jar shared with other sources. Empty means a jar of its own.
+                timeouts:
+                    $ref: '#/components/schemas/panelarr.source.v1.Timeouts'
+            description: NetworkProfile is everything a plugin needs to make requests for one source.
+        panelarr.source.v1.Page:
+            type: object
+            properties:
+                index:
+                    type: integer
+                    description: 0-based position in the chapter.
+                    format: uint32
+                ref:
+                    type: string
+                    description: Opaque reference to pass to FetchImage.
+                imageUrl:
+                    type: string
+                    description: |-
+                        Direct image URL when known. It may need the source's headers or cookies, so
+                         fetching through FetchImage is preferred.
+        panelarr.source.v1.PluginInfo:
+            type: object
+            properties:
+                id:
+                    type: string
+                    description: Stable identifier of the plugin, e.g. "mihon-source".
+                name:
+                    type: string
+                    description: Human-readable name.
+                version:
+                    type: string
+                    description: Version of the plugin itself.
+                contracts:
+                    type: array
+                    items:
+                        type: string
+                    description: Contracts the plugin implements, e.g. "panelarr.source.v1".
+                capabilities:
+                    type: array
+                    items:
+                        enum:
+                            - PLUGIN_CAPABILITY_UNSPECIFIED
+                            - PLUGIN_CAPABILITY_NETWORK_PROFILES
+                            - PLUGIN_CAPABILITY_DYNAMIC_SOURCES
+                        type: string
+                        format: enum
+                    description: Features of the plugin as a whole. Per-source features are on Source.
+                limits:
+                    allOf:
+                        - $ref: '#/components/schemas/panelarr.source.v1.Limits'
+                    description: Limits the plugin asks hosts to respect. Hosts should enforce them too.
+                configSchema:
+                    type: object
+                    description: |-
+                        JSON Schema of the plugin-level configuration the plugin expects from a host.
+                         Unset when the plugin needs none.
+                commonServices:
+                    type: array
+                    items:
+                        enum:
+                            - COMMON_SERVICE_UNSPECIFIED
+                            - COMMON_SERVICE_NETWORK_PROFILE
+                            - COMMON_SERVICE_SOLVER
+                        type: string
+                        format: enum
+                    description: Common services the plugin can use when a host provides them.
+        panelarr.source.v1.PopularResponse:
+            type: object
+            properties:
+                series:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/panelarr.source.v1.Series'
+                hasNextPage:
+                    type: boolean
+        panelarr.source.v1.Proxy:
+            type: object
+            properties:
+                url:
+                    type: string
+                    description: http://, https:// or socks5:// URL without credentials.
+                username:
+                    type: string
+                password:
+                    type: string
+        panelarr.source.v1.RateLimit:
+            type: object
+            properties:
+                requests:
+                    type: integer
+                    description: Requests allowed per period.
+                    format: uint32
+                period:
+                    pattern: ^-?(?:0|[1-9][0-9]{0,11})(?:\.[0-9]{1,9})?s$
+                    type: string
+                    description: Length of the period.
+                burst:
+                    type: integer
+                    description: Extra requests allowed in a burst. 0 means none.
+                    format: uint32
+                scope:
+                    enum:
+                        - RATE_LIMIT_SCOPE_UNSPECIFIED
+                        - RATE_LIMIT_SCOPE_SOURCE
+                        - RATE_LIMIT_SCOPE_HOST
+                    type: string
+                    description: What the limit counts.
+                    format: enum
+        panelarr.source.v1.ResolveUrlRequest:
+            type: object
+            properties:
+                url:
+                    type: string
+                sourceId:
+                    type: string
+                    description: Source to ask. Empty means every source that has the RESOLVE_URL capability.
+        panelarr.source.v1.ResolveUrlResponse:
+            type: object
+            properties:
+                sourceId:
+                    type: string
+                series:
+                    $ref: '#/components/schemas/panelarr.source.v1.Series'
+        panelarr.source.v1.SearchRequest:
+            type: object
+            properties:
+                sourceId:
+                    type: string
+                page:
+                    type: integer
+                    description: 1-based page number.
+                    format: uint32
+                query:
+                    type: string
+                filters:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/panelarr.source.v1.FilterValue'
+                    description: Filters to change from their defaults. Filters not listed keep their default.
+        panelarr.source.v1.SearchResponse:
+            type: object
+            properties:
+                series:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/panelarr.source.v1.Series'
+                hasNextPage:
+                    type: boolean
+        panelarr.source.v1.SelectFilter:
+            type: object
+            properties:
+                options:
+                    type: array
+                    items:
+                        type: string
+                selected:
+                    type: integer
+                    description: Index into options.
+                    format: uint32
+        panelarr.source.v1.SeparatorFilter:
+            type: object
+            properties: {}
+            description: SeparatorFilter is a visual divider with no value.
+        panelarr.source.v1.Series:
+            type: object
+            properties:
+                key:
+                    type: string
+                    description: Opaque key of the series within its source.
+                title:
+                    type: string
+                altTitles:
+                    type: array
+                    items:
+                        type: string
+                authors:
+                    type: array
+                    items:
+                        type: string
+                artists:
+                    type: array
+                    items:
+                        type: string
+                description:
+                    type: string
+                genres:
+                    type: array
+                    items:
+                        type: string
+                status:
+                    enum:
+                        - SERIES_STATUS_UNSPECIFIED
+                        - SERIES_STATUS_ONGOING
+                        - SERIES_STATUS_COMPLETED
+                        - SERIES_STATUS_LICENSED
+                        - SERIES_STATUS_PUBLISHING_FINISHED
+                        - SERIES_STATUS_CANCELLED
+                        - SERIES_STATUS_ON_HIATUS
+                    type: string
+                    format: enum
+                coverUrl:
+                    type: string
+                url:
+                    type: string
+                    description: Web address of the series, for display and "open in browser".
+                detailsLoaded:
+                    type: boolean
+                    description: |-
+                        False when only list fields (key, title, cover) are filled in. Call GetSeries for
+                         the rest.
+        panelarr.source.v1.SetNetworkProfileRequest:
+            type: object
+            properties:
+                sourceId:
+                    type: string
+                profile:
+                    allOf:
+                        - $ref: '#/components/schemas/panelarr.source.v1.NetworkProfile'
+                    description: Unset removes the pushed profile.
+        panelarr.source.v1.SetNetworkProfileResponse:
+            type: object
+            properties: {}
+        panelarr.source.v1.SetSettingsRequest:
+            type: object
+            properties:
+                sourceId:
+                    type: string
+                values:
+                    type: object
+                    description: Settings to change. Keys not listed keep their value.
+        panelarr.source.v1.SetSettingsResponse:
+            type: object
+            properties:
+                values:
+                    type: object
+        panelarr.source.v1.Solver:
+            type: object
+            properties:
+                type:
+                    enum:
+                        - SOLVER_TYPE_UNSPECIFIED
+                        - SOLVER_TYPE_FLARESOLVERR
+                        - SOLVER_TYPE_BYPARR
+                    type: string
+                    format: enum
+                url:
+                    type: string
+                    description: Base URL of the solver, e.g. http://flaresolverr:8191.
+                sessionTtl:
+                    pattern: ^-?(?:0|[1-9][0-9]{0,11})(?:\.[0-9]{1,9})?s$
+                    type: string
+                    description: How long a solver session or its clearance cookies are reused.
+                maxTimeout:
+                    pattern: ^-?(?:0|[1-9][0-9]{0,11})(?:\.[0-9]{1,9})?s$
+                    type: string
+                    description: Upper bound for one solve.
+                asResponseFallback:
+                    type: boolean
+                    description: Use the solver's own response body when a fresh request still fails.
+        panelarr.source.v1.SortFilter:
+            type: object
+            properties:
+                options:
+                    type: array
+                    items:
+                        type: string
+                selection:
+                    allOf:
+                        - $ref: '#/components/schemas/panelarr.source.v1.SortSelection'
+                    description: Unset when no sort is selected.
+        panelarr.source.v1.SortSelection:
+            type: object
+            properties:
+                index:
+                    type: integer
+                    description: Index into options.
+                    format: uint32
+                ascending:
+                    type: boolean
+        panelarr.source.v1.Source:
+            type: object
+            properties:
+                id:
+                    type: string
+                    description: Identifier of the source, unique within the plugin and stable across restarts.
+                name:
+                    type: string
+                lang:
+                    type: string
+                    description: Language as a BCP 47 tag, or "all" / "multi" for multi-language sources.
+                contentRating:
+                    enum:
+                        - CONTENT_RATING_UNSPECIFIED
+                        - CONTENT_RATING_SAFE
+                        - CONTENT_RATING_MIXED
+                        - CONTENT_RATING_NSFW
+                    type: string
+                    format: enum
+                iconUrl:
+                    type: string
+                    description: URL of an icon for the source, if the plugin has one.
+                capabilities:
+                    type: array
+                    items:
+                        enum:
+                            - SOURCE_CAPABILITY_UNSPECIFIED
+                            - SOURCE_CAPABILITY_LATEST
+                            - SOURCE_CAPABILITY_SEARCH
+                            - SOURCE_CAPABILITY_FILTERS
+                            - SOURCE_CAPABILITY_RESOLVE_URL
+                            - SOURCE_CAPABILITY_SETTINGS
+                            - SOURCE_CAPABILITY_NEEDS_WEBVIEW
+                            - SOURCE_CAPABILITY_NSFW
+                        type: string
+                        format: enum
+                homeUrl:
+                    type: string
+                    description: Web address of the source, for display.
+        panelarr.source.v1.TextFilter:
+            type: object
+            properties:
+                value:
+                    type: string
+        panelarr.source.v1.Timeouts:
+            type: object
+            properties:
+                connect:
+                    pattern: ^-?(?:0|[1-9][0-9]{0,11})(?:\.[0-9]{1,9})?s$
+                    type: string
+                read:
+                    pattern: ^-?(?:0|[1-9][0-9]{0,11})(?:\.[0-9]{1,9})?s$
+                    type: string
+                call:
+                    pattern: ^-?(?:0|[1-9][0-9]{0,11})(?:\.[0-9]{1,9})?s$
+                    type: string
+                    description: Whole call, including redirects and retries.
+        panelarr.source.v1.TriStateFilter:
+            type: object
+            properties:
+                value:
+                    enum:
+                        - TRI_STATE_UNSPECIFIED
+                        - TRI_STATE_IGNORE
+                        - TRI_STATE_INCLUDE
+                        - TRI_STATE_EXCLUDE
+                    type: string
+                    format: enum
+        panelarr.source.v1.UserAgent:
+            type: object
+            properties:
+                fixed:
+                    type: string
+                    description: Always this value.
+                randomDesktop:
+                    type: boolean
+                    description: A realistic desktop browser user agent chosen by the plugin.
+                fromSolver:
+                    type: boolean
+                    description: The user agent the solver reports, so it matches the clearance cookies.
+    securitySchemes:
+        bearer:
+            type: http
+            description: The admin token or a client API key.
+            scheme: bearer
+security:
+    - bearer: []
+tags:
+    - name: MihonAdminService
+      description: MihonAdminService manages installed Mihon extensions. Needs the `admin` scope.
+    - name: MihonClientsService
+      description: |-
+        MihonClientsService manages API clients: callers such as a Panelarr server or a
+         script, each with its own API key and scopes.
+
+         Scopes:
+         - `sources:read`: browse sources (panelarr.source.v1 reads).
+         - `sources:write`: change source settings and push network profiles.
+         - `admin`: everything, including this service.
+
+         Keys are shown once, when created or rotated, and stored only as hashes.
+         Every method needs the `admin` scope except WhoAmI, which any valid key may call.
+    - name: MihonIntegrationsService
+      description: |-
+        MihonIntegrationsService manages the network settings sources use: challenge
+         solvers, network profiles and which profile each source uses. Needs the `admin`
+         scope.
+
+         A source uses, in order: a profile pushed by a host (SetNetworkProfile in
+         panelarr.source.v1), the profile assigned to it here, the default profile, or a
+         direct connection when there is none.
+    - name: MihonStoresService
+      description: |-
+        MihonStoresService manages extension stores: indexes of extensions published by a
+         third party. No store is configured by default. Needs the `admin` scope.
+
+         A store is pinned to the signing key fingerprint it announces when it's added.
+         Every install from the store must be signed with that key, and a refresh that sees
+         a different key fails instead of changing the pin.
+    - name: SourcePluginService
+      description: |-
+        SourcePluginService is the contract every Panelarr source plugin implements.
+
+         A plugin serves one or more sources. Each source is a catalogue of series that can be
+         browsed (popular, latest, search), and each series has chapters made of pages.
+
+         Keys (series keys, chapter keys, page refs) are opaque strings chosen by the plugin.
+         Callers store them and pass them back as they are, and never parse them.
+
+         Errors use gRPC status codes. When a request fails because of the upstream source,
+         the status carries a google.rpc.ErrorInfo whose `reason` is one of ErrorReason's
+         names without the `ERROR_REASON_` prefix (for example `RATE_LIMITED`), and whose
+         `domain` is `source.panelarr`. RATE_LIMITED may also carry a google.rpc.RetryInfo.

@@ -1,0 +1,13 @@
+# buf configuration for the protos in proto/.
+version: v2
+modules:
+  - path: proto
+deps:
+  - buf.build/googleapis/googleapis
+  - buf.build/gnostic/gnostic
+lint:
+  use:
+    - STANDARD
+breaking:
+  use:
+    - FILE

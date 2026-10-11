@@ -26,6 +26,18 @@ make check   # detekt, ktlint and all tests
 - **No third-party extensions, extension stores or links to them.** Not in code, tests, fixtures, docs or issues. Tests use the small test extensions built in this repo.
 - No site names or URLs of content sources.
 
+## Changing the API
+
+The protos in `proto/` are the source of truth. After changing them:
+
+```sh
+make fmt    # buf format
+make gen    # regenerates the OpenAPI document in service/src/main/resources/openapi
+make check  # includes buf lint
+```
+
+Commit the regenerated OpenAPI document with the proto change. CI fails when it is out of date. Generated Kotlin code is not committed; Gradle builds it.
+
 ## Code style
 
 - Kotlin, official code style, enforced by ktlint (`make fmt` fixes most issues) and detekt.

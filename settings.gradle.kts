@@ -19,4 +19,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "mihon-source"
 
-include(":service")
+include(":api", ":service")

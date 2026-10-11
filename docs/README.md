@@ -2,6 +2,8 @@
 
 | Doc | What it covers |
 |---|---|
+| [api.md](api.md) | The two APIs, protocols, authentication and scopes, errors |
+| [configuration.md](configuration.md) | Environment variables and the data directory |
 | [architecture.md](architecture.md) | How the service is built, for contributors |
 
-More docs (configuration, auth, API) are added as the features land.
+More docs are added as the features land.

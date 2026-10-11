@@ -1,0 +1,47 @@
+syntax = "proto3";
+
+// Document-level settings for the generated OpenAPI document (`make gen`). This file
+// has no messages or services and isn't compiled into code.
+
+package panelarr.mihon.v1;
+
+import "gnostic/openapi/v3/annotations.proto";
+
+option java_multiple_files = true;
+option java_package = "panelarr.mihon.v1";
+option (gnostic.openapi.v3.document) = {
+  info: {
+    title: "mihon-source API"
+    version: "v1"
+    description:
+      "Runs Mihon extensions and serves their sources. `panelarr.source.v1` is the source API and `panelarr.mihon.v1` is the admin API. "
+      "Every endpoint except /v1/health needs `Authorization: Bearer <token>`: the admin token, or a client API key with the right scope. "
+      "Images are served by `GET /v1/sources/{sourceId}/image?ref=...`, and extensions can be uploaded as multipart form data to `POST /v1/admin/extensions/upload` (field `file`)."
+  }
+  components: {
+    security_schemes: {
+      additional_properties: [
+        {
+          name: "bearer"
+          value: {
+            security_scheme: {
+              type: "http"
+              scheme: "bearer"
+              description: "The admin token or a client API key."
+            }
+          }
+        }
+      ]
+    }
+  }
+  security: [
+    {
+      additional_properties: [
+        {
+          name: "bearer"
+          value: {}
+        }
+      ]
+    }
+  ]
+};

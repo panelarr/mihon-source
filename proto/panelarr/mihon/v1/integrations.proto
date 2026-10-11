@@ -1,0 +1,234 @@
+syntax = "proto3";
+
+package panelarr.mihon.v1;
+
+import "google/api/annotations.proto";
+import "google/protobuf/duration.proto";
+
+option java_multiple_files = true;
+option java_package = "panelarr.mihon.v1";
+
+// MihonIntegrationsService manages the network settings sources use: challenge
+// solvers, network profiles and which profile each source uses. Needs the `admin`
+// scope.
+//
+// A source uses, in order: a profile pushed by a host (SetNetworkProfile in
+// panelarr.source.v1), the profile assigned to it here, the default profile, or a
+// direct connection when there is none.
+service MihonIntegrationsService {
+  rpc ListSolvers(ListSolversRequest) returns (ListSolversResponse) {
+    option (google.api.http) = {get: "/v1/admin/solvers"};
+  }
+
+  // PutSolver creates or replaces a solver.
+  rpc PutSolver(PutSolverRequest) returns (PutSolverResponse) {
+    option (google.api.http) = {
+      put: "/v1/admin/solvers/{solver.id}"
+      body: "solver"
+    };
+  }
+
+  // DeleteSolver fails while a profile still uses the solver.
+  rpc DeleteSolver(DeleteSolverRequest) returns (DeleteSolverResponse) {
+    option (google.api.http) = {delete: "/v1/admin/solvers/{solver_id}"};
+  }
+
+  rpc ListProfiles(ListProfilesRequest) returns (ListProfilesResponse) {
+    option (google.api.http) = {get: "/v1/admin/profiles"};
+  }
+
+  // PutProfile creates or replaces a profile. A proxy password left empty keeps the
+  // stored one.
+  rpc PutProfile(PutProfileRequest) returns (PutProfileResponse) {
+    option (google.api.http) = {
+      put: "/v1/admin/profiles/{profile.id}"
+      body: "profile"
+    };
+  }
+
+  // DeleteProfile also removes the profile's assignments.
+  rpc DeleteProfile(DeleteProfileRequest) returns (DeleteProfileResponse) {
+    option (google.api.http) = {delete: "/v1/admin/profiles/{profile_id}"};
+  }
+
+  // ListAssignments lists which profile each source uses and why.
+  rpc ListAssignments(ListAssignmentsRequest) returns (ListAssignmentsResponse) {
+    option (google.api.http) = {get: "/v1/admin/assignments"};
+  }
+
+  // AssignProfile sets the profile of one source. An empty profile_id removes the
+  // assignment, so the source falls back to the default profile.
+  rpc AssignProfile(AssignProfileRequest) returns (AssignProfileResponse) {
+    option (google.api.http) = {
+      put: "/v1/admin/assignments/{source_id}"
+      body: "*"
+    };
+  }
+
+  // SetDefaultProfile sets the profile used by sources without an assignment. An
+  // empty profile_id means a direct connection.
+  rpc SetDefaultProfile(SetDefaultProfileRequest) returns (SetDefaultProfileResponse) {
+    option (google.api.http) = {
+      put: "/v1/admin/default-profile"
+      body: "*"
+    };
+  }
+}
+
+message Solver {
+  // Identifier chosen by the admin: lowercase letters, digits and dashes.
+  string id = 1;
+  string name = 2;
+  SolverType type = 3;
+  // Base URL, e.g. http://flaresolverr:8191.
+  string url = 4;
+  // How long clearance cookies from one solve are reused.
+  google.protobuf.Duration session_ttl = 5;
+  // Upper bound for one solve.
+  google.protobuf.Duration max_timeout = 6;
+  // Use the solver's own response body when a fresh request still fails.
+  bool as_response_fallback = 7;
+}
+
+enum SolverType {
+  SOLVER_TYPE_UNSPECIFIED = 0;
+  SOLVER_TYPE_FLARESOLVERR = 1;
+  SOLVER_TYPE_BYPARR = 2;
+}
+
+message NetworkProfile {
+  // Identifier chosen by the admin: lowercase letters, digits and dashes.
+  string id = 1;
+  string name = 2;
+  // Unset means a direct connection.
+  Proxy proxy = 3;
+  // Solver to use. Empty means none.
+  string solver_id = 4;
+  // Unset means no rate limit.
+  RateLimit rate_limit = 5;
+  // Maximum parallel requests per source. 0 means no limit.
+  uint32 concurrency = 6;
+  UserAgentMode user_agent_mode = 7;
+  // Used when user_agent_mode is FIXED.
+  string user_agent = 8;
+  // Extra headers added to every request.
+  map<string, string> headers = 9;
+  // Name of a cookie jar shared by every source using it. Empty means each source
+  // keeps its own jar.
+  string shared_cookie_jar = 10;
+  google.protobuf.Duration connect_timeout = 11;
+  google.protobuf.Duration read_timeout = 12;
+  google.protobuf.Duration call_timeout = 13;
+}
+
+message Proxy {
+  // http://, https:// or socks5:// URL without credentials.
+  string url = 1;
+  string username = 2;
+  // Write-only. Never returned; has_password says whether one is stored.
+  string password = 3;
+  bool has_password = 4;
+}
+
+message RateLimit {
+  // Requests allowed per period.
+  uint32 requests = 1;
+  google.protobuf.Duration period = 2;
+  // Count requests per target host instead of per source.
+  bool per_host = 3;
+}
+
+enum UserAgentMode {
+  // The service's default user agent.
+  USER_AGENT_MODE_UNSPECIFIED = 0;
+  USER_AGENT_MODE_FIXED = 1;
+  USER_AGENT_MODE_RANDOM_DESKTOP = 2;
+  // The user agent reported by the solver, so it matches its clearance cookies.
+  USER_AGENT_MODE_FROM_SOLVER = 3;
+}
+
+message Assignment {
+  string source_id = 1;
+  // Profile assigned here. Empty when none.
+  string profile_id = 2;
+  // Name of the profile pushed by a host, when there is one. It wins over profile_id.
+  string pushed_profile_name = 3;
+  // Where the effective settings come from.
+  ProfileOrigin effective = 4;
+  // The profile in effect when it's a local one (assigned or default).
+  string effective_profile_id = 5;
+}
+
+enum ProfileOrigin {
+  PROFILE_ORIGIN_UNSPECIFIED = 0;
+  // No profile: direct connection with defaults.
+  PROFILE_ORIGIN_NONE = 1;
+  PROFILE_ORIGIN_DEFAULT = 2;
+  PROFILE_ORIGIN_ASSIGNED = 3;
+  PROFILE_ORIGIN_PUSHED = 4;
+}
+
+message ListSolversRequest {}
+
+message ListSolversResponse {
+  repeated Solver solvers = 1;
+}
+
+message PutSolverRequest {
+  Solver solver = 1;
+}
+
+message PutSolverResponse {
+  Solver solver = 1;
+}
+
+message DeleteSolverRequest {
+  string solver_id = 1;
+}
+
+message DeleteSolverResponse {}
+
+message ListProfilesRequest {}
+
+message ListProfilesResponse {
+  repeated NetworkProfile profiles = 1;
+  // Profile used by sources without an assignment. Empty means none.
+  string default_profile_id = 2;
+}
+
+message PutProfileRequest {
+  NetworkProfile profile = 1;
+}
+
+message PutProfileResponse {
+  NetworkProfile profile = 1;
+}
+
+message DeleteProfileRequest {
+  string profile_id = 1;
+}
+
+message DeleteProfileResponse {}
+
+message ListAssignmentsRequest {}
+
+message ListAssignmentsResponse {
+  // One entry per installed source.
+  repeated Assignment assignments = 1;
+  string default_profile_id = 2;
+}
+
+message AssignProfileRequest {
+  string source_id = 1;
+  string profile_id = 2;
+}
+
+message AssignProfileResponse {
+  Assignment assignment = 1;
+}
+
+message SetDefaultProfileRequest {
+  string profile_id = 1;
+}
+
+message SetDefaultProfileResponse {}

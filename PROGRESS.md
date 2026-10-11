@@ -3,7 +3,7 @@
 The v0 plan, in slices. Each slice works end to end, has tests and ends with `make check` green.
 
 - [x] **1. Scaffold:** Gradle build, `make` targets, lint, repo docs, CI. *(`chore/repo-scaffold`)*
-- [ ] **2. Protos, server skeleton and auth:** `panelarr.source.v1` and `panelarr.mihon.v1` protos, gRPC + HTTP/JSON + OpenAPI, admin token and scoped client API keys.
+- [x] **2. Protos, server skeleton and auth:** `panelarr.source.v1` and `panelarr.mihon.v1` protos, gRPC + HTTP/JSON + OpenAPI, admin token and scoped client API keys. *(`feat/api-protos-auth`)*
 - [ ] **3. Extension loading and admin API:** install by URL or upload (jar, APK via dex2jar), lib 1.4–1.6 check, signing fingerprint, child-first classloader per extension, list/uninstall/reload.
 - [ ] **4. Host classpath and Android shims:** vendored source API, host libraries, our own Android shims, GraalJS-backed JS engines.
 - [ ] **5. Source API:** popular/latest/search with filters, series, chapters, pages, images, settings.
@@ -12,4 +12,4 @@ The v0 plan, in slices. Each slice works end to end, has tests and ends with `ma
 - [ ] **8. Admin SPA:** React + TanStack admin served at `/`.
 - [ ] **9. Image and docs:** multi-arch Docker image, quick start, configuration and API docs.
 
-**Next:** slice 2.
+**Next:** slice 3.
