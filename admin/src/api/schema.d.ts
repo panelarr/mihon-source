@@ -250,7 +250,12 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** @description PutSolver creates or replaces a solver. */
+        /**
+         * @description PutSolver creates or replaces a solver. A solver is only used through a network
+         *      profile. As a convenience, adding a solver while no profiles exist at all also
+         *      creates a profile "default" that uses it and makes it the default profile, so every
+         *      source starts using the solver right away.
+         */
         put: operations["MihonIntegrationsService_PutSolver"];
         post?: never;
         delete?: never;

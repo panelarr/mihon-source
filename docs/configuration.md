@@ -12,6 +12,20 @@ mihon-source reads a few environment variables at start. Everything else (extens
 | `MIHON_MAX_EXTENSION_MB` | `50` | Largest extension file accepted, downloaded or uploaded. |
 | `MIHON_ADMIN_DIR` | *(bundled)* | Serve the admin UI from this directory instead of the copy in the jar. For development. |
 
+## Network settings: solvers, profiles, assignments
+
+Network settings are managed in the admin UI (Integrations) or with `MihonIntegrationsService`. They form a chain:
+
+1. A **solver** is a FlareSolverr-compatible endpoint (FlareSolverr, Byparr), e.g. `http://flaresolverr:8191`. On its own it does nothing.
+2. A **network profile** uses at most one solver, plus an optional proxy, user agent, headers, rate limit, concurrency limit, timeouts and cookie jar.
+3. A profile applies to the sources **assigned** to it, or, as the **default profile**, to every source without an assignment.
+
+Each source uses, in order: a profile pushed by a host (`SetNetworkProfile`), its assigned profile, the default profile, or a direct connection with no solver.
+
+The common setup, a solver for every source, is one step: add the solver while no profiles exist and a profile `default` that uses it is created and made the default. Later, the Integrations page flags solvers that no profile uses, with a button to put one on the default profile.
+
+A request counts as an anti-bot challenge when the site answers 403 or 503 with `cf-mitigated: challenge`, with a Cloudflare `Server` header, or with a challenge page in the body. A challenge is sent to the source's solver. Requests made after that use the clearance cookies and the user agent the solver reported, unless the profile pins a fixed user agent. A challenge with no solver configured fails with the `CLOUDFLARE_CHALLENGE` error reason. Other 403 and 503 responses are logged with the host, status and `Server` header, which helps when a challenge isn't recognized.
+
 ## Data directory
 
 | Path | Contents |

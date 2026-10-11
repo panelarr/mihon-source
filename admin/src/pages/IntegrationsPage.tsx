@@ -68,8 +68,10 @@ const solverTypes: SolverType[] = ["SOLVER_TYPE_FLARESOLVERR", "SOLVER_TYPE_BYPA
 
 function SolversSection() {
   const solvers = useQuery(solversQuery());
+  const profiles = useQuery(profilesQuery());
   const [editing, setEditing] = useState<Solver | "new" | null>(null);
   const [deleting, setDeleting] = useState<Solver | null>(null);
+  const usedSolvers = new Set((profiles.data?.profiles ?? []).map((profile) => profile.solverId).filter(Boolean));
 
   return (
     <section className="section">
@@ -79,6 +81,11 @@ function SolversSection() {
           Add solver
         </button>
       </header>
+      <p className="muted">
+        A solver is only used through a network profile: choose it in a profile, then make that profile the default or
+        assign it to sources. Adding the first solver while there are no profiles creates a default profile that uses
+        it.
+      </p>
       {solvers.isPending ? <Loading /> : null}
       <ErrorBox error={solvers.error} onRetry={() => solvers.refetch()} />
       {solvers.data?.length === 0 ? <Empty>No solvers.</Empty> : null}
@@ -103,6 +110,13 @@ function SolversSection() {
                   <div>
                     <Mono>{solver.id}</Mono>
                   </div>
+                  {profiles.data && !usedSolvers.has(solver.id) ? (
+                    <div>
+                      <Badge tone="warn" title="No network profile uses this solver, so no source uses it.">
+                        Not used by any profile
+                      </Badge>
+                    </div>
+                  ) : null}
                 </td>
                 <td>{enumLabel(solver.type, "SOLVER_TYPE_")}</td>
                 <td className="wrap">{solver.url}</td>
@@ -110,6 +124,13 @@ function SolversSection() {
                 <td>{formatDuration(solver.maxTimeout)}</td>
                 <td>{solver.asResponseFallback ? "Yes" : "No"}</td>
                 <td className="row-actions">
+                  {profiles.data && !usedSolvers.has(solver.id) ? (
+                    <UseForAllSourcesButton
+                      solver={solver}
+                      profiles={profiles.data.profiles}
+                      defaultProfileId={profiles.data.defaultProfileId}
+                    />
+                  ) : null}
                   <button type="button" className="small" onClick={() => setEditing(solver)}>
                     Edit
                   </button>
@@ -127,6 +148,65 @@ function SolversSection() {
       ) : null}
       {deleting ? <DeleteSolverDialog solver={deleting} onClose={() => setDeleting(null)} /> : null}
     </section>
+  );
+}
+
+/**
+ * Makes every source without an assignment use [solver]: the default profile gets the
+ * solver, or a default profile is created. Plain API calls, like everything else here.
+ */
+function UseForAllSourcesButton({
+  solver,
+  profiles,
+  defaultProfileId,
+}: {
+  solver: Solver;
+  profiles: NetworkProfile[];
+  defaultProfileId: string;
+}) {
+  const invalidate = useInvalidateNetwork();
+  const use = useMutation({
+    mutationFn: async () => {
+      const existing = profiles.find((profile) => profile.id === defaultProfileId);
+      if (existing?.id) {
+        await unwrap(
+          api.PUT("/v1/admin/profiles/{profile.id}", {
+            params: { path: { "profile.id": existing.id } },
+            body: { ...existing, solverId: solver.id },
+          }),
+        );
+        return;
+      }
+      const taken = new Set(profiles.map((profile) => profile.id));
+      let id = "default";
+      for (let n = 2; taken.has(id); n++) id = `default-${n}`;
+      await unwrap(
+        api.PUT("/v1/admin/profiles/{profile.id}", {
+          params: { path: { "profile.id": id } },
+          body: { id, name: "Default", solverId: solver.id, userAgentMode: "USER_AGENT_MODE_FROM_SOLVER" },
+        }),
+      );
+      await unwrap(api.PUT("/v1/admin/default-profile", { body: { profileId: id } }));
+    },
+    onSettled: invalidate,
+  });
+  return (
+    <>
+      <button
+        type="button"
+        className="small"
+        disabled={use.isPending}
+        title={
+          defaultProfileId
+            ? "Set this solver on the default profile"
+            : "Create a default profile with this solver, used by every source without an assignment"
+        }
+        onClick={() => use.mutate()}
+      >
+        Use for all sources
+      </button>
+      <ErrorBox error={use.error} />
+    </>
   );
 }
 

@@ -300,6 +300,67 @@ class NetworkProfilesTest {
         }
     }
 
+    @Test
+    fun `a challenge without a solver fails with CLOUDFLARE_CHALLENGE`() {
+        proxyA.override = {
+            MockResponse
+                .Builder()
+                .code(403)
+                .body("<html><title>Just a moment...</title></html>")
+                .build()
+        }
+        putProfile("a", proxyA.baseUrl)
+        assign(en, "a")
+        val error = kotlin.test.assertFailsWith<io.grpc.StatusException> { popular(en) }
+        assertEquals(io.grpc.Status.Code.UNAVAILABLE, error.status.code)
+        val reason =
+            io.grpc.protobuf.StatusProto
+                .fromThrowable(error)!!
+                .detailsList
+                .single()
+                .unpack(com.google.rpc.ErrorInfo::class.java)
+                .reason
+        assertEquals("CLOUDFLARE_CHALLENGE", reason)
+        assertTrue("add a solver" in error.status.description!!)
+    }
+
+    @Test
+    fun `adding the first solver creates a default profile that uses it`() {
+        runBlocking {
+            service.integrations.putSolver(
+                putSolverRequest {
+                    solver =
+                        solver {
+                            id = "fs"
+                            name = "Solver"
+                            type = SolverType.SOLVER_TYPE_FLARESOLVERR
+                            url = "http://127.0.0.1:1"
+                        }
+                },
+            )
+        }
+        val profiles = runBlocking { service.integrations.listProfiles(listProfilesRequest {}) }
+        assertEquals("default", profiles.defaultProfileId)
+        assertEquals("fs", profiles.profilesList.single().solverId)
+        val assignment = runBlocking { service.integrations.listAssignments(listAssignmentsRequest {}) }.assignmentsList.first()
+        assertEquals(ProfileOrigin.PROFILE_ORIGIN_DEFAULT, assignment.effective)
+
+        // A second solver changes nothing: there are profiles now.
+        runBlocking {
+            service.integrations.putSolver(
+                putSolverRequest {
+                    solver =
+                        solver {
+                            id = "other"
+                            name = "Other"
+                            url = "http://127.0.0.1:2"
+                        }
+                },
+            )
+        }
+        assertEquals(1, runBlocking { service.integrations.listProfiles(listProfilesRequest {}) }.profilesCount)
+    }
+
     private companion object {
         const val SOLVE_MILLIS = 500L
     }

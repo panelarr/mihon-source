@@ -5,6 +5,7 @@ import userEvent from "@testing-library/user-event";
 import { HttpResponse, http } from "msw";
 import { describe, expect, it } from "vitest";
 import type { JsonObject, SearchRequest } from "../api/types";
+import { createDb, createHandlers } from "../mocks/handlers";
 import { renderApp } from "../test/render";
 import { server } from "../test/setup";
 
@@ -241,6 +242,22 @@ describe("integrations", () => {
       proxy: { url: "socks5://proxy.example:1080", username: "example-user" },
     });
     expect((body as unknown as { proxy: JsonObject }).proxy).not.toHaveProperty("password");
+    app.dispose();
+  });
+
+  it("flags a solver no profile uses and puts it on the default profile", async () => {
+    const db = createDb();
+    db.solvers = [
+      ...db.solvers,
+      { id: "spare", name: "Spare solver", type: "SOLVER_TYPE_BYPARR", url: "http://spare:8191" },
+    ];
+    server.resetHandlers(...createHandlers(db));
+    const app = renderApp("/integrations");
+    const row = (await screen.findByText("Spare solver")).closest("tr") as HTMLElement;
+    expect(await within(row).findByText("Not used by any profile")).toBeInTheDocument();
+    await userEvent.click(within(row).getByRole("button", { name: "Use for all sources" }));
+    await waitFor(() => expect(db.profiles.find((p) => p.id === db.defaultProfileId)?.solverId).toBe("spare"));
+    await waitFor(() => expect(within(row).queryByText("Not used by any profile")).not.toBeInTheDocument());
     app.dispose();
   });
 

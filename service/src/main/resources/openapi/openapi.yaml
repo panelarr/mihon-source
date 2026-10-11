@@ -344,7 +344,11 @@ paths:
         put:
             tags:
                 - MihonIntegrationsService
-            description: PutSolver creates or replaces a solver.
+            description: |-
+                PutSolver creates or replaces a solver. A solver is only used through a network
+                 profile. As a convenience, adding a solver while no profiles exist at all also
+                 creates a profile "default" that uses it and makes it the default profile, so every
+                 source starts using the solver right away.
             operationId: MihonIntegrationsService_PutSolver
             parameters:
                 - name: solver.id
@@ -2064,6 +2068,9 @@ tags:
         MihonIntegrationsService manages the network settings sources use: challenge
          solvers, network profiles and which profile each source uses. Needs the `admin`
          scope.
+
+         The chain: a solver is used by a profile (solver_id), and a profile applies to the
+         sources it's assigned to, or to every other source when it's the default profile.
 
          A source uses, in order: a profile pushed by a host (SetNetworkProfile in
          panelarr.source.v1), the profile assigned to it here, the default profile, or a

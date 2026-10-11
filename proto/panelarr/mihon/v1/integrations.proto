@@ -14,6 +14,9 @@ option java_package = "panelarr.mihon.v1";
 // solvers, network profiles and which profile each source uses. Needs the `admin`
 // scope.
 //
+// The chain: a solver is used by a profile (solver_id), and a profile applies to the
+// sources it's assigned to, or to every other source when it's the default profile.
+//
 // A source uses, in order: a profile pushed by a host (SetNetworkProfile in
 // panelarr.source.v1), the profile assigned to it here, the default profile, or a
 // direct connection when there is none.
@@ -22,7 +25,10 @@ service MihonIntegrationsService {
     option (google.api.http) = {get: "/v1/admin/solvers"};
   }
 
-  // PutSolver creates or replaces a solver.
+  // PutSolver creates or replaces a solver. A solver is only used through a network
+  // profile. As a convenience, adding a solver while no profiles exist at all also
+  // creates a profile "default" that uses it and makes it the default profile, so every
+  // source starts using the solver right away.
   rpc PutSolver(PutSolverRequest) returns (PutSolverResponse) {
     option (google.api.http) = {
       put: "/v1/admin/solvers/{solver.id}"

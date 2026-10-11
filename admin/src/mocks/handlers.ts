@@ -576,7 +576,15 @@ export function createHandlers(db: Db = createDb(), latency = 0) {
       const solver = (await request.json()) as Solver;
       if (!solver.url) return grpcError("INVALID_ARGUMENT", "url is required");
       const saved = { ...solver, id: String(params.id) };
+      const isNew = !db.solvers.some((s) => s.id === saved.id);
       db.solvers = [...db.solvers.filter((s) => s.id !== saved.id), saved];
+      // Like the service: the first solver, with no profiles at all, becomes the default profile's.
+      if (isNew && db.profiles.length === 0 && !db.defaultProfileId) {
+        db.profiles = [
+          { id: "default", name: "Default", solverId: saved.id, userAgentMode: "USER_AGENT_MODE_FROM_SOLVER" },
+        ];
+        db.defaultProfileId = "default";
+      }
       return ok({ solver: saved });
     }),
 

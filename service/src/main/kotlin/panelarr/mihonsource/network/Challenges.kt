@@ -11,8 +11,35 @@ object Challenges {
     private val CHALLENGE_CODES = setOf(403, 503)
     private val CHALLENGE_SERVERS = setOf("cloudflare", "cloudflare-nginx")
 
-    fun isChallenge(response: Response): Boolean =
-        response.code in CHALLENGE_CODES && response.header("Server")?.lowercase() in CHALLENGE_SERVERS
+    /** Strings that only appear in anti-bot challenge pages. */
+    private val BODY_MARKERS =
+        listOf(
+            "<title>just a moment...</title>",
+            "challenge-platform",
+            "cf-chl",
+            "cf_chl_opt",
+            "cf-browser-verification",
+            "<title>attention required! | cloudflare</title>",
+        )
+
+    /** How much of a body is inspected; challenge pages are small. */
+    private const val PEEK_BYTES = 64L * 1024
+
+    /** Whether [response] could be a challenge at all (a 403 or 503). */
+    fun isCandidate(response: Response): Boolean = response.code in CHALLENGE_CODES
+
+    /**
+     * Whether [response] is an anti-bot challenge: a 403 or 503 that says so in its
+     * `cf-mitigated` header, comes from a Cloudflare server, or carries a challenge page.
+     * The Server header alone isn't enough, because proxies and CDNs rewrite or drop it.
+     */
+    fun isChallenge(response: Response): Boolean {
+        if (!isCandidate(response)) return false
+        if (response.header("cf-mitigated")?.trim()?.equals("challenge", ignoreCase = true) == true) return true
+        if (response.header("Server")?.trim()?.lowercase() in CHALLENGE_SERVERS) return true
+        val body = runCatching { response.peekBody(PEEK_BYTES).string().lowercase() }.getOrNull() ?: return false
+        return BODY_MARKERS.any { it in body }
+    }
 
     fun toCookies(
         solution: Solution,

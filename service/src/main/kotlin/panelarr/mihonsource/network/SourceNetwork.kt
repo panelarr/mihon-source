@@ -41,6 +41,7 @@ class SourceNetwork(
     private val sourceId: () -> Long?,
     private val networks: SourceNetworks,
 ) : NetworkHelper.Backend {
+    private val log = org.slf4j.LoggerFactory.getLogger(SourceNetwork::class.java)
     private val pool = ConnectionPool()
     private val solverAgents = ConcurrentHashMap<String, String>()
     private var cachedVersion = -1L
@@ -164,8 +165,10 @@ class SourceNetwork(
         val current = request.header(USER_AGENT)
         // Only replace user agents we handed out ourselves; an extension's own choice wins.
         if (current == null || UserAgents.isOurs(current)) {
+            // Clearance cookies only work with the user agent they were issued for, so once a
+            // solver has answered for this host its agent is used unless the profile pins one.
             val solverAgent = solverAgents[request.url.host]
-            val agent = if (profile.userAgentMode == UserAgentMode.FROM_SOLVER && solverAgent != null) solverAgent else userAgent()
+            val agent = if (solverAgent != null && profile.userAgentMode != UserAgentMode.FIXED) solverAgent else userAgent()
             builder.header(USER_AGENT, agent)
         }
         profile.headers.forEach { (name, value) -> if (request.header(name) == null) builder.header(name, value) }
@@ -212,12 +215,11 @@ class SourceNetwork(
     private fun solver(chain: Interceptor.Chain): Response {
         val request = chain.request()
         val response = chain.proceed(request)
+        val host = request.url.host
         val profile = profile()
-        val solver = profile.solver ?: return response
-        if (!Challenges.isChallenge(response)) return response
+        val solver = solverFor(response, host, profile) ?: return response
         response.close()
 
-        val host = request.url.host
         val solution =
             try {
                 networks.solvers.solve(solver, request.url.toString(), host, profile.proxy)
@@ -235,15 +237,57 @@ class SourceNetwork(
         val retried = chain.proceed(retry)
         if (!Challenges.isChallenge(retried) || !solver.asResponseFallback || solution.html == null) return retried
         retried.close()
-        return Response
+        return fallbackResponse(retry, solution, solution.html)
+    }
+
+    /**
+     * The solver to pass [response]'s challenge with, or null when it isn't a challenge.
+     * Fails when it is one but the source's profile has no solver.
+     */
+    private fun solverFor(
+        response: Response,
+        host: String,
+        profile: EffectiveProfile,
+    ): SolverSettings? {
+        if (!Challenges.isCandidate(response)) return null
+        if (!Challenges.isChallenge(response)) {
+            // Logged so a blocked source can be diagnosed: was it a challenge we didn't recognize?
+            log.info(
+                "HTTP {} from {} (Server: {}) doesn't look like a challenge; not solving",
+                response.code,
+                host,
+                response.header("Server") ?: "none",
+            )
+            return null
+        }
+        return profile.solver ?: run {
+            response.close()
+            log.info(
+                "Challenge from {} for source {}, but its network profile ({}) has no solver",
+                host,
+                sourceId() ?: "?",
+                profile.profileId ?: "none",
+            )
+            throw ChallengeException(
+                "$host answered with an anti-bot challenge; add a solver to a network profile and assign it to this source " +
+                    "(or make it the default profile)",
+            )
+        }
+    }
+
+    private fun fallbackResponse(
+        retry: Request,
+        solution: Solution,
+        html: String,
+    ): Response =
+        Response
             .Builder()
             .request(retry)
             .protocol(Protocol.HTTP_1_1)
             .code(if (solution.status in SUCCESS) solution.status else HTTP_OK)
             .message("OK (from solver)")
-            .body(solution.html.toResponseBody(HTML))
+            .body(html.toResponseBody(HTML))
             .build()
-    }
 
     private inner class ProfileProxySelector : ProxySelector() {
         override fun select(uri: URI?): List<java.net.Proxy> {

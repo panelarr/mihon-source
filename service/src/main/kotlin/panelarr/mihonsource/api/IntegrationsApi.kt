@@ -54,6 +54,8 @@ import panelarr.mihonsource.network.Urls
 import panelarr.mihonsource.secret.SecretBox
 import panelarr.mihonsource.network.UserAgentMode as Mode
 
+private const val DEFAULT_PROFILE_ID = "default"
+
 /** `panelarr.mihon.v1.MihonIntegrationsService`: solvers, network profiles, assignments. */
 class IntegrationsApi(
     private val store: IntegrationsStore,
@@ -75,7 +77,25 @@ class IntegrationsApi(
         }
 
     override suspend fun putSolver(request: PutSolverRequest): PutSolverResponse =
-        rpc { putSolverResponse { solver = store.putSolver(request.solver.toSettings()).toProto() } }
+        rpc {
+            val settings = request.solver.toSettings()
+            val before = store.state()
+            val saved = store.putSolver(settings)
+            // A solver does nothing until a profile uses it. When there are no profiles at
+            // all, the obvious intent is "use this solver for everything", so set that up.
+            if (before.profiles.isEmpty() && before.defaultProfileId == null && before.solvers.none { it.id == settings.id }) {
+                store.putProfile(
+                    ProfileSettings(
+                        id = DEFAULT_PROFILE_ID,
+                        name = "Default",
+                        solverId = saved.id,
+                        userAgentMode = Mode.FROM_SOLVER,
+                    ),
+                )
+                store.setDefaultProfile(DEFAULT_PROFILE_ID)
+            }
+            putSolverResponse { solver = saved.toProto() }
+        }
 
     override suspend fun deleteSolver(request: DeleteSolverRequest): DeleteSolverResponse =
         rpc {
