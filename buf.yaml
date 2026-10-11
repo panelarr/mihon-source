@@ -2,6 +2,8 @@
 version: v2
 modules:
   - path: proto
+  # panelarr.source.v1, pinned from source-api (third_party/source-api/PIN).
+  - path: third_party/source-api/proto
 deps:
   - buf.build/googleapis/googleapis
   - buf.build/gnostic/gnostic

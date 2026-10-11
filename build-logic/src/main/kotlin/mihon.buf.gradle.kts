@@ -32,7 +32,14 @@ val bufBinary =
     }
 
 val bufExecutable = layout.buildDirectory.file("buf/buf")
-val bufInputs = files("buf.yaml", "buf.lock", "buf.gen.yaml", fileTree("proto") { include("**/*.proto") })
+val bufInputs =
+    files(
+        "buf.yaml",
+        "buf.lock",
+        "buf.gen.yaml",
+        fileTree("proto") { include("**/*.proto") },
+        fileTree("third_party/source-api/proto") { include("**/*.proto") },
+    )
 
 fun bufTask(
     name: String,

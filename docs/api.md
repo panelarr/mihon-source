@@ -1,9 +1,9 @@
 # API
 
-mihon-source serves two APIs, both defined as protobuf in [`proto/`](../proto):
+mihon-source serves two APIs, both defined as protobuf:
 
-- **`panelarr.source.v1`** (`SourcePluginService`): the source API. List sources, browse (popular, latest, search with filters), series details, chapters, pages, images and source settings. Any Panelarr source plugin implements the same contract.
-- **`panelarr.mihon.v1`**: the admin API. Extensions (`MihonAdminService`), extension stores (`MihonStoresService`), API clients (`MihonClientsService`) and network settings (`MihonIntegrationsService`).
+- **`panelarr.source.v1`** (`SourcePluginService`): the source API, from [source-api](https://github.com/panelarr/source-api) (pinned in [`third_party/source-api/`](../third_party/source-api)). List sources, browse (popular, latest, search with filters), series details, chapters, pages, images and source settings. Any Panelarr source plugin implements the same contract. mihon-source has no plugin-level configuration (`GetConfig`/`SetConfig` answer UNIMPLEMENTED): it is configured through its own admin API and environment.
+- **`panelarr.mihon.v1`** (in [`proto/`](../proto)): the admin API. Extensions (`MihonAdminService`), extension stores (`MihonStoresService`), API clients (`MihonClientsService`) and network settings (`MihonIntegrationsService`).
 
 Both are served on one port in three ways:
 

@@ -1,7 +1,7 @@
 # Every target wraps Gradle, so `./gradlew <task>` works the same way.
 # `make` or `make help` lists the targets.
 .DEFAULT_GOAL := help
-.PHONY: help setup build test lint fmt check run docker gen clean compat
+.PHONY: help setup build test lint fmt check run docker gen sync-source-api clean compat
 
 GRADLE ?= ./gradlew
 
@@ -35,6 +35,9 @@ docker: ## Build the Docker image
 
 gen: ## Regenerate generated sources
 	$(GRADLE) gen
+
+sync-source-api: ## Pin the source API protos from a source-api checkout: make sync-source-api [REF=main] [SOURCE_API_DIR=../source-api]
+	$(GRADLE) syncSourceApi -PsourceApiRef=$(or $(REF),main) -PsourceApiDir=$(or $(SOURCE_API_DIR),../source-api)
 
 compat: ## Check extensions against a running service: make compat ARGS="--store URL --random 20 --checks popular"
 	$(GRADLE) --quiet :tools:compat-check:run --args="$(ARGS)"

@@ -520,6 +520,35 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/config": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description GetConfig returns the plugin-level configuration in effect, described by
+         *      PluginInfo.config_schema. Values of properties the schema marks `writeOnly` (secrets
+         *      such as API keys) come back empty. Plugins without a config_schema answer
+         *      UNIMPLEMENTED.
+         */
+        get: operations["SourcePluginService_GetConfig"];
+        /**
+         * @description SetConfig replaces the plugin-level configuration after validating it against
+         *      PluginInfo.config_schema. Hosts call it after starting the plugin and whenever the
+         *      configuration changes. A `writeOnly` property sent empty keeps its current value, so
+         *      a configuration read with GetConfig can be sent back. It returns the configuration in
+         *      effect, as GetConfig does.
+         */
+        put: operations["SourcePluginService_SetConfig"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/health": {
         parameters: {
             query?: never;
@@ -1386,6 +1415,9 @@ export interface components {
             select?: number;
             sort?: components["schemas"]["panelarr.source.v1.SortSelection"];
         };
+        "panelarr.source.v1.GetConfigResponse": {
+            values?: Record<string, never>;
+        };
         "panelarr.source.v1.GetFiltersResponse": {
             /** @description Filters in display order, with their default values. */
             filters?: components["schemas"]["panelarr.source.v1.Filter"][];
@@ -1498,8 +1530,8 @@ export interface components {
             /** @description Limits the plugin asks hosts to respect. Hosts should enforce them too. */
             limits?: components["schemas"]["panelarr.source.v1.Limits"];
             /**
-             * @description JSON Schema of the plugin-level configuration the plugin expects from a host.
-             *      Unset when the plugin needs none.
+             * @description JSON Schema (draft 2020-12) of the plugin-level configuration the plugin expects
+             *      from a host, which sets it with SetConfig. Unset when the plugin needs none.
              */
             configSchema?: Record<string, never>;
             /** @description Common services the plugin can use when a host provides them. */
@@ -1596,6 +1628,12 @@ export interface components {
              *      the rest.
              */
             detailsLoaded?: boolean;
+        };
+        "panelarr.source.v1.SetConfigRequest": {
+            values?: Record<string, never>;
+        };
+        "panelarr.source.v1.SetConfigResponse": {
+            values?: Record<string, never>;
         };
         "panelarr.source.v1.SetNetworkProfileRequest": {
             sourceId?: string;
@@ -2496,6 +2534,50 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["panelarr.mihon.v1.RefreshStoreResponse"];
+                };
+            };
+        };
+    };
+    SourcePluginService_GetConfig: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["panelarr.source.v1.GetConfigResponse"];
+                };
+            };
+        };
+    };
+    SourcePluginService_SetConfig: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["panelarr.source.v1.SetConfigRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["panelarr.source.v1.SetConfigResponse"];
                 };
             };
         };

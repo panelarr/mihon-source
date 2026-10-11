@@ -28,7 +28,13 @@ make check   # detekt, ktlint and all tests
 
 ## Changing the API
 
-The protos in `proto/` are the source of truth. After changing them:
+The admin API protos in `proto/` are the source of truth for `panelarr.mihon.v1`. The source API (`panelarr.source.v1`) is shared by every Panelarr source plugin and lives in [source-api](https://github.com/panelarr/source-api). mihon-source pins a copy in `third_party/source-api/`: don't edit it (the build fails if you do). Change the protos in source-api, then pin the new version:
+
+```sh
+make sync-source-api REF=main   # or a tag; SOURCE_API_DIR defaults to ../source-api
+```
+
+After changing or pinning protos:
 
 ```sh
 make fmt    # buf format
@@ -43,7 +49,7 @@ Commit the regenerated OpenAPI document with the proto change. CI fails when it 
 - Kotlin, official code style, enforced by ktlint (`make fmt` fixes most issues) and detekt.
 - Explain *why* in comments when the code can't say it. Don't comment the obvious.
 - New behaviour comes with tests.
-- Every source file starts with an SPDX licence line: `// SPDX-License-Identifier: GPL-3.0-or-later` for code, `// SPDX-License-Identifier: Apache-2.0` for files in `proto/`.
+- Every source file starts with an SPDX licence line: `// SPDX-License-Identifier: GPL-3.0-or-later` for code, `// SPDX-License-Identifier: Apache-2.0` for files in `proto/` and `third_party/source-api/`.
 
 ## Reporting security issues
 

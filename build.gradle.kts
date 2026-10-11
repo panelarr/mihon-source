@@ -14,10 +14,67 @@ tasks.register("setup") {
     dependsOn(kotlinModules.map { "$it:dependencies" }, "bufBinary", ":admin:npmInstall")
 }
 
+// panelarr.source.v1 is pinned from source-api: third_party/source-api/PIN names the
+// commit and the SHA-256 of the proto, so a local edit fails the build.
+val sourceApiProto = "proto/panelarr/source/v1/source_plugin.proto"
+
+val sourceApiCheck =
+    tasks.register("sourceApiCheck") {
+        group = "verification"
+        description = "Fails when the vendored source API proto differs from its pin."
+        val pin = file("third_party/source-api/PIN")
+        val proto = file("third_party/source-api/$sourceApiProto")
+        inputs.files(pin, proto)
+        doLast {
+            val want = pin.readLines().first { it.startsWith("sha256=") }.substringAfter("=")
+            val got =
+                java.security.MessageDigest
+                    .getInstance("SHA-256")
+                    .digest(proto.readBytes())
+                    .joinToString("") { "%02x".format(it) }
+            check(got == want) {
+                "third_party/source-api/proto was edited. Change the protos in source-api, then run make sync-source-api."
+            }
+        }
+    }
+
+// make sync-source-api [REF=v0.2.0] [SOURCE_API_DIR=../source-api]
+tasks.register("syncSourceApi") {
+    group = "panelarr"
+    description = "Copies the source API proto from a source-api checkout at a ref and pins it."
+    val dir = providers.gradleProperty("sourceApiDir").orElse("../source-api")
+    val ref = providers.gradleProperty("sourceApiRef").orElse("main")
+    val pin = file("third_party/source-api/PIN")
+    val protoPath = sourceApiProto
+    val target = file("third_party/source-api/$protoPath")
+    doLast {
+        fun git(vararg args: String): ByteArray {
+            val process =
+                ProcessBuilder(listOf("git", "-C", dir.get()) + args)
+                    .redirectError(ProcessBuilder.Redirect.INHERIT)
+                    .start()
+            val out = process.inputStream.readBytes()
+            check(process.waitFor() == 0) { "git ${args.joinToString(" ")} failed in ${dir.get()}" }
+            return out
+        }
+        val commit = String(git("rev-parse", "${ref.get()}^{commit}")).trim()
+        val proto = git("show", "$commit:$protoPath")
+        val sha256 =
+            java.security.MessageDigest
+                .getInstance("SHA-256")
+                .digest(proto)
+                .joinToString("") { "%02x".format(it) }
+        target.writeBytes(proto)
+        val kept = pin.readLines().filter { it.startsWith("#") || it.startsWith("repository=") }
+        pin.writeText((kept + listOf("commit=$commit", "sha256=$sha256")).joinToString("\n", postfix = "\n"))
+        logger.lifecycle("Pinned source-api $commit. Run make gen and make check.")
+    }
+}
+
 tasks.register("lint") {
     group = "panelarr"
-    description = "Runs detekt, the ktlint format check, buf lint and the admin SPA's lint."
-    dependsOn(kotlinModules.flatMap { listOf("$it:detekt", "$it:ktlintCheck") }, "bufLint", "bufFormatCheck")
+    description = "Runs detekt, the ktlint format check, buf lint, the source API pin check and the admin SPA's lint."
+    dependsOn(kotlinModules.flatMap { listOf("$it:detekt", "$it:ktlintCheck") }, "bufLint", "bufFormatCheck", sourceApiCheck)
     dependsOn(":admin:lint")
 }
 

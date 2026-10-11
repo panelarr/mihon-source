@@ -6,7 +6,7 @@ mihon-source is one JVM process with no database. Its state is plain files under
 
 | Gradle module | Contents |
 |---|---|
-| `api` | Code generated from `proto/`: messages, gRPC stubs, Kotlin coroutine stubs. Nothing hand-written |
+| `api` | Code generated from `proto/` (the admin API) and `third_party/source-api/proto/` (the source API, pinned from source-api): messages, gRPC stubs, Kotlin coroutine stubs. Nothing hand-written |
 | `extension-api` | The Mihon source API extensions are compiled against (`eu.kanade.tachiyomi.*`), binary compatible with extensions-lib 1.4 and 1.6, plus the libraries extensions expect from their host |
 | `android-compat` | Our own replacements for the Android APIs extensions use: Context and SharedPreferences, Uri, Base64, Bitmap/Canvas (on Java 2D), Html, Looper/Handler and `Dispatchers.Main`, preference classes, QuickJS/Duktape on GraalJS, and inert stubs for UI and WebView |
 | `service` | The service itself |

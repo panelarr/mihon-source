@@ -17,9 +17,11 @@ import panelarr.mihon.v1.whoAmIRequest
 import panelarr.mihonsource.auth.Scopes
 import panelarr.mihonsource.config.AppConfig
 import panelarr.source.v1.SourcePluginServiceGrpcKt.SourcePluginServiceCoroutineStub
+import panelarr.source.v1.getConfigRequest
 import panelarr.source.v1.getInfoRequest
 import panelarr.source.v1.healthRequest
 import panelarr.source.v1.listSourcesRequest
+import panelarr.source.v1.setConfigRequest
 import java.net.URI
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
@@ -144,6 +146,38 @@ class ApiAuthIntegrationTest {
         assertEquals(200, doc.statusCode())
         assertTrue("/v1/sources/{sourceId}/popular" in doc.body())
         assertEquals(200, get("/docs/", null).statusCode())
+    }
+
+    @Test
+    fun `plugin-level config isn't implemented, and setting it needs the write scope`() {
+        val reader = createReader()
+        val read =
+            assertFailsWith<StatusException> {
+                runBlocking {
+                    stub<SourcePluginServiceCoroutineStub>(
+                        reader,
+                    ).getConfig(getConfigRequest {})
+                }
+            }
+        assertEquals(Status.Code.UNIMPLEMENTED, read.status.code)
+        val write =
+            assertFailsWith<StatusException> {
+                runBlocking {
+                    stub<SourcePluginServiceCoroutineStub>(
+                        reader,
+                    ).setConfig(setConfigRequest {})
+                }
+            }
+        assertEquals(Status.Code.PERMISSION_DENIED, write.status.code)
+        val admin =
+            assertFailsWith<StatusException> {
+                runBlocking {
+                    stub<SourcePluginServiceCoroutineStub>(
+                        ADMIN,
+                    ).setConfig(setConfigRequest {})
+                }
+            }
+        assertEquals(Status.Code.UNIMPLEMENTED, admin.status.code)
     }
 
     companion object {

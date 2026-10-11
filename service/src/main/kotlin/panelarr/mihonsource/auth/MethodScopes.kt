@@ -20,6 +20,7 @@ object MethodScopes {
         setOf(
             SourcePluginServiceGrpc.getSetSettingsMethod().fullMethodName,
             SourcePluginServiceGrpc.getSetNetworkProfileMethod().fullMethodName,
+            SourcePluginServiceGrpc.getSetConfigMethod().fullMethodName,
         )
 
     private val sourceService = SourcePluginServiceGrpc.SERVICE_NAME
