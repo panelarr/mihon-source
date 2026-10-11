@@ -21,6 +21,7 @@ import panelarr.mihonsource.auth.ClientRegistry
 import panelarr.mihonsource.auth.Scopes
 import panelarr.mihonsource.compat.AndroidHost
 import panelarr.mihonsource.config.AppConfig
+import panelarr.mihonsource.extension.DateFormatRewriter
 import panelarr.mihonsource.extension.ExtensionIcons
 import panelarr.mihonsource.extension.ExtensionInstaller
 import panelarr.mihonsource.extension.ExtensionManager
@@ -84,7 +85,7 @@ class Application(
         integrations.addListener(networks::configurationChanged)
         MihonHost.install(dataDir, networks)
 
-        extensions = ExtensionManager(dataDir.resolve("extensions"), MihonInstantiator())
+        extensions = ExtensionManager(dataDir.resolve("extensions"), MihonInstantiator(), transform = DateFormatRewriter::rewrite)
         val installer =
             ExtensionInstaller(extensions, Downloader(), config.maxExtensionBytes) { sourceIds ->
                 sourceIds.forEach { id ->

@@ -19,6 +19,8 @@ dependencies {
     // QuickJs and Duktape run on GraalJS. Nothing starts until a script engine is created.
     implementation(libs.graalvm.polyglot)
     implementation(libs.graalvm.js)
+    // Android's date formatting is ICU's; extensions rely on its patterns and parsing.
+    implementation(libs.icu4j)
 }
 
 tasks.withType<JavaCompile>().configureEach {

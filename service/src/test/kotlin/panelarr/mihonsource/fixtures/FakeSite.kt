@@ -74,7 +74,7 @@ class FakeSite : AutoCloseable {
             path.matches(Regex("/api/series/[^/]+/chapters")) -> {
                 json(
                     """[{"id":"c2","name":"Chapter 2","number":2,"uploaded":1700000100000,"scanlator":"Group"},""" +
-                        """{"id":"c1","name":"Chapter 1","number":1,"uploaded":1700000000000}]""",
+                        """{"id":"c1","name":"Chapter 1","number":1,"date":"2023-11-15T00:13:20+02:00"}]""",
                 )
             }
 

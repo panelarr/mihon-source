@@ -232,6 +232,8 @@ class SourceApiTest {
         assertEquals(listOf("c2", "c1"), chapters.map { it.key })
         assertEquals(2.0, chapters[0].number)
         assertEquals(1_700_000_100L, chapters[0].uploadedAt.seconds)
+        // Parsed by the extension with an Android-only (ICU) date pattern.
+        assertEquals(1_700_000_000L, chapters[1].uploadedAt.seconds)
         assertEquals("Group", chapters[0].scanlator)
         assertEquals(site.baseUrl + "/read/c2", chapters[0].url)
 

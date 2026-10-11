@@ -32,7 +32,8 @@ mihon-source is one JVM process with no database. Its state is plain files under
 1. **Inspect.** An APK is told from a jar by content. APK signatures are verified with apksig; jar (v1) signatures by reading every entry. The fingerprint is the SHA-256 of the signing certificate. The manifest (binary in APKs, usually plain text in jars) gives the package, version, lib version, content warning and source classes.
 2. **Convert.** APKs go through dex2jar. Its output has no stack map frames, so they're recomputed with ASM against the extension's own classes and the host API. The APK's `assets/` are copied in.
 3. **Load.** Each extension gets a classloader whose parent exposes only the host API packages (`eu.kanade.tachiyomi.*`, `android.*`, OkHttp, jsoup, kotlinx, Injekt, …) and hides the rest of the service. Delegation is parent first, as on Android, so an extension can't replace the API, yet its own classes in those packages (obfuscated ones, for example) still load from its jar.
-4. **Instantiate.** The classes named in the manifest are created; each is a `Source` or a `SourceFactory`. Any failure is recorded on that extension only.
+4. **Fix up.** As each class is defined, `new SimpleDateFormat(…)` becomes `new IcuSimpleDateFormat(…)` (an ICU-backed subclass in the host), because Android's date formats are ICU's and extensions depend on that.
+5. **Instantiate.** The classes named in the manifest are created; each is a `Source` or a `SourceFactory`. Any failure is recorded on that extension only.
 
 ## Per-source networking
 

@@ -152,7 +152,8 @@ class TestSource(
                         url = dto.id
                         name = dto.name
                         chapter_number = dto.number
-                        date_upload = dto.uploaded
+                        // ZZZZZ is an ISO offset on Android (ICU); the JDK can't parse this.
+                        date_upload = dto.date?.let { DATE_FORMAT.parse(it)?.time } ?: dto.uploaded
                         scanlator = dto.scanlator
                     }
                 }
@@ -284,6 +285,7 @@ class TestSource(
         val name: String,
         val number: Float = -1f,
         val uploaded: Long = 0,
+        val date: String? = null,
         val scanlator: String? = null,
     )
 
@@ -306,6 +308,7 @@ class TestSource(
         const val PREF_LANGS = "langs"
         const val PREF_REJECTED = "rejects_bad"
         private val STATUSES = listOf("any", "ongoing", "completed")
+        private val DATE_FORMAT = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssZZZZZ", java.util.Locale.US)
         private val SORTS = listOf("popular", "latest")
     }
 }

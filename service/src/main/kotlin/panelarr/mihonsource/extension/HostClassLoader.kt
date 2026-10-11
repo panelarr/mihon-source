@@ -54,6 +54,8 @@ class HostClassLoader(
                 "org.json.",
                 "org.intellij.lang.annotations.",
                 "org.jetbrains.annotations.",
+                // The Android-style date format extension bytecode is rewritten to create.
+                "panelarr.mihonsource.compat.IcuSimpleDateFormat",
             )
     }
 }

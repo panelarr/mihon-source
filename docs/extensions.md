@@ -21,6 +21,12 @@ What's reported for each installed extension: version, lib version, sources, the
 
 A source's settings come from its preference screen and are stored like on Android, per source, under `prefs/`. Its cookies are kept under `cookies/`. Uninstalling keeps both unless you ask to delete the data. Some extensions read settings once when they're created; reload the extension if a change doesn't take effect.
 
+## Android behaviour
+
+Extensions are written for Android, and some Android behaviour differs from the JVM's. Where it matters, the host follows Android:
+
+- **Dates:** Android's `SimpleDateFormat` is ICU's, which accepts more pattern letters, reads `ZZZZZ` as an ISO offset (`+02:00`) and `SSSSSS` as a fraction of a second. When an extension is loaded, its `new SimpleDateFormat(…)` calls are rewritten to create an ICU-backed subclass, so dates parse as they do on a phone. Nothing else in the extension changes.
+
 ## Limits
 
 - **WebView:** there's no browser engine. Sources that drive a WebView report the `needs_webview` capability and most of their calls fail.
