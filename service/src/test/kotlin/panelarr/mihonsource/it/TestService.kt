@@ -24,6 +24,7 @@ class TestService(
     val dataDir: Path,
     metricsPort: Int? = null,
     healthCheckInterval: java.time.Duration? = null,
+    storeRefreshInterval: java.time.Duration = java.time.Duration.ZERO,
 ) : AutoCloseable {
     val app =
         Application(
@@ -34,6 +35,7 @@ class TestService(
                 adminToken = ADMIN,
                 metricsPort = metricsPort,
                 healthCheckInterval = healthCheckInterval,
+                storeRefreshInterval = storeRefreshInterval,
             ),
         )
     val base = "http://127.0.0.1:${app.start()}"

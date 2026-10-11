@@ -167,6 +167,38 @@ class StoresTest {
     }
 
     @Test
+    fun `scheduled refresh shows updates but never installs them`() {
+        service.close()
+        service = TestService(dir.resolve("data2"), storeRefreshInterval = java.time.Duration.ofSeconds(1))
+        store.publish(key, listOf(lib16()))
+        val storeId = add().id
+        runBlocking {
+            api.installFromStore(
+                installFromStoreRequest {
+                    this.storeId = storeId
+                    pkgName = TestExtensions.LIB16_PKG
+                },
+            )
+        }
+
+        store.publish(key, listOf(lib16("1.6.3", 106003)))
+        val deadline = System.currentTimeMillis() + 10_000
+        var updates = 0
+        while (System.currentTimeMillis() < deadline && updates == 0) {
+            Thread.sleep(250)
+            updates = runBlocking { api.listAvailable(listAvailableRequest { updatesOnly = true }) }.extensionsCount
+        }
+        assertEquals(1, updates)
+        // Still the old version: refreshing never installs.
+        assertEquals(
+            "1.6.2",
+            service.app.extensions
+                .get(TestExtensions.LIB16_PKG)
+                .record.versionName,
+        )
+    }
+
+    @Test
     fun `files signed by another key are refused`() {
         store.publish(key, listOf(lib16(signer = TestSigningKey("someone else"))))
         val storeId = add().id

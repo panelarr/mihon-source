@@ -5,7 +5,7 @@ mihon-source runs Mihon extensions. It ships with **none** and with **no store c
 ## Installing
 
 - **From a URL or an upload** (`InstallExtension`, or `POST /v1/admin/extensions/upload`): a `.jar` or an `.apk`. You can pass the expected SHA-256 of the file and the expected signing fingerprint; a mismatch aborts the install.
-- **From a store** (`MihonStoresService`): add the store's `repo.json` URL (or an index URL), browse what it offers, install and update. When a store is added, the signing key it announces is **pinned**: every file installed from it must be signed with that key, and a later refresh that sees a different key fails instead of changing the pin. To trust a new key, remove the store and add it again.
+- **From a store** (`MihonStoresService`): store indexes are refreshed every 12 hours by default (`MIHON_STORE_REFRESH_INTERVAL`), so available updates are listed, but updates are only installed when you ask. Add the store's `repo.json` URL (or an index URL), browse what it offers, install and update. When a store is added, the signing key it announces is **pinned**: every file installed from it must be signed with that key, and a later refresh that sees a different key fails instead of changing the pin. To trust a new key, remove the store and add it again.
 
 Supported: extensions built against extensions-lib **1.4 to 1.6**. Others are refused with an error that says why.
 

@@ -24,12 +24,15 @@ data class AppConfig(
     val metricsPort: Int? = null,
     /** How often each source gets a health check. Null means no scheduled checks. */
     val healthCheckInterval: java.time.Duration? = null,
+    /** How often store indexes are refreshed. Zero means never (refresh by hand only). */
+    val storeRefreshInterval: java.time.Duration = DEFAULT_STORE_REFRESH,
 ) {
     companion object {
         const val DEFAULT_PORT = 8902
         const val DEFAULT_MAX_EXTENSION_MB = 50L
         private const val MB = 1024L * 1024
 
+        val DEFAULT_STORE_REFRESH: java.time.Duration = java.time.Duration.ofHours(12)
         private val SIMPLE_DURATION = Regex("(\\d+)\\s*(s|m|h|d)")
 
         /** "90s", "30m", "6h", "1d", "0" or ISO-8601 ("PT6H"). */
@@ -73,6 +76,7 @@ data class AppConfig(
                 adminDir = value("MIHON_ADMIN_DIR")?.let(Path::of),
                 metricsPort = number("MIHON_METRICS_PORT")?.toInt(),
                 healthCheckInterval = value("MIHON_HEALTH_CHECK_INTERVAL")?.let(::duration)?.takeIf { !it.isZero },
+                storeRefreshInterval = value("MIHON_STORE_REFRESH_INTERVAL")?.let(::duration) ?: DEFAULT_STORE_REFRESH,
             )
         }
     }

@@ -48,6 +48,7 @@ import panelarr.mihonsource.secret.SecretBox
 import panelarr.mihonsource.store.StoreIcons
 import panelarr.mihonsource.store.StoreManager
 import panelarr.mihonsource.store.StoreReader
+import panelarr.mihonsource.store.StoreRefresher
 import java.nio.file.Files
 
 /** Name the service reports about itself. */
@@ -67,6 +68,7 @@ class Application(
     val networks: SourceNetworks
     val metrics = Metrics()
     private val health: SourceHealthService
+    val storeRefresher: StoreRefresher
     private val server: ApiServer
 
     @Volatile
@@ -104,6 +106,7 @@ class Application(
             }
         }
         val stores = StoreManager(dataDir.resolve("stores"), StoreReader(downloader), extensions, installer, iconFetcher)
+        storeRefresher = StoreRefresher(stores, config.storeRefreshInterval)
         val storeIcons = StoreIcons(dataDir.resolve("cache/store-icons"), stores, downloader)
 
         metrics.extensionGauges(
@@ -160,6 +163,7 @@ class Application(
         server.start().also {
             ready = true
             health.start(scope)
+            storeRefresher.start(scope)
         }
 
     /** The bound separate metrics port, if one was configured. */
@@ -167,6 +171,7 @@ class Application(
 
     fun stop() {
         health.stop()
+        storeRefresher.stop()
         server.stop().join()
         extensions.close()
         scope.cancel()
