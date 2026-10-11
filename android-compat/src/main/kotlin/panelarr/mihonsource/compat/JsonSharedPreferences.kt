@@ -28,6 +28,7 @@ import java.util.concurrent.CopyOnWriteArrayList
  *
  * File format: `{"key": {"type": "string|int|long|float|boolean|stringSet", "value": ...}}`.
  */
+@Suppress("TooManyFunctions") // one override per SharedPreferences member
 class JsonSharedPreferences(
     private val file: Path,
 ) : SharedPreferences {
