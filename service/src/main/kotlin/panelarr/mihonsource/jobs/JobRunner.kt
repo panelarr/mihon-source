@@ -162,11 +162,15 @@ class JobRunner(
             log.info("Running job {} every {}", job.id, interval)
             schedules +=
                 scope.launch {
+                    fun nextWait() = interval.toMillis() + random.nextLong(interval.toMillis() / JITTER_DIVISOR + 1)
+                    var wait = nextWait()
+                    nextRuns[job.id] = now().plusMillis(wait)
                     while (isActive) {
-                        val wait = interval.toMillis() + random.nextLong(interval.toMillis() / JITTER_DIVISOR + 1)
-                        nextRuns[job.id] = now().plusMillis(wait)
                         delay(wait)
-                        nextRuns.remove(job.id)
+                        // The next run is known before this one starts, so the job always
+                        // shows a next run while its schedule is on.
+                        wait = nextWait()
+                        nextRuns[job.id] = now().plusMillis(wait)
                         scheduled(job)
                     }
                 }
@@ -241,9 +245,11 @@ class JobRunner(
                     notes = context.notes().map { NoteRecord(it.at.toString(), it.level, it.message, it.ref) },
                 )
             histories.getValue(job.id).replace(record)
-            active.remove(job.id)
             val took = Duration.between(Instant.parse(running.record.startedAt), finishedAt)
+            // Counted before the run stops showing as running, so whoever sees it
+            // finished also sees it in the metrics.
             metrics?.jobRun(job.id, status.label, record.trigger.label, took)
+            active.remove(job.id)
             log.info("Job {} {} in {} ms{}", job.id, status.label, took.toMillis(), if (message.isBlank()) "" else ": $message")
         }
     }
