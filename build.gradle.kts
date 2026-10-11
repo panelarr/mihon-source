@@ -6,7 +6,7 @@ plugins {
     id("mihon.buf")
 }
 
-val kotlinModules = subprojects.map { it.path } - ":admin"
+val kotlinModules = subprojects.filter { it.buildFile.exists() }.map { it.path } - ":admin"
 
 tasks.register("setup") {
     group = "panelarr"

@@ -2,11 +2,13 @@
 
 package panelarr.mihonsource.network
 
+import eu.kanade.tachiyomi.network.NetworkHelper
 import okhttp3.Authenticator
 import okhttp3.ConnectionPool
 import okhttp3.Cookie
 import okhttp3.CookieJar
 import okhttp3.Credentials
+import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.HttpUrl
 import okhttp3.Interceptor
 import okhttp3.OkHttpClient
@@ -38,7 +40,7 @@ import java.util.concurrent.atomic.AtomicLong
 class SourceNetwork(
     private val sourceId: () -> Long?,
     private val networks: SourceNetworks,
-) {
+) : NetworkHelper.Backend {
     private val pool = ConnectionPool()
     private val solverAgents = ConcurrentHashMap<String, String>()
     private var cachedVersion = -1L
@@ -66,7 +68,7 @@ class SourceNetwork(
     }
 
     /** The user agent this source sends unless an extension sets its own. */
-    fun userAgent(): String {
+    override fun userAgent(): String {
         val profile = profile()
         return when (profile.userAgentMode) {
             UserAgentMode.FIXED -> profile.userAgent?.takeIf { it.isNotBlank() } ?: UserAgents.DEFAULT
@@ -75,7 +77,7 @@ class SourceNetwork(
         }
     }
 
-    val cookieJar: CookieJar =
+    override val cookieJar: CookieJar =
         object : CookieJar {
             override fun saveFromResponse(
                 url: HttpUrl,
@@ -88,18 +90,55 @@ class SourceNetwork(
     /** The cookie jar in use now (the source's own, or a shared one). */
     fun jar(): FileCookieJar = networks.cookieJar(sourceId(), profile().sharedCookieJar)
 
-    val client: OkHttpClient by lazy {
+    /**
+     * Interceptor class names matter: some extensions check that the client has interceptors
+     * named UncaughtExceptionInterceptor, UserAgentInterceptor and CloudflareInterceptor,
+     * as Mihon's client has, and move the last one to the end.
+     */
+    override val client: OkHttpClient by lazy {
         networks.base
             .newBuilder()
             .connectionPool(pool)
             .proxySelector(ProfileProxySelector())
             .proxyAuthenticator(ProxyAuth())
             .cookieJar(cookieJar)
-            .addInterceptor(::timeouts)
-            .addInterceptor(::headers)
-            .addInterceptor(::limits)
-            .addInterceptor(::solver)
+            .addInterceptor(UncaughtExceptionInterceptor())
+            .addInterceptor(TimeoutInterceptor())
+            .addInterceptor(UserAgentInterceptor())
+            .addInterceptor(LimitInterceptor())
+            .addInterceptor(CloudflareInterceptor())
             .build()
+    }
+
+    /** Turns unexpected exceptions into IOExceptions, so OkHttp's async calls report them. */
+    private class UncaughtExceptionInterceptor : Interceptor {
+        override fun intercept(chain: Interceptor.Chain): Response =
+            try {
+                chain.proceed(chain.request())
+            } catch (e: IOException) {
+                throw e
+            } catch (
+                @Suppress("TooGenericExceptionCaught") e: Exception,
+            ) {
+                throw IOException(e)
+            }
+    }
+
+    private inner class TimeoutInterceptor : Interceptor {
+        override fun intercept(chain: Interceptor.Chain): Response = timeouts(chain)
+    }
+
+    private inner class UserAgentInterceptor : Interceptor {
+        override fun intercept(chain: Interceptor.Chain): Response = headers(chain)
+    }
+
+    private inner class LimitInterceptor : Interceptor {
+        override fun intercept(chain: Interceptor.Chain): Response = limits(chain)
+    }
+
+    /** Passes anti-bot challenges with the profile's solver, if it has one. */
+    private inner class CloudflareInterceptor : Interceptor {
+        override fun intercept(chain: Interceptor.Chain): Response = solver(chain)
     }
 
     private fun timeouts(chain: Interceptor.Chain): Response {
@@ -234,7 +273,7 @@ class SourceNetwork(
         const val PROXY_AUTHORIZATION = "Proxy-Authorization"
         const val HTTP_OK = 200
         val SUCCESS = 200..299
-        val HTML = okhttp3.MediaType.Companion.run { "text/html; charset=utf-8".toMediaType() }
+        val HTML = "text/html; charset=utf-8".toMediaType()
     }
 }
 
@@ -263,6 +302,9 @@ class SourceNetworks(
     }
 
     fun create(sourceId: () -> Long?): SourceNetwork = SourceNetwork(sourceId, this)
+
+    /** Network for code that isn't tied to a source (e.g. extension helpers using a global client). */
+    val global: SourceNetwork by lazy { create { null } }
 
     fun resolve(sourceId: Long): EffectiveProfile = resolver.resolve(sourceId)
 

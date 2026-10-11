@@ -11,10 +11,10 @@ import java.util.Enumeration
 import java.util.jar.JarFile
 
 /**
- * Loads one extension's jar. Host packages always come from [host], so an extension
- * can't replace the API it's loaded through. Everything else is looked up in the
- * extension's own jar first (child first), so the libraries an extension bundles win
- * over anything the host happens to have.
+ * Loads one extension's jar, parent first like Android does: a class the host provides
+ * always comes from the host, so an extension can't replace the API it's loaded
+ * through; everything else comes from the extension's jar. Host package names are not
+ * reserved, because extensions may contain their own (e.g. obfuscated) classes in them.
  *
  * Class bytes pass through [transform] before they're defined, for bytecode fix-ups.
  */
@@ -28,30 +28,13 @@ class ExtensionClassLoader(
     private val jarFile = JarFile(jar.toFile(), false)
     private val jarUri: URI = jar.toUri()
 
-    override fun loadClass(
-        name: String,
-        resolve: Boolean,
-    ): Class<*> =
-        synchronized(getClassLoadingLock(name)) {
-            val loaded =
-                findLoadedClass(name)
-                    ?: if (name.startsWith("java.") || host.isShared(name)) {
-                        host.loadClass(name)
-                    } else {
-                        findOwnClass(name) ?: host.loadClass(name)
-                    }
-            if (resolve) resolveClass(loaded)
-            loaded
-        }
-
-    override fun findClass(name: String): Class<*> = findOwnClass(name) ?: throw ClassNotFoundException(name)
-
-    private fun findOwnClass(name: String): Class<*>? {
-        val entry = jarFile.getJarEntry(name.replace('.', '/') + ".class") ?: return null
+    override fun findClass(name: String): Class<*> {
+        val entry = jarFile.getJarEntry(name.replace('.', '/') + ".class") ?: throw ClassNotFoundException(name)
         val bytes = transform(name, jarFile.getInputStream(entry).use { it.readAllBytes() })
         return defineClass(name, bytes, 0, bytes.size)
     }
 
+    /** The extension's own resources come first, so its assets win over anything shared. */
     override fun getResource(name: String): URL? = findResource(name) ?: host.getResource(name)
 
     override fun getResources(name: String): Enumeration<URL> {

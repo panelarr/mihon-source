@@ -6,7 +6,6 @@ import com.linecorp.armeria.common.HttpHeaderNames
 import com.linecorp.armeria.common.HttpRequest
 import com.linecorp.armeria.common.HttpResponse
 import com.linecorp.armeria.common.HttpStatus
-import com.linecorp.armeria.common.MediaType
 import com.linecorp.armeria.server.HttpService
 import com.linecorp.armeria.server.ServiceRequestContext
 import com.linecorp.armeria.server.SimpleDecoratingHttpService
@@ -43,25 +42,21 @@ class HttpAuth(
             scope: String = Scopes.ADMIN,
         ): (HttpService) -> HttpService = { HttpAuth(it, authenticator, scope) }
 
-        /** Error body in the same shape as transcoded gRPC errors. */
+        /** An error response in the same problem+json shape as API errors. */
         fun error(
             status: HttpStatus,
             message: String,
         ): HttpResponse {
-            val grpc =
+            val code =
                 when (status) {
-                    HttpStatus.UNAUTHORIZED -> "UNAUTHENTICATED" to 16
-                    HttpStatus.FORBIDDEN -> "PERMISSION_DENIED" to 7
-                    HttpStatus.NOT_FOUND -> "NOT_FOUND" to 5
-                    HttpStatus.BAD_REQUEST -> "INVALID_ARGUMENT" to 3
-                    HttpStatus.REQUEST_ENTITY_TOO_LARGE -> "RESOURCE_EXHAUSTED" to 8
-                    else -> "INTERNAL" to 13
+                    HttpStatus.UNAUTHORIZED -> io.grpc.Status.UNAUTHENTICATED
+                    HttpStatus.FORBIDDEN -> io.grpc.Status.PERMISSION_DENIED
+                    HttpStatus.NOT_FOUND -> io.grpc.Status.NOT_FOUND
+                    HttpStatus.BAD_REQUEST -> io.grpc.Status.INVALID_ARGUMENT
+                    HttpStatus.REQUEST_ENTITY_TOO_LARGE -> io.grpc.Status.RESOURCE_EXHAUSTED
+                    else -> io.grpc.Status.INTERNAL
                 }
-            val body = """{"code":${grpc.second},"grpc-code":"${grpc.first}","message":${jsonString(message)}}"""
-            return HttpResponse.of(status, MediaType.JSON_UTF_8, body)
+            return Problems.response(code.withDescription(message), null, null, status)
         }
-
-        private fun jsonString(value: String): String =
-            kotlinx.serialization.json.JsonPrimitive(value).toString()
     }
 }

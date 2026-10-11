@@ -113,5 +113,5 @@ object TestApkBuilder {
         value: String,
     ) = Element("meta-data", listOf(Attribute.Str("name", name), Attribute.Str("value", value)))
 
-    private const val MIN_API = 21
+    private const val MIN_API = 26
 }

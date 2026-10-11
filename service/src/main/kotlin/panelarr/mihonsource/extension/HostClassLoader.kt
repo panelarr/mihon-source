@@ -37,7 +37,7 @@ class HostClassLoader(
                 "android.",
                 "androidx.",
                 "dalvik.",
-                // JS engines (backed by GraalJS).
+                // JS engines.
                 "app.cash.quickjs.",
                 "com.squareup.duktape.",
                 // Libraries extensions expect from the host.
@@ -46,6 +46,8 @@ class HostClassLoader(
                 "kotlinx.serialization.",
                 "okhttp3.",
                 "okio.",
+                "com.squareup.zstd.",
+                "org.brotli.",
                 "org.jsoup.",
                 "rx.",
                 "uy.kohesive.injekt.",

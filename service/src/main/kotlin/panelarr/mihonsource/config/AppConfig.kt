@@ -16,6 +16,10 @@ data class AppConfig(
     val adminToken: String?,
     /** Largest extension file accepted (download or upload), in bytes. */
     val maxExtensionBytes: Long = DEFAULT_MAX_EXTENSION_MB * MB,
+    /** Base64 AES-256 key for secrets at rest. Null means use (or generate) `secret.key`. */
+    val secretKey: String? = null,
+    /** Directory with a built admin SPA, overriding the one bundled in the jar (development). */
+    val adminDir: Path? = null,
 ) {
     companion object {
         const val DEFAULT_PORT = 8902
@@ -34,6 +38,8 @@ data class AppConfig(
                 port = port ?: DEFAULT_PORT,
                 adminToken = value("MIHON_ADMIN_TOKEN"),
                 maxExtensionBytes = (number("MIHON_MAX_EXTENSION_MB") ?: DEFAULT_MAX_EXTENSION_MB) * MB,
+                secretKey = value("MIHON_SECRET_KEY"),
+                adminDir = value("MIHON_ADMIN_DIR")?.let(Path::of),
             )
         }
     }

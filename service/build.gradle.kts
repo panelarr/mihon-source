@@ -6,8 +6,14 @@ plugins {
     application
 }
 
+val testExtensions: Configuration by configurations.creating {
+    isCanBeConsumed = false
+    isTransitive = false
+}
+
 dependencies {
     implementation(project(":api"))
+    implementation(project(":extension-api"))
     implementation(platform(libs.armeria.bom))
     implementation(libs.armeria.core)
     implementation(libs.armeria.grpc)
@@ -30,6 +36,9 @@ dependencies {
     testImplementation(libs.okhttp.mockwebserver)
     testImplementation(libs.r8)
     testImplementation(libs.bouncycastle.pkix)
+
+    testExtensions(project(":test-extensions:lib14"))
+    testExtensions(project(":test-extensions:lib16"))
 }
 
 application {
@@ -38,9 +47,25 @@ application {
 }
 
 tasks.named<JavaExec>("run") {
-    // `make run` keeps its state in ./data at the repository root.
+    // `make run` keeps its state in ./data at the repository root and serves the SPA from admin/dist.
+    dependsOn(":admin:buildSpa")
     environment("MIHON_DATA_DIR", rootProject.file("data").path)
+    environment("MIHON_ADMIN_DIR", rootProject.file("admin/dist").path)
     workingDir = rootProject.projectDir
+}
+
+// The built jar carries the admin SPA under admin/. Tests don't need it.
+tasks.named<Jar>("jar") {
+    dependsOn(":admin:buildSpa")
+    from(rootProject.file("admin/dist")) { into("admin") }
+}
+
+tasks.named<Test>("test") {
+    // Test extensions are fixtures loaded by the extension loader, not test classpath entries.
+    inputs.files(testExtensions)
+    val jars = testExtensions
+    jvmArgumentProviders += CommandLineArgumentProvider { listOf("-Dtest.extensions=" + jars.files.joinToString(File.pathSeparator)) }
+    systemProperty("java.awt.headless", "true")
 }
 
 val buildInfo =

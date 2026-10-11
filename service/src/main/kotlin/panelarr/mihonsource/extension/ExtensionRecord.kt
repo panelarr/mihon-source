@@ -59,4 +59,6 @@ data class ExtensionDescriptor(
     val libVersion: String,
     val classNames: List<String>,
     val nsfw: Boolean,
+    /** From the manifest (lib 1.6), when the extension declares it. */
+    val contentWarning: ExtensionRecord.ContentWarning? = null,
 )

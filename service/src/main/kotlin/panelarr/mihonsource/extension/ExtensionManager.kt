@@ -27,6 +27,7 @@ fun interface SourceInstantiator {
     fun instantiate(
         classLoader: ClassLoader,
         record: ExtensionRecord,
+        jar: Path,
     ): List<HostedSource>
 }
 
@@ -135,7 +136,7 @@ class ExtensionManager(
                         format = prepared.format,
                         classNames = descriptor.classNames,
                         nsfw = descriptor.nsfw,
-                        contentWarning = contentWarning,
+                        contentWarning = contentWarning ?: descriptor.contentWarning,
                         signingFingerprint = prepared.signingFingerprint,
                         sha256 = prepared.sha256,
                         origin = origin,
@@ -179,7 +180,7 @@ class ExtensionManager(
         val installed =
             try {
                 classLoader = ExtensionClassLoader(jarPath(extDir), host, record.pkgName, transform)
-                val sources = instantiator.instantiate(classLoader, record)
+                val sources = instantiator.instantiate(classLoader, record, jarPath(extDir))
                 checkIds(record, sources)
                 InstalledExtension(record, sources, null, classLoader)
             } catch (

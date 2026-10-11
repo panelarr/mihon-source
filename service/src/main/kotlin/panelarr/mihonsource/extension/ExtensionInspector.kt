@@ -122,7 +122,11 @@ object ManifestDescriptors {
     const val FEATURE = "tachiyomi.extension"
     const val META_CLASS = "tachiyomi.extension.class"
     const val META_NSFW = "tachiyomi.extension.nsfw"
+    const val META_NAME = "tachiyomix.name"
+    const val META_CONTENT_WARNING = "tachiyomix.contentWarning"
+    const val META_LIB = "tachiyomix.extensionLib"
     private const val LABEL_PREFIX = "Tachiyomi: "
+    private val LIB_PATTERN = Regex("\\d+\\.\\d+")
 
     fun fromManifest(manifest: ApkManifest): ExtensionDescriptor {
         if (FEATURE !in manifest.features) throw ExtensionException("not a Mihon extension (no '$FEATURE' feature)")
@@ -143,14 +147,28 @@ object ManifestDescriptors {
         metaData: Map<String, String>,
     ): ExtensionDescriptor {
         val classes = metaData[META_CLASS]?.takeIf { it.isNotBlank() } ?: throw ExtensionException("no '$META_CLASS' entry")
+        val warning =
+            when (metaData[META_CONTENT_WARNING]?.trim()) {
+                "0" -> ExtensionRecord.ContentWarning.SAFE
+                "1" -> ExtensionRecord.ContentWarning.MIXED
+                "2" -> ExtensionRecord.ContentWarning.NSFW
+                else -> null
+            }
+        val lib =
+            metaData[META_LIB]?.trim()?.takeIf { it.matches(LIB_PATTERN) }
+                ?: runCatching { LibVersion.fromVersionName(versionName) }.getOrElse { throw ExtensionException(it.message ?: "") }
         return ExtensionDescriptor(
             pkgName = PackageNames.require(pkgName),
-            name = label?.removePrefix(LABEL_PREFIX)?.takeIf { it.isNotBlank() } ?: pkgName,
+            name =
+                metaData[META_NAME]?.takeIf { it.isNotBlank() }
+                    ?: label?.removePrefix(LABEL_PREFIX)?.takeIf { it.isNotBlank() }
+                    ?: pkgName,
             versionName = versionName,
             versionCode = versionCode,
-            libVersion = runCatching { LibVersion.fromVersionName(versionName) }.getOrElse { throw ExtensionException(it.message ?: "") },
+            libVersion = lib,
             classNames = resolveClassNames(pkgName, classes),
-            nsfw = metaData[META_NSFW] == "1",
+            nsfw = warning == ExtensionRecord.ContentWarning.NSFW || (warning == null && metaData[META_NSFW] == "1"),
+            contentWarning = warning,
         )
     }
 
