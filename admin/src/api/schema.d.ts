@@ -1319,7 +1319,11 @@ export interface components {
              * @enum {string}
              */
             contentRating?: "CONTENT_RATING_UNSPECIFIED" | "CONTENT_RATING_SAFE" | "CONTENT_RATING_MIXED" | "CONTENT_RATING_NSFW";
-            /** @description URL of an icon for the source, if the plugin has one. */
+            /**
+             * @description URL of an icon for the source, if the plugin has one. It may be a path relative to
+             *      the plugin's own address (e.g. "/v1/sources/123/icon"), fetched with the same
+             *      credentials as the API.
+             */
             iconUrl?: string;
             capabilities?: ("SOURCE_CAPABILITY_UNSPECIFIED" | "SOURCE_CAPABILITY_LATEST" | "SOURCE_CAPABILITY_SEARCH" | "SOURCE_CAPABILITY_FILTERS" | "SOURCE_CAPABILITY_RESOLVE_URL" | "SOURCE_CAPABILITY_SETTINGS" | "SOURCE_CAPABILITY_NEEDS_WEBVIEW" | "SOURCE_CAPABILITY_NSFW")[];
             /** @description Web address of the source, for display. */

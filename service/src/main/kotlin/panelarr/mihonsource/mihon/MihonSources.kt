@@ -55,6 +55,7 @@ class MihonSources(
             lang = source.lang
             contentRating = rating(source.extension)
             source.homeUrl?.let { homeUrl = it }
+            if (extensions.icons.has(source.extension.pkgName)) iconUrl = "/v1/sources/${source.id}/icon"
             capabilities += capabilities(source)
         }
 

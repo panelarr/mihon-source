@@ -4,7 +4,9 @@ import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/r
 import { getRouteApi, Link } from "@tanstack/react-router";
 import { type FormEvent, type ReactNode, useMemo, useState } from "react";
 import { api, unwrap } from "../api/client";
+import { storeIconPath } from "../api/extras";
 import type { AvailableExtension, Store } from "../api/types";
+import { AuthIcon } from "../components/AuthIcon";
 import { ConfirmDialog } from "../components/Dialog";
 import { TabList, tabProps } from "../components/Tabs";
 import { Badge, Empty, ErrorBox, Field, Loading, Mono, PageHeader } from "../components/ui";
@@ -394,9 +396,17 @@ function AvailableRow({ ext, store }: { ext: AvailableExtension; store: Store | 
   return (
     <tr>
       <td>
-        <strong>{ext.name || ext.pkgName}</strong> <ContentWarningBadge warning={ext.contentWarning} />
-        <br />
-        <Mono>{ext.pkgName}</Mono>
+        <div className="with-icon">
+          <AuthIcon
+            path={ext.storeId && ext.pkgName && ext.iconUrl ? storeIconPath(ext.storeId, ext.pkgName) : undefined}
+            label={ext.name || ext.pkgName || ""}
+          />
+          <div>
+            <strong>{ext.name || ext.pkgName}</strong> <ContentWarningBadge warning={ext.contentWarning} />
+            <br />
+            <Mono>{ext.pkgName}</Mono>
+          </div>
+        </div>
         <ErrorBox error={install.error} />
       </td>
       <td>

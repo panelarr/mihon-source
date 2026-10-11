@@ -4,8 +4,9 @@ import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/r
 import { Link } from "@tanstack/react-router";
 import { type FormEvent, useState } from "react";
 import { api, unwrap } from "../api/client";
-import { uploadExtension } from "../api/extras";
+import { extensionIconPath, uploadExtension } from "../api/extras";
 import type { ContentWarning, Extension } from "../api/types";
+import { AuthIcon } from "../components/AuthIcon";
 import { Dialog } from "../components/Dialog";
 import { Badge, Empty, ErrorBox, Field, Loading, Mono, PageHeader } from "../components/ui";
 import { enumLabel, formatDate, languageLabel, shortHash } from "../lib/format";
@@ -76,9 +77,12 @@ function ExtensionCard({ extension, onUninstall }: { extension: Extension; onUni
   return (
     <article className={failed ? "card extension failed" : "card extension"}>
       <header className="card-header">
-        <div>
-          <h3>{extension.name || pkgName}</h3>
-          <Mono>{pkgName}</Mono>
+        <div className="with-icon">
+          <AuthIcon path={extensionIconPath(pkgName)} label={extension.name || pkgName} />
+          <div>
+            <h3>{extension.name || pkgName}</h3>
+            <Mono>{pkgName}</Mono>
+          </div>
         </div>
         <span className="badges">
           {failed ? <Badge tone="bad">Error</Badge> : <Badge tone="good">Loaded</Badge>}

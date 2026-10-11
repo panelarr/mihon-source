@@ -1982,7 +1982,10 @@ components:
                     format: enum
                 iconUrl:
                     type: string
-                    description: URL of an icon for the source, if the plugin has one.
+                    description: |-
+                        URL of an icon for the source, if the plugin has one. It may be a path relative to
+                         the plugin's own address (e.g. "/v1/sources/123/icon"), fetched with the same
+                         credentials as the API.
                 capabilities:
                     type: array
                     items:

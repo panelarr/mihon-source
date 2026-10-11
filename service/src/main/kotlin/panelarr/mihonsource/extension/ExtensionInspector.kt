@@ -14,6 +14,8 @@ class PreparedExtension(
     val jar: Path,
     val sha256: String,
     val signingFingerprint: String?,
+    /** The launcher icon found in the file, if any. */
+    val icon: ByteArray? = null,
 )
 
 /** What the caller expects the file to be. Mismatches abort the install. */
@@ -94,6 +96,7 @@ class ExtensionInspector(
             }
         val descriptor = ManifestDescriptors.fromManifest(manifest)
         LibVersion.requireSupported(descriptor.libVersion)
+        val icon = ExtensionIcons.extract(apk)
         val jar = Files.createTempFile(workDir, descriptor.pkgName, ".jar")
         try {
             ApkConverter.convert(apk, jar)
@@ -103,7 +106,7 @@ class ExtensionInspector(
         } finally {
             Files.deleteIfExists(apk)
         }
-        return PreparedExtension(descriptor, ExtensionRecord.Format.APK, jar, sha256, fingerprint)
+        return PreparedExtension(descriptor, ExtensionRecord.Format.APK, jar, sha256, fingerprint, icon)
     }
 
     private fun prepareJar(
@@ -114,7 +117,7 @@ class ExtensionInspector(
         val fingerprint = Signatures.verifyJar(jar)
         val descriptor = jarDescriptors.read(jar, hint)
         LibVersion.requireSupported(descriptor.libVersion)
-        return PreparedExtension(descriptor, ExtensionRecord.Format.JAR, jar, sha256, fingerprint)
+        return PreparedExtension(descriptor, ExtensionRecord.Format.JAR, jar, sha256, fingerprint, ExtensionIcons.extract(jar))
     }
 
     private companion object {

@@ -63,6 +63,8 @@ class StoreManager(
     private val reader: StoreReader,
     private val extensions: ExtensionManager,
     private val installer: ExtensionInstaller,
+    /** Downloads an icon, or null when that fails. Icons are best effort. */
+    private val iconFetcher: suspend (String) -> ByteArray? = { null },
     private val clock: () -> Instant = Instant::now,
 ) {
     private val log = LoggerFactory.getLogger(StoreManager::class.java)
@@ -214,8 +216,16 @@ class StoreManager(
             installer.uninstall(installed.record.pkgName, deleteData = false)
             throw ExtensionException("the store's file contains '${installed.record.pkgName}', not '$pkgName'")
         }
+        // Many extension files don't carry their icon under a findable name; the store's does.
+        if (!extensions.icons.has(pkgName)) offer.iconUrl?.let { url -> iconFetcher(url)?.let { extensions.icons.save(pkgName, it) } }
         return installed
     }
+
+    /** The icon URL the store lists for [pkgName], if any. */
+    fun iconUrl(
+        storeId: String,
+        pkgName: String,
+    ): String? = snapshot(get(storeId).id).firstOrNull { it.pkgName == pkgName }?.iconUrl
 
     private fun warning(value: IndexContentWarning): ExtensionRecord.ContentWarning =
         when (value) {

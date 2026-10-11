@@ -3,7 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { getRouteApi, Link } from "@tanstack/react-router";
 import { useMemo } from "react";
-import { AuthImage } from "../../components/AuthImage";
+import { AuthIcon } from "../../components/AuthIcon";
 import { Empty, ErrorBox, Field, Loading, Mono, PageHeader } from "../../components/ui";
 import { languageLabel } from "../../lib/format";
 import { sourcesQuery } from "./queries";
@@ -86,9 +86,17 @@ export function SourcesPage() {
             {visible.map((source) => (
               <tr key={source.id}>
                 <td className="icon-cell">
-                  {source.iconUrl && source.id ? (
-                    <AuthImage sourceId={source.id} imageRef={source.iconUrl} alt="" className="icon" />
-                  ) : null}
+                  {/* The service serves icons at a path of its own; other URLs go through the image endpoint. */}
+                  <AuthIcon
+                    path={
+                      source.iconUrl?.startsWith("/")
+                        ? source.iconUrl
+                        : source.iconUrl && source.id
+                          ? `/v1/sources/${encodeURIComponent(source.id)}/image?ref=${encodeURIComponent(source.iconUrl)}`
+                          : undefined
+                    }
+                    label={source.name ?? ""}
+                  />
                 </td>
                 <td>
                   <Link to="/sources/$sourceId" params={{ sourceId: source.id ?? "" }}>

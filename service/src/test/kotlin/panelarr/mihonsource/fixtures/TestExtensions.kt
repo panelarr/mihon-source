@@ -108,10 +108,19 @@ object TestExtensions {
                 key,
                 out,
                 assets,
+                mapOf("res/mipmap-mdpi/ic_launcher.png" to png(16), "res/mipmap-xxhdpi/ic_launcher.png" to png(48)),
             )
         } finally {
             Files.deleteIfExists(classesOnly)
         }
+    }
+
+    /** A small solid PNG of [size] pixels, as a test icon. */
+    fun png(size: Int): ByteArray {
+        val image = java.awt.image.BufferedImage(size, size, java.awt.image.BufferedImage.TYPE_INT_RGB)
+        val out = java.io.ByteArrayOutputStream()
+        javax.imageio.ImageIO.write(image, "png", out)
+        return out.toByteArray()
     }
 
     private const val MIN_SDK = 26

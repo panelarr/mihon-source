@@ -136,6 +136,15 @@ class StoresTest {
         assertEquals(storeId, installed.origin.storeId)
         assertEquals(Signatures.fingerprint(key.certificate), installed.signingFingerprint)
         assertEquals(ContentWarning.CONTENT_WARNING_MIXED, installed.contentWarning)
+        // The jar has no icon, so the store's is kept; the store's icon is also served through the service.
+        assertEquals(200, service.get("/v1/admin/extensions/${TestExtensions.LIB16_PKG}/icon").statusCode())
+        val proxied = service.get("/v1/admin/stores/$storeId/extensions/${TestExtensions.LIB16_PKG}/icon")
+        assertEquals(200, proxied.statusCode())
+        assertEquals("image/png", proxied.headers().firstValue("content-type").get())
+        assertEquals(
+            401,
+            service.get("/v1/admin/stores/$storeId/extensions/${TestExtensions.LIB16_PKG}/icon", token = "msk_nope").statusCode(),
+        )
 
         store.publish(key, listOf(lib16("1.6.3", 106003)))
         runBlocking { api.refreshStore(refreshStoreRequest { this.storeId = storeId }) }

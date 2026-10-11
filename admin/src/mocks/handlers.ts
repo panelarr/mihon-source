@@ -293,6 +293,24 @@ export function createHandlers(db: Db = createDb(), latency = 0) {
       return new HttpResponse(fakeImage(ref), { headers: { "Content-Type": "image/svg+xml" } });
     }),
 
+    // Icons: a generated image for the first sources and extensions, none for the rest.
+    http.get(`${base}/sources/:sourceId/icon`, async ({ request, params }) => {
+      const denied = guard(request, false);
+      if (denied) return denied;
+      return new HttpResponse(fakeImage(`icon-${params.sourceId}`), { headers: { "Content-Type": "image/svg+xml" } });
+    }),
+    http.get(`${base}/admin/extensions/:pkgName/icon`, async ({ request, params }) => {
+      const denied = guard(request, true);
+      if (denied) return denied;
+      if (String(params.pkgName).endsWith("broken")) return grpcError("NOT_FOUND", "no icon");
+      return new HttpResponse(fakeImage(`icon-${params.pkgName}`), { headers: { "Content-Type": "image/svg+xml" } });
+    }),
+    http.get(`${base}/admin/stores/:storeId/extensions/:pkgName/icon`, async ({ request, params }) => {
+      const denied = guard(request, true);
+      if (denied) return denied;
+      return new HttpResponse(fakeImage(`icon-${params.pkgName}`), { headers: { "Content-Type": "image/svg+xml" } });
+    }),
+
     http.get(`${base}/sources/:sourceId/settings/schema`, async ({ request, params }) => {
       await wait();
       const denied = guard(request, false);

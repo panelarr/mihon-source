@@ -245,7 +245,9 @@ message Source {
   // Language as a BCP 47 tag, or "all" / "multi" for multi-language sources.
   string lang = 3;
   ContentRating content_rating = 4;
-  // URL of an icon for the source, if the plugin has one.
+  // URL of an icon for the source, if the plugin has one. It may be a path relative to
+  // the plugin's own address (e.g. "/v1/sources/123/icon"), fetched with the same
+  // credentials as the API.
   string icon_url = 5;
   repeated SourceCapability capabilities = 6;
   // Web address of the source, for display.

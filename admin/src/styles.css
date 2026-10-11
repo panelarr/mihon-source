@@ -855,3 +855,40 @@ p.success {
   flex-direction: column;
   gap: 0.25rem;
 }
+
+/* Extension and source icons. */
+.icon {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 0.4rem;
+  overflow: hidden;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  vertical-align: middle;
+}
+
+.icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.icon-letter {
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.with-icon {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  min-width: 0;
+}
+
+.with-icon > :last-child {
+  min-width: 0;
+}

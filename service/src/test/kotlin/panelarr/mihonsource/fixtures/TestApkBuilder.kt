@@ -35,6 +35,8 @@ object TestApkBuilder {
         key: TestSigningKey,
         out: Path,
         assets: Map<String, ByteArray> = emptyMap(),
+        /** Extra entries, e.g. "res/mipmap-xxhdpi/ic_launcher.png". */
+        resources: Map<String, ByteArray> = emptyMap(),
     ): Path {
         val work = Files.createTempDirectory("apk")
         try {
@@ -62,6 +64,11 @@ object TestApkBuilder {
                 }
                 assets.forEach { (name, bytes) ->
                     zip.putNextEntry(ZipEntry("assets/$name"))
+                    zip.write(bytes)
+                    zip.closeEntry()
+                }
+                resources.forEach { (name, bytes) ->
+                    zip.putNextEntry(ZipEntry(name))
                     zip.write(bytes)
                     zip.closeEntry()
                 }

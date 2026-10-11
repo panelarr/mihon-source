@@ -68,6 +68,7 @@ class ExtensionManager(
     private val listeners = mutableListOf<ExtensionListener>()
     private val workDir: Path = dir.resolve(".work")
     val inspector = ExtensionInspector(workDir)
+    val icons = ExtensionIcons(dir)
 
     fun addListener(listener: ExtensionListener) {
         listeners += listener
@@ -147,6 +148,7 @@ class ExtensionManager(
                 val extDir = Files.createDirectories(dir.resolve(record.pkgName))
                 Files.move(prepared.jar, jarPath(extDir), StandardCopyOption.REPLACE_EXISTING)
                 recordFile(extDir).write(record)
+                prepared.icon?.let { icons.save(record.pkgName, it) }
                 log.info("Installed {} {} ({})", record.pkgName, record.versionName, record.format)
                 load(record)
             } finally {

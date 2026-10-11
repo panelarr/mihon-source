@@ -57,6 +57,9 @@ class ExtensionLoadingTest {
 
         val sources = runBlocking { service.sources.listSources(listSourcesRequest {}) }.sourcesList
         assertEquals(2, sources.size)
+        // This jar has no icon of its own.
+        assertTrue(sources.all { it.iconUrl.isEmpty() })
+        assertEquals(404, service.get("/v1/sources/${sources[0].id}/icon").statusCode())
         // Mihon's id scheme: MD5 of "name/lang/versionId".
         assertTrue(sources.all { it.id.toLong() > 0 })
     }

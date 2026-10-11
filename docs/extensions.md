@@ -9,6 +9,8 @@ mihon-source runs Mihon extensions. It ships with **none** and with **no store c
 
 Supported: extensions built against extensions-lib **1.4 to 1.6**. Others are refused with an error that says why.
 
+Icons: an extension's launcher icon is taken from its file when it uses the usual resource name, otherwise from the store it was installed from. They're served by the service (see [the API](api.md)).
+
 What's reported for each installed extension: version, lib version, sources, the SHA-256 of the file, the signing certificate fingerprint (empty when unsigned), and load errors.
 
 ## Store formats

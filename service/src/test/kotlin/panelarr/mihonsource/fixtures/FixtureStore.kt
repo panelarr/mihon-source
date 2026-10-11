@@ -76,6 +76,7 @@ class FixtureStore : AutoCloseable {
             offers.map { offer ->
                 val path = "/store/files/${offer.pkgName}-${offer.versionName}.${if (offer.asJar) "jar" else "apk"}"
                 put(path, offer.file)
+                put("/store/icons/${offer.pkgName}.png", TestExtensions.png(32))
                 IndexExtension(
                     name = offer.name,
                     packageName = offer.pkgName,
@@ -83,6 +84,7 @@ class FixtureStore : AutoCloseable {
                         IndexExtension.Resources(
                             apkUrl = if (offer.asJar) "" else "files/${path.substringAfterLast('/')}",
                             jarUrl = if (offer.asJar) "files/${path.substringAfterLast('/')}" else "",
+                            iconUrl = "icons/${offer.pkgName}.png",
                         ),
                     extensionLib = offer.libVersion,
                     versionCode = offer.versionCode,

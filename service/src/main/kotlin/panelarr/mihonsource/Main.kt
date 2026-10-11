@@ -21,10 +21,12 @@ import panelarr.mihonsource.auth.ClientRegistry
 import panelarr.mihonsource.auth.Scopes
 import panelarr.mihonsource.compat.AndroidHost
 import panelarr.mihonsource.config.AppConfig
+import panelarr.mihonsource.extension.ExtensionIcons
 import panelarr.mihonsource.extension.ExtensionInstaller
 import panelarr.mihonsource.extension.ExtensionManager
 import panelarr.mihonsource.http.ApiServer
 import panelarr.mihonsource.http.HttpAuth
+import panelarr.mihonsource.http.IconService
 import panelarr.mihonsource.http.ImageService
 import panelarr.mihonsource.http.SpaFiles
 import panelarr.mihonsource.http.UploadService
@@ -38,6 +40,7 @@ import panelarr.mihonsource.network.PushedProfiles
 import panelarr.mihonsource.network.SolverClient
 import panelarr.mihonsource.network.SourceNetworks
 import panelarr.mihonsource.secret.SecretBox
+import panelarr.mihonsource.store.StoreIcons
 import panelarr.mihonsource.store.StoreManager
 import panelarr.mihonsource.store.StoreReader
 import java.nio.file.Files
@@ -83,7 +86,15 @@ class Application(
                 }
             }
         runBlocking { extensions.loadAll() }
-        val stores = StoreManager(dataDir.resolve("stores"), StoreReader(Downloader()), extensions, installer)
+        val downloader = Downloader()
+        val iconFetcher: suspend (String) -> ByteArray? = { url ->
+            runCatching { downloader.fetch(url, ExtensionIcons.MAX_BYTES.toLong()) }.getOrNull()?.takeIf {
+                ExtensionIcons.contentType(it) !=
+                    null
+            }
+        }
+        val stores = StoreManager(dataDir.resolve("stores"), StoreReader(downloader), extensions, installer, iconFetcher)
+        val storeIcons = StoreIcons(dataDir.resolve("cache/store-icons"), stores, downloader)
 
         val sources = MihonSources(extensions)
         server =
@@ -105,6 +116,12 @@ class Application(
                     mapOf(
                         "/v1/sources/{sourceId}/image" to HttpAuth(ImageService(sources, scope), authenticator, Scopes.SOURCES_READ),
                         "/v1/admin/extensions/upload" to HttpAuth(UploadService(installer, scope), authenticator, Scopes.ADMIN),
+                        "/v1/sources/{sourceId}/icon" to
+                            HttpAuth(IconService.forSources(extensions, scope), authenticator, Scopes.SOURCES_READ),
+                        "/v1/admin/extensions/{pkgName}/icon" to
+                            HttpAuth(IconService.forExtensions(extensions, scope), authenticator, Scopes.ADMIN),
+                        "/v1/admin/stores/{storeId}/extensions/{pkgName}/icon" to
+                            HttpAuth(IconService.forStores(storeIcons, scope), authenticator, Scopes.ADMIN),
                     ),
                 // Base64 in JSON makes uploads a third larger.
                 maxRequestLength = config.maxExtensionBytes * 4 / 3 + REQUEST_OVERHEAD,

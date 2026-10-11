@@ -18,6 +18,9 @@ Two HTTP routes have no RPC of their own:
 | Route | Does |
 |---|---|
 | `GET /v1/sources/{sourceId}/image?ref=<ref>` | Streams an image through the source's client: a `Page.ref` from ListPages, or an absolute image URL such as a cover. The HTTP form of `FetchImage`. Scope `sources:read`. |
+| `GET /v1/sources/{sourceId}/icon` | The icon of a source's extension. `Source.iconUrl` points here when there is one. Scope `sources:read`. |
+| `GET /v1/admin/extensions/{pkgName}/icon` | An installed extension's icon. Scope `admin`. |
+| `GET /v1/admin/stores/{storeId}/extensions/{pkgName}/icon` | A store's icon for an extension it offers, fetched through the service and cached for a week, so clients never load images from the store. Scope `admin`. |
 | `POST /v1/admin/extensions/upload` | Installs an extension from `multipart/form-data`: field `file`, optional `expectedSha256` and `expectedSigningFingerprint`. Answers like `InstallExtension`. Scope `admin`. |
 
 ## Authentication
