@@ -1,5 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+// The deprecated Rx members are kept, and used, for extensions built against lib 1.4.
+@file:Suppress("DEPRECATION", "OVERRIDE_DEPRECATION")
+
 package eu.kanade.tachiyomi.source.online
 
 import eu.kanade.tachiyomi.network.GET

@@ -14,23 +14,39 @@ mihon-source ships with **no extensions and no extension stores**. You choose an
 
 ## Quick start
 
-The Docker image doesn't exist yet. Until then, run from source:
-
 ```sh
-make setup   # downloads Gradle, a JDK 21 toolchain, buf and dependencies
-make run     # listens on :8902, keeps its state in ./data
+docker run -d --name mihon-source -p 8902:8902 -v mihon-source-data:/data panelarr/mihon-source
+docker logs mihon-source   # shows the generated admin token, once
 ```
 
-On first start an admin token is printed once. Use it to create an API key and call the API:
+Open `http://localhost:8902/` and sign in with the admin token. From there you can add an extension store or install an extension by URL or upload, then browse its sources. Or use the API:
 
 ```sh
+ADMIN=msa_...   # the token from the logs
 curl localhost:8902/v1/health
+curl -H "Authorization: Bearer $ADMIN" -X POST localhost:8902/v1/admin/extensions \
+  -d '{"url": "https://example.com/some-extension.jar"}'
 curl -H "Authorization: Bearer $ADMIN" -X POST localhost:8902/v1/admin/clients \
-  -d '{"name": "me", "scopes": ["sources:read"]}'
+  -d '{"name": "me", "scopes": ["sources:read"]}'      # prints an API key, once
 curl -H "Authorization: Bearer $KEY" localhost:8902/v1/sources
+curl -H "Authorization: Bearer $KEY" "localhost:8902/v1/sources/$SOURCE_ID/popular?page=1"
 ```
 
-The admin UI is at `http://localhost:8902/` (sign in with the admin token). API docs are at `http://localhost:8902/docs/` (OpenAPI document at `/openapi.yaml`). See [docs/api.md](docs/api.md), [docs/extensions.md](docs/extensions.md) and [docs/configuration.md](docs/configuration.md).
+API docs are at `http://localhost:8902/docs/` (OpenAPI document at `/openapi.yaml`); gRPC is served on the same port. See [docs/api.md](docs/api.md), [docs/extensions.md](docs/extensions.md) and [docs/configuration.md](docs/configuration.md).
+
+Notes:
+
+- All state is in `/data`. The image runs as user 10001. With a bind mount instead of a named volume, make the directory writable for that user, or run with `--user "$(id -u):$(id -g)"`.
+- Set `MIHON_ADMIN_TOKEN` to choose the admin token yourself.
+- The image has no browser engine, so sources that need a WebView don't work.
+
+### From source
+
+```sh
+make setup   # downloads Gradle, a JDK 21 toolchain, Node.js, buf and dependencies
+make run     # builds the admin UI, listens on :8902, keeps its state in ./data
+make docker  # builds panelarr/mihon-source:dev for this machine
+```
 
 ## Development
 

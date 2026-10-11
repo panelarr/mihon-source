@@ -10,8 +10,6 @@ The v0 plan, in slices. Each slice works end to end, has tests and ends with `ma
 - [x] **6. Per-source networking and integrations:** OkHttp per source from network profiles, solvers, cookies, rate limits.
 - [x] **7. Extension stores:** add, refresh, list available, install and update, signing-key pinning.
 - [x] **8. Admin SPA:** React + TanStack admin served at `/`.
-- [ ] **9. Image and docs:** multi-arch Docker image, quick start, configuration and API docs.
+- [x] **9. Image and docs:** multi-arch Docker image, quick start, configuration and API docs.
 
-Slices 3–7 are merged into `main` (one squash commit). Slice 8: the admin UI is merged and served at `/` with a strict CSP.
-
-**Next:** slice 9, the multi-arch Docker image (`make docker`) and the quick start with it.
+All v0 slices are done. The image is built by `make docker` (local platform) and by the Docker workflow (linux/amd64 and linux/arm64, pushed on main and tags).

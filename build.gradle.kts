@@ -39,8 +39,12 @@ tasks.register("gen") {
     dependsOn("bufGenerate")
 }
 
-tasks.register("docker") {
+// `make docker` builds the image for this machine's platform and loads it as
+// panelarr/mihon-source:dev. Multi-arch images are built and pushed by CI.
+tasks.register<Exec>("docker") {
     group = "panelarr"
-    description = "Builds the Docker image."
-    doLast { logger.lifecycle("The Docker image isn't set up yet.") }
+    description = "Builds the Docker image (panelarr/mihon-source:dev) for the local platform."
+    val tag = providers.gradleProperty("dockerTag").orElse("panelarr/mihon-source:dev")
+    commandLine("docker", "buildx", "build", "--load", "--tag", tag.get(), ".")
+    workingDir = projectDir
 }

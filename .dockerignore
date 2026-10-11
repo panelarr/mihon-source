@@ -1,0 +1,10 @@
+# Build outputs and local state never go into the build context.
+**/build/
+**/.gradle/
+.kotlin/
+admin/node_modules/
+admin/dist/
+data/
+.git/
+.idea/
+*.log
