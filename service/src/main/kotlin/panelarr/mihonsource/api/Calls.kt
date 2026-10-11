@@ -29,6 +29,9 @@ internal suspend fun <T> rpc(block: suspend () -> T): T =
         throw Status.NOT_FOUND.withDescription(e.message).asException()
     } catch (e: IllegalStateException) {
         throw Status.FAILED_PRECONDITION.withDescription(e.message).asException()
+    } catch (e: java.io.IOException) {
+        // Downloads and other outbound requests made on the caller's behalf.
+        throw Status.UNAVAILABLE.withDescription(e.message).asException()
     } catch (
         @Suppress("TooGenericExceptionCaught") e: Exception,
     ) {

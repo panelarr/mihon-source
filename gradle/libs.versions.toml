@@ -15,6 +15,12 @@ coroutines = "1.11.0"
 serialization = "1.11.0"
 logback = "1.5.20"
 swaggerUi = "5.33.1"
+apksig = "9.4.1"
+dex2jar = "2.4.38"
+asm = "9.11"
+okhttp = "5.5.0"
+r8 = "9.5.23"
+bouncycastle = "1.86"
 
 [libraries]
 junit-bom = { module = "org.junit:junit-bom", version.ref = "junit" }
@@ -38,6 +44,15 @@ coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", ve
 serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "serialization" }
 logback = { module = "ch.qos.logback:logback-classic", version.ref = "logback" }
 swagger-ui = { module = "org.webjars:swagger-ui", version.ref = "swaggerUi" }
+apksig = { module = "com.android.tools.build:apksig", version.ref = "apksig" }
+dex2jar = { module = "de.femtopedia.dex2jar:dex-translator", version.ref = "dex2jar" }
+asm = { module = "org.ow2.asm:asm", version.ref = "asm" }
+asm-tree = { module = "org.ow2.asm:asm-tree", version.ref = "asm" }
+asm-commons = { module = "org.ow2.asm:asm-commons", version.ref = "asm" }
+okhttp = { module = "com.squareup.okhttp3:okhttp", version.ref = "okhttp" }
+okhttp-mockwebserver = { module = "com.squareup.okhttp3:mockwebserver3", version.ref = "okhttp" }
+r8 = { module = "com.android.tools:r8", version.ref = "r8" }
+bouncycastle-pkix = { module = "org.bouncycastle:bcpkix-jdk18on", version.ref = "bouncycastle" }
 
 # Plugins used by the convention plugins in build-logic/.
 gradle-kotlin = { module = "org.jetbrains.kotlin:kotlin-gradle-plugin", version.ref = "kotlin" }

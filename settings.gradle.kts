@@ -16,9 +16,16 @@ dependencyResolutionManagement {
     repositoriesMode = RepositoriesMode.FAIL_ON_PROJECT_REPOS
     repositories {
         mavenCentral()
+        // Android build tools (apksig for APK signatures, D8 for test fixtures) live only here.
+        google {
+            content {
+                includeGroup("com.android.tools.build")
+                includeGroup("com.android.tools")
+            }
+        }
     }
 }
 
 rootProject.name = "mihon-source"
 
-include(":api", ":service")
+include(":api", ":android-compat", ":service")

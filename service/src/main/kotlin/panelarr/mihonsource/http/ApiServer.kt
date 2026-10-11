@@ -33,6 +33,10 @@ class ApiServer(
     private val port: Int,
     private val services: List<BindableService>,
     private val interceptors: List<ServerInterceptor>,
+    /** Plain HTTP routes (path to service, auth already applied). */
+    private val routes: Map<String, HttpService> = emptyMap(),
+    /** Largest request body accepted, in bytes. Uploads need more than Armeria's default. */
+    private val maxRequestLength: Long = DEFAULT_MAX_REQUEST_LENGTH,
 ) {
     private var server: Server? = null
 
@@ -45,10 +49,14 @@ class ApiServer(
                 .enableHttpJsonTranscoding(true)
                 .build()
 
-        val built =
+        val builder =
             Server
                 .builder()
                 .http(InetSocketAddress(host, port))
+                .maxRequestLength(maxRequestLength)
+        routes.forEach { (path, service) -> builder.service(path, service) }
+        val built =
+            builder
                 .service(grpc)
                 .service("/openapi.yaml", openApiDocument())
                 .service("/docs") { _, _ -> HttpResponse.ofRedirect(HttpStatus.MOVED_PERMANENTLY, "/docs/") }
@@ -61,6 +69,10 @@ class ApiServer(
         built.start().join()
         server = built
         return built.activeLocalPort()
+    }
+
+    companion object {
+        const val DEFAULT_MAX_REQUEST_LENGTH: Long = 10L * 1024 * 1024
     }
 
     fun stop(): CompletableFuture<Void> = server?.stop() ?: CompletableFuture.completedFuture(null)

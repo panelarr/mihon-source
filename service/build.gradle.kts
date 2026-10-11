@@ -18,9 +18,18 @@ dependencies {
     implementation(libs.coroutines.core)
     implementation(libs.serialization.json)
     implementation(libs.logback)
+    implementation(libs.okhttp)
+    implementation(libs.apksig)
+    implementation(libs.dex2jar)
+    implementation(libs.asm)
+    implementation(libs.asm.tree)
+    implementation(libs.asm.commons)
     runtimeOnly(libs.swagger.ui)
 
     testImplementation(libs.armeria.junit5)
+    testImplementation(libs.okhttp.mockwebserver)
+    testImplementation(libs.r8)
+    testImplementation(libs.bouncycastle.pkix)
 }
 
 application {
