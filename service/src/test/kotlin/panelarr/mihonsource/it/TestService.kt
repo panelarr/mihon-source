@@ -24,6 +24,8 @@ class TestService(
     val dataDir: Path,
     metricsPort: Int? = null,
     healthCheckInterval: java.time.Duration? = null,
+    healthCheckLangs: Set<String> = emptySet(),
+    healthCheckSample: Int? = AppConfig.DEFAULT_HEALTH_CHECK_SAMPLE,
     storeRefreshInterval: java.time.Duration = java.time.Duration.ZERO,
     /** Tests see fresh results unless they test caching. */
     cacheTtls: Map<String, java.time.Duration> = AppConfig.DEFAULT_CACHE_TTLS.mapValues { java.time.Duration.ZERO },
@@ -37,6 +39,8 @@ class TestService(
                 adminToken = ADMIN,
                 metricsPort = metricsPort,
                 healthCheckInterval = healthCheckInterval,
+                healthCheckLangs = healthCheckLangs,
+                healthCheckSample = healthCheckSample,
                 storeRefreshInterval = storeRefreshInterval,
                 cacheTtls = cacheTtls,
             ),

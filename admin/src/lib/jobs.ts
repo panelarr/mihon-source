@@ -59,6 +59,17 @@ export function scheduleLabel(job: Job): string {
   return "Manual only";
 }
 
+/**
+ * What runs use when no params are given, scheduled runs included: the params' defaults,
+ * e.g. "langs: en, fr · sample: 10". Empty when the job has none.
+ */
+export function defaultSelection(job: Job): string {
+  return (job.params ?? [])
+    .filter((param) => param.default)
+    .map((param) => `${param.name}: ${(param.default ?? "").split(",").join(", ")}`)
+    .join(" · ");
+}
+
 /** How long a run took, or has been running so far. */
 export function runDuration(run: JobRunSummary, now: number = Date.now()): string {
   if (!run.startedAt) return "—";

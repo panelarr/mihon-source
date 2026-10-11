@@ -5,7 +5,7 @@ import { Link } from "@tanstack/react-router";
 import type { Job, JobRunSummary } from "../../api/types";
 import { Badge, Empty, ErrorBox, Loading, PageHeader } from "../../components/ui";
 import { formatDate } from "../../lib/format";
-import { scheduleLabel, statusLabel, statusTone } from "../../lib/jobs";
+import { defaultSelection, scheduleLabel, statusLabel, statusTone } from "../../lib/jobs";
 import { jobsQuery } from "./queries";
 import { RunJobButton } from "./RunJob";
 
@@ -74,6 +74,7 @@ function JobRow({ job }: { job: Job }) {
       <td>
         {scheduleLabel(job)}
         {job.schedule?.source ? <div className="muted small">{job.schedule.source}</div> : null}
+        {defaultSelection(job) ? <div className="small">Runs with {defaultSelection(job)}</div> : null}
       </td>
       <td>
         {job.running && job.currentRunId ? (

@@ -63,12 +63,19 @@ export function JobPage() {
             </dd>
             {job.data.params?.length ? (
               <>
-                <dt>Parameters</dt>
+                <dt title="Scheduled runs use the defaults">Parameters</dt>
                 <dd>
                   <ul className="plain-list">
                     {job.data.params.map((param) => (
                       <li key={param.name}>
-                        <Mono>{param.name}</Mono> <span className="muted small">{param.description}</span>
+                        <Mono>{param.name}</Mono>
+                        {param.default ? (
+                          <>
+                            {" "}
+                            = <Mono>{param.default}</Mono>
+                          </>
+                        ) : null}{" "}
+                        <span className="muted small">{param.description}</span>
                       </li>
                     ))}
                   </ul>

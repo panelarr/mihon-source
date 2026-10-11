@@ -119,7 +119,7 @@ Background work runs as jobs. `MihonJobsService` (admin scope) lists them, keeps
 | Job | Does | Params | Schedule |
 |---|---|---|---|
 | `store-refresh` | Refreshes the stores' indexes, so updates show up. Never installs anything. Fails when a store fails to refresh (the store keeps its last good index). | `store_id`: one store only | `MIHON_STORE_REFRESH_INTERVAL` |
-| `source-health` | Checks sources and records their [health](#checking-sources). Without `source_ids`, only sources whose scheduled checks are on. | `source_ids` (list), `steps` (list of `popular`, `latest`, `search`, `details`, `chapters`, `pages`, `image`; default `popular`) | `MIHON_HEALTH_CHECK_INTERVAL` |
+| `source-health` | Checks sources and records their [health](#checking-sources). Without `source_ids`: the sources whose scheduled checks are on, in `langs`, at most `sample` of them, least recently checked first. | `source_ids` (list; overrides `langs` and `sample`), `langs` (list of installed languages or `all`; default `MIHON_HEALTH_CHECK_LANGS`), `sample` (int, `0` for all; default `MIHON_HEALTH_CHECK_SAMPLE`), `steps` (list of `popular`, `latest`, `search`, `details`, `chapters`, `pages`, `image`; default `popular`) | `MIHON_HEALTH_CHECK_INTERVAL` |
 
 ```sh
 curl -H "Authorization: Bearer $ADMIN" localhost:8902/v1/admin/jobs
@@ -130,7 +130,7 @@ curl -H "Authorization: Bearer $ADMIN" "localhost:8902/v1/admin/jobs/source-heal
 curl -H "Authorization: Bearer $ADMIN" -X POST localhost:8902/v1/admin/job-runs/$RUN:cancel
 ```
 
-- **Jobs** have a stable ID, a schedule (an interval, read-only: it comes from the configuration; without one the job only runs on request), the next scheduled run, the last finished run and the params `RunJob` accepts. List params are comma-separated.
+- **Jobs** have a stable ID, a schedule (an interval, read-only: it comes from the configuration; without one the job only runs on request), the next scheduled run, the last finished run and the params `RunJob` accepts. List params are comma-separated. A param left out gets its `default`; scheduled runs use the defaults, so they show what the schedule runs with.
 - **Runs** have a status (`RUNNING`, `SUCCEEDED`, `FAILED`, `CANCELLED`, `SKIPPED`), a trigger (`SCHEDULE` or `MANUAL`, with who started it), start and finish times, a one-line result, counts such as `{"ok": 18, "failing": 2}`, and notes: the warnings and errors of the run (at most 200). A running run also reports its progress.
 - **One run at a time:** `RunJob` returns the new run at once. While the job runs, another `RunJob` fails with `ALREADY_EXISTS` (HTTP 409, reason `ALREADY_RUNNING`) and the running run's ID (the `JobAlreadyRunning` detail; `currentRunId` over HTTP). A scheduled run that comes due meanwhile is recorded as `SKIPPED`.
 - **Cancelling** stops a run between steps. Cancelling a run that isn't running fails with `FAILED_PRECONDITION`.

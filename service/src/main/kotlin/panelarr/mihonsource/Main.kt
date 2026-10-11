@@ -127,7 +127,14 @@ class Application(
                 dataDir.resolve("jobs"),
                 listOf(
                     StoreRefreshJob(stores, config.storeRefreshInterval),
-                    SourceHealthJob(sources, prober, health, config.healthCheckInterval),
+                    SourceHealthJob(
+                        sources,
+                        prober,
+                        health,
+                        config.healthCheckInterval,
+                        config.healthCheckLangs,
+                        config.healthCheckSample,
+                    ),
                 ),
                 scope,
                 keep = config.jobHistory.coerceAtLeast(1),

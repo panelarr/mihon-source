@@ -425,9 +425,27 @@ export function mockJobs(): Job[] {
         {
           name: "source_ids",
           type: "string_list",
-          description: "Check only these sources (IDs). Sources with checks on when empty.",
+          description: "Check only these sources (IDs). Overrides langs and sample.",
           required: false,
           default: "",
+          choices: [],
+        },
+        {
+          name: "langs",
+          type: "string_list",
+          description:
+            'Only sources in these languages; "all" for every language. Defaults to MIHON_HEALTH_CHECK_LANGS.',
+          required: false,
+          default: "en,fr",
+          choices: ["all", "en", "fr"],
+        },
+        {
+          name: "sample",
+          type: "int",
+          description:
+            "How many sources to check, least recently checked first; 0 for all. Defaults to MIHON_HEALTH_CHECK_SAMPLE.",
+          required: false,
+          default: "10",
           choices: [],
         },
         {

@@ -20,7 +20,10 @@ interface BackgroundJob {
 
     val schedule: JobSchedule
 
-    /** What a manual run accepts. */
+    /**
+     * What a run accepts. Scheduled runs use the defaults, so the defaults are what the
+     * schedule runs with.
+     */
     val params: List<JobParamSpec> get() = emptyList()
 
     /** Whether a run stops when cancelled. Jobs check for cancellation between steps. */
@@ -31,6 +34,9 @@ interface BackgroundJob {
      * named store exists. Throws [IllegalArgumentException] or [NoSuchElementException].
      */
     fun validate(params: Map<String, String>) {}
+
+    /** Adjusts checked params (defaults filled in) before a run, e.g. drops ones another param overrides. */
+    fun normalize(params: Map<String, String>): Map<String, String> = params
 
     /** Does the work. An exception fails the run with its message. */
     suspend fun run(run: JobRunContext)

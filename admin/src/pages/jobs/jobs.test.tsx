@@ -25,6 +25,8 @@ describe("jobs", () => {
     const health = row("Check sources");
     expect(within(health).getByText("Manual only")).toBeInTheDocument();
     expect(within(health).getByText("Never ran")).toBeInTheDocument();
+    expect(within(health).getByText("Runs with langs: en, fr · sample: 10 · steps: popular")).toBeInTheDocument();
+    expect(within(refresh).queryByText(/Runs with/)).not.toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "Sources" })).toBeInTheDocument();
     app.dispose();
   });
@@ -40,13 +42,17 @@ describe("jobs", () => {
     // The default is ticked; add another step.
     expect(within(dialog).getByRole("checkbox", { name: "popular" })).toBeChecked();
     await userEvent.click(within(dialog).getByRole("checkbox", { name: "latest" }));
-    await userEvent.type(within(dialog).getByLabelText(/source ids/), "1001, 2001");
+    // The configured selection is filled in and can be changed.
+    expect(within(dialog).getByRole("checkbox", { name: "en" })).toBeChecked();
+    await userEvent.click(within(dialog).getByRole("checkbox", { name: "fr" }));
+    await userEvent.clear(within(dialog).getByLabelText(/sample/));
+    await userEvent.type(within(dialog).getByLabelText(/sample/), "3");
     await userEvent.click(within(dialog).getByRole("button", { name: "Run now" }));
 
     expect(await screen.findByRole("heading", { name: /^Run mock/ })).toBeInTheDocument();
     expect(await screen.findByText("Running")).toBeInTheDocument();
     expect(screen.getByRole("progressbar", { name: "Progress" })).toBeInTheDocument();
-    expect(db.runs[0]?.params).toEqual({ steps: "popular,latest", source_ids: "1001, 2001" });
+    expect(db.runs[0]?.params).toEqual({ steps: "popular,latest", langs: "en", sample: "3" });
 
     await userEvent.click(screen.getByRole("button", { name: "Cancel run" }));
     expect(await screen.findByText("Cancelled", { selector: ".badge" })).toBeInTheDocument();

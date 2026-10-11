@@ -24,6 +24,10 @@ data class AppConfig(
     val metricsPort: Int? = null,
     /** How often each source gets a health check. Null means no scheduled checks. */
     val healthCheckInterval: java.time.Duration? = null,
+    /** Source languages scheduled health checks cover. Empty means all. */
+    val healthCheckLangs: Set<String> = emptySet(),
+    /** Sources per scheduled health check round, least recently checked first. Null means all. */
+    val healthCheckSample: Int? = DEFAULT_HEALTH_CHECK_SAMPLE,
     /** How often store indexes are refreshed. Zero means never (refresh by hand only). */
     val storeRefreshInterval: java.time.Duration = DEFAULT_STORE_REFRESH,
     /** Result cache lifetimes per kind of result; zero turns caching off for that kind. */
@@ -40,6 +44,7 @@ data class AppConfig(
         val DEFAULT_STORE_REFRESH: java.time.Duration = java.time.Duration.ofHours(12)
         const val DEFAULT_CACHE_MB = 64L
         const val DEFAULT_JOB_HISTORY = 100
+        const val DEFAULT_HEALTH_CHECK_SAMPLE = 10
 
         /** Lists change often, pages rarely. Keys match ResultCache.Kind names. */
         val DEFAULT_CACHE_TTLS: Map<String, java.time.Duration> =
@@ -67,6 +72,32 @@ data class AppConfig(
             return runCatching { java.time.Duration.parse(text.trim().uppercase()) }
                 .getOrElse { error("'$text' isn't a duration (e.g. 30m, 6h, 1d)") }
         }
+
+        /** "en, fr" → {"en", "fr"}. */
+        private fun langs(text: String?): Set<String> =
+            text
+                ?.split(',')
+                ?.map { it.trim() }
+                ?.filter { it.isNotEmpty() }
+                ?.toSet()
+                .orEmpty()
+
+        /** A number of sources, or "all" (null). */
+        private fun sample(text: String?): Int? =
+            when {
+                text == null -> {
+                    DEFAULT_HEALTH_CHECK_SAMPLE
+                }
+
+                text.equals("all", ignoreCase = true) -> {
+                    null
+                }
+
+                else -> {
+                    text.toIntOrNull()?.takeIf { it > 0 }
+                        ?: error("MIHON_HEALTH_CHECK_SAMPLE must be a positive number or all, got '$text'")
+                }
+            }
 
         /** MIHON_CACHE_TTL_<KIND> for each kind, else its default. */
         private fun cacheTtls(value: (String) -> String?): Map<String, java.time.Duration> =
@@ -96,6 +127,8 @@ data class AppConfig(
                 adminDir = value("MIHON_ADMIN_DIR")?.let(Path::of),
                 metricsPort = number("MIHON_METRICS_PORT")?.toInt(),
                 healthCheckInterval = value("MIHON_HEALTH_CHECK_INTERVAL")?.let(::duration)?.takeIf { !it.isZero },
+                healthCheckLangs = langs(value("MIHON_HEALTH_CHECK_LANGS")),
+                healthCheckSample = sample(value("MIHON_HEALTH_CHECK_SAMPLE")),
                 storeRefreshInterval = value("MIHON_STORE_REFRESH_INTERVAL")?.let(::duration) ?: DEFAULT_STORE_REFRESH,
                 cacheTtls = cacheTtls(::value),
                 cacheMaxBytes = (number("MIHON_CACHE_MAX_MB") ?: DEFAULT_CACHE_MB) * MB,

@@ -7,6 +7,7 @@ import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
 
 class AppConfigTest {
@@ -19,6 +20,18 @@ class AppConfigTest {
         assertEquals(8902, config.port)
         assertNull(config.adminToken)
         assertNull(config.metricsPort)
+        assertEquals(emptySet(), config.healthCheckLangs)
+        assertEquals(10, config.healthCheckSample)
+    }
+
+    @Test
+    fun `health check languages and sample`() {
+        val config = AppConfig.fromEnv(mapOf("MIHON_HEALTH_CHECK_LANGS" to " en, fr ,", "MIHON_HEALTH_CHECK_SAMPLE" to "25"))
+        assertEquals(setOf("en", "fr"), config.healthCheckLangs)
+        assertEquals(25, config.healthCheckSample)
+        assertNull(AppConfig.fromEnv(mapOf("MIHON_HEALTH_CHECK_SAMPLE" to "all")).healthCheckSample)
+        assertFailsWith<IllegalStateException> { AppConfig.fromEnv(mapOf("MIHON_HEALTH_CHECK_SAMPLE" to "0")) }
+        assertFailsWith<IllegalStateException> { AppConfig.fromEnv(mapOf("MIHON_HEALTH_CHECK_SAMPLE" to "some")) }
     }
 
     @Test

@@ -119,7 +119,7 @@ class JobRunner(
         triggeredBy: String = "",
     ): RunRecord {
         val job = job(jobId)
-        val checked = JobParams.check(job, params)
+        val checked = job.normalize(JobParams.check(job, params))
         job.validate(checked)
         synchronized(lock) {
             active[jobId]?.let { throw JobAlreadyRunningException(jobId, it.record.id) }
