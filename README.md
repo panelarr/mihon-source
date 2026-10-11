@@ -44,4 +44,6 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) and [docs/](docs/README.md).
 
 ## Licence
 
-To be decided. Until a licence is added, no rights are granted beyond what GitHub's terms of service allow.
+mihon-source is licensed under the [GNU General Public License v3.0](LICENSE).
+
+The protobuf definitions in [`proto/`](proto) are licensed under the [Apache License 2.0](proto/LICENSE), so that other implementations of the API can use them freely.
