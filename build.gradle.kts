@@ -6,30 +6,31 @@ plugins {
     id("mihon.buf")
 }
 
-val kotlinModules = subprojects.map { it.path }
+val kotlinModules = subprojects.map { it.path } - ":admin"
 
 tasks.register("setup") {
     group = "panelarr"
     description = "Resolves every dependency, the JDK toolchain and buf."
-    dependsOn(kotlinModules.map { "$it:dependencies" }, "bufBinary")
+    dependsOn(kotlinModules.map { "$it:dependencies" }, "bufBinary", ":admin:npmInstall")
 }
 
 tasks.register("lint") {
     group = "panelarr"
-    description = "Runs detekt, the ktlint format check and buf lint."
+    description = "Runs detekt, the ktlint format check, buf lint and the admin SPA's lint."
     dependsOn(kotlinModules.flatMap { listOf("$it:detekt", "$it:ktlintCheck") }, "bufLint", "bufFormatCheck")
+    dependsOn(":admin:lint")
 }
 
 tasks.register("fmt") {
     group = "panelarr"
-    description = "Formats Kotlin sources with ktlint and protos with buf."
-    dependsOn(kotlinModules.map { "$it:ktlintFormat" }, "bufFormat")
+    description = "Formats Kotlin sources with ktlint, protos with buf and the admin SPA with Biome."
+    dependsOn(kotlinModules.map { "$it:ktlintFormat" }, "bufFormat", ":admin:fmt")
 }
 
 tasks.register("check") {
     group = "verification"
     description = "Lint plus tests."
-    dependsOn("lint", kotlinModules.map { "$it:check" })
+    dependsOn("lint", kotlinModules.map { "$it:check" }, ":admin:check")
 }
 
 tasks.register("gen") {

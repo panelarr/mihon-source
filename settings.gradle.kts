@@ -23,9 +23,21 @@ dependencyResolutionManagement {
                 includeGroup("com.android.tools")
             }
         }
+        // Node.js for the admin SPA (admin/), downloaded by the node-gradle plugin.
+        exclusiveContent {
+            forRepository {
+                ivy {
+                    name = "Node.js"
+                    setUrl("https://nodejs.org/dist/")
+                    patternLayout { artifact("v[revision]/[artifact](-v[revision]-[classifier]).[ext]") }
+                    metadataSources { artifact() }
+                }
+            }
+            filter { includeModule("org.nodejs", "node") }
+        }
     }
 }
 
 rootProject.name = "mihon-source"
 
-include(":api", ":android-compat", ":service")
+include(":api", ":android-compat", ":service", ":admin")

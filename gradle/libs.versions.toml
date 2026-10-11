@@ -21,6 +21,9 @@ asm = "9.11"
 okhttp = "5.5.0"
 r8 = "9.5.23"
 bouncycastle = "1.86"
+# The admin SPA (admin/): the Gradle plugin downloads this Node.js LTS itself.
+nodeGradle = "7.1.0"
+nodejs = "24.21.0"
 
 [libraries]
 junit-bom = { module = "org.junit:junit-bom", version.ref = "junit" }
@@ -62,3 +65,4 @@ gradle-serialization = { module = "org.jetbrains.kotlin:kotlin-serialization", v
 
 [plugins]
 protobuf = { id = "com.google.protobuf", version.ref = "protobufPlugin" }
+node = { id = "com.github.node-gradle.node", version.ref = "nodeGradle" }
