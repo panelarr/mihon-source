@@ -12,7 +12,7 @@ public class SpannableString implements Spannable, GetChars {
     }
 
     private SpannableString(CharSequence source, int start, int end) {
-        text = source.subSequence(start, end).toString();
+        text = source.toString().substring(start, end);
         spans.copyFrom(source, start, end);
     }
 

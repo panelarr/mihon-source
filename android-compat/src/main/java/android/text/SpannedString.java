@@ -12,7 +12,7 @@ public final class SpannedString implements Spanned, GetChars {
     }
 
     SpannedString(CharSequence source, int start, int end) {
-        text = source.subSequence(start, end).toString();
+        text = source.toString().substring(start, end);
         spans.copyFrom(source, start, end);
     }
 

@@ -17,7 +17,7 @@ public class SpannableStringBuilder implements Editable {
     }
 
     public SpannableStringBuilder(CharSequence text, int start, int end) {
-        this.text = new StringBuilder(text.subSequence(start, end));
+        this.text = new StringBuilder(text.toString().substring(start, end));
         spans.copyFrom(text, start, end);
     }
 
@@ -27,7 +27,7 @@ public class SpannableStringBuilder implements Editable {
 
     @Override
     public SpannableStringBuilder replace(int st, int en, CharSequence source, int start, int end) {
-        text.replace(st, en, source.subSequence(start, end).toString());
+        text.replace(st, en, source.toString().substring(start, end));
         return this;
     }
 
