@@ -9,7 +9,7 @@ Both are served on one port in three ways:
 
 | Protocol | How to call it |
 |---|---|
-| gRPC (and gRPC-Web) | Any gRPC client. Server reflection is on, e.g. `grpcurl -H 'authorization: Bearer <admin token>' localhost:8080 list` |
+| gRPC (and gRPC-Web) | Any gRPC client. Server reflection is on, e.g. `grpcurl -H 'authorization: Bearer <admin token>' localhost:8902 list` |
 | HTTP/JSON | The REST-style routes from the `google.api.http` annotations, e.g. `GET /v1/sources`. JSON field names are lowerCamelCase, 64-bit integers are strings and enums are their names. |
 | OpenAPI | The document is at `/openapi.yaml` and Swagger UI at `/docs/`. It is generated from the protos (`make gen`). |
 
@@ -18,7 +18,7 @@ Both are served on one port in three ways:
 Every call except `GET /v1/health` (gRPC `Health`) needs a bearer token:
 
 ```sh
-curl -H "Authorization: Bearer $TOKEN" localhost:8080/v1/sources
+curl -H "Authorization: Bearer $TOKEN" localhost:8902/v1/sources
 ```
 
 Over gRPC, send the same value in the `authorization` metadata.
@@ -39,12 +39,12 @@ Any valid token may call `GET /v1/whoami` to see who it is and which scopes it h
 Create a client with the admin token. The key is in the response and is **never shown again**: only a hash is stored. Rotate it to get a new one.
 
 ```sh
-curl -H "Authorization: Bearer $ADMIN" -X POST localhost:8080/v1/admin/clients \
+curl -H "Authorization: Bearer $ADMIN" -X POST localhost:8902/v1/admin/clients \
   -d '{"name": "my-script", "scopes": ["sources:read"]}'
 # {"client": {"id": "…", "keyPrefix": "msk_…", …}, "apiKey": "msk_…"}
 
-curl -H "Authorization: Bearer $ADMIN" -X POST localhost:8080/v1/admin/clients/<id>/rotate
-curl -H "Authorization: Bearer $ADMIN" -X DELETE localhost:8080/v1/admin/clients/<id>
+curl -H "Authorization: Bearer $ADMIN" -X POST localhost:8902/v1/admin/clients/<id>/rotate
+curl -H "Authorization: Bearer $ADMIN" -X DELETE localhost:8902/v1/admin/clients/<id>
 ```
 
 Request bodies are JSON. A body sent without a JSON content type (as `curl -d` does) is read as JSON anyway.

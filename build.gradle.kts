@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 // Root project: modules apply the conventions from build-logic/. The lifecycle tasks below
 // are what the Makefile calls, so `make <target>` and `./gradlew <target>` behave the same.
 plugins {

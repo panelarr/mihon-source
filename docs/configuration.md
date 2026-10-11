@@ -6,7 +6,7 @@ mihon-source reads a few environment variables at start. Everything else (extens
 |---|---|---|
 | `MIHON_DATA_DIR` | `/data` | Where all state is kept. `make run` uses `./data` in the repository. |
 | `MIHON_HOST` | `0.0.0.0` | Address to listen on. |
-| `MIHON_PORT` | `8080` | Port for everything: gRPC, HTTP/JSON, OpenAPI and the admin UI. |
+| `MIHON_PORT` | `8902` | Port for everything: gRPC, HTTP/JSON, OpenAPI and the admin UI. |
 | `MIHON_ADMIN_TOKEN` | *(generated)* | The admin token. When unset, a token is generated on first start, printed once to standard output and stored only as a hash. Setting it later replaces the stored one. |
 
 ## Data directory

@@ -18,19 +18,19 @@ The Docker image doesn't exist yet. Until then, run from source:
 
 ```sh
 make setup   # downloads Gradle, a JDK 21 toolchain, buf and dependencies
-make run     # listens on :8080, keeps its state in ./data
+make run     # listens on :8902, keeps its state in ./data
 ```
 
 On first start an admin token is printed once. Use it to create an API key and call the API:
 
 ```sh
-curl localhost:8080/v1/health
-curl -H "Authorization: Bearer $ADMIN" -X POST localhost:8080/v1/admin/clients \
+curl localhost:8902/v1/health
+curl -H "Authorization: Bearer $ADMIN" -X POST localhost:8902/v1/admin/clients \
   -d '{"name": "me", "scopes": ["sources:read"]}'
-curl -H "Authorization: Bearer $KEY" localhost:8080/v1/sources
+curl -H "Authorization: Bearer $KEY" localhost:8902/v1/sources
 ```
 
-API docs are at `http://localhost:8080/docs/` (OpenAPI document at `/openapi.yaml`). See [docs/api.md](docs/api.md) and [docs/configuration.md](docs/configuration.md).
+API docs are at `http://localhost:8902/docs/` (OpenAPI document at `/openapi.yaml`). See [docs/api.md](docs/api.md) and [docs/configuration.md](docs/configuration.md).
 
 ## Development
 
@@ -44,6 +44,6 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) and [docs/](docs/README.md).
 
 ## Licence
 
-mihon-source is licensed under the [GNU General Public License v3.0](LICENSE).
+mihon-source is licensed under the [GNU General Public License v3.0 or later](LICENSE).
 
 The protobuf definitions in [`proto/`](proto) are licensed under the [Apache License 2.0](proto/LICENSE), so that other implementations of the API can use them freely.

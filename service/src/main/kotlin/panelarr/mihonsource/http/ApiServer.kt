@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package panelarr.mihonsource.http
 
 import com.linecorp.armeria.common.HttpHeaderNames

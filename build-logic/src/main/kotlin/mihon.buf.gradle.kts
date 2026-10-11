@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 // buf tasks for the protos in proto/: lint, format and OpenAPI generation. The buf CLI
 // comes from Maven Central for the current OS and architecture, so nothing needs to be
 // installed by hand.

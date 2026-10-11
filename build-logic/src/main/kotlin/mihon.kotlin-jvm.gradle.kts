@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 // Shared setup for every Kotlin/JVM module: toolchain, tests, detekt and ktlint.
 import org.gradle.accessors.dm.LibrariesForLibs
 

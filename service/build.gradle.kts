@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 plugins {
     id("mihon.kotlin-jvm")
     id("org.jetbrains.kotlin.plugin.serialization")

@@ -43,6 +43,7 @@ Commit the regenerated OpenAPI document with the proto change. CI fails when it 
 - Kotlin, official code style, enforced by ktlint (`make fmt` fixes most issues) and detekt.
 - Explain *why* in comments when the code can't say it. Don't comment the obvious.
 - New behaviour comes with tests.
+- Every source file starts with an SPDX licence line: `// SPDX-License-Identifier: GPL-3.0-or-later` for code, `// SPDX-License-Identifier: Apache-2.0` for files in `proto/`.
 
 ## Reporting security issues
 

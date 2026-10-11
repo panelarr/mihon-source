@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 // Generated Java/Kotlin code for the protos in ../proto: messages, gRPC stubs and
 // coroutine stubs. Nothing hand-written lives here.
 plugins {

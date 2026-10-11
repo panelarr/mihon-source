@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package panelarr.mihonsource.config
 
 import java.nio.file.Path
@@ -14,7 +16,7 @@ data class AppConfig(
     val adminToken: String?,
 ) {
     companion object {
-        const val DEFAULT_PORT = 8080
+        const val DEFAULT_PORT = 8902
 
         fun fromEnv(env: Map<String, String> = System.getenv()): AppConfig {
             fun value(name: String): String? = env[name]?.trim()?.takeIf { it.isNotEmpty() }
