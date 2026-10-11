@@ -56,7 +56,6 @@ class ApiServer(
                 .intercept(interceptors)
                 .enableHttpJsonTranscoding(true)
                 .httpJsonTranscodingErrorHandler(ProblemErrorHandler)
-                .unframedGrpcErrorHandler(ProblemErrorHandler)
                 .build()
 
         val builder =
@@ -133,13 +132,14 @@ class ApiServer(
             val trailers = Metadata()
             val raw = response.trailers().get(DETAILS) ?: response.headers().get(DETAILS)
             if (raw != null) {
-                runCatching { Base64.getDecoder().decode(raw.padEnd((raw.length + 3) / 4 * 4, '=')) }
+                runCatching { Base64.getDecoder().decode(raw.padEnd((raw.length + BASE64_BLOCK - 1) / BASE64_BLOCK * BASE64_BLOCK, '=')) }
                     .getOrNull()
                     ?.let { trailers.put(DETAILS_KEY, it) }
             }
             return Problems.fromStatus(status, trailers)
         }
 
+        private const val BASE64_BLOCK = 4
         private const val DETAILS = "grpc-status-details-bin"
         private val DETAILS_KEY: Metadata.Key<ByteArray> = Metadata.Key.of(DETAILS, Metadata.BINARY_BYTE_MARSHALLER)
     }
@@ -162,7 +162,14 @@ class ApiServer(
                     req.path().startsWith("/v1/") &&
                     (contentType == null || contentType.`is`(MediaType.FORM_DATA))
             if (!needsJson) return delegate.serve(ctx, req)
-            val json = req.withHeaders(req.headers().toBuilder().contentType(MediaType.JSON_UTF_8).build())
+            val json =
+                req.withHeaders(
+                    req
+                        .headers()
+                        .toBuilder()
+                        .contentType(MediaType.JSON_UTF_8)
+                        .build(),
+                )
             ctx.updateRequest(json)
             return delegate.serve(ctx, json)
         }

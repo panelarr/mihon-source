@@ -8,9 +8,9 @@ import okhttp3.ConnectionPool
 import okhttp3.Cookie
 import okhttp3.CookieJar
 import okhttp3.Credentials
-import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.HttpUrl
 import okhttp3.Interceptor
+import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Protocol
 import okhttp3.Request
@@ -146,7 +146,12 @@ class SourceNetwork(
         var next = chain
         profile.connectTimeout?.let { next = next.withConnectTimeout(it.toMillis().toInt(), TimeUnit.MILLISECONDS) }
         profile.readTimeout?.let {
-            next = next.withReadTimeout(it.toMillis().toInt(), TimeUnit.MILLISECONDS).withWriteTimeout(it.toMillis().toInt(), TimeUnit.MILLISECONDS)
+            next =
+                next
+                    .withReadTimeout(
+                        it.toMillis().toInt(),
+                        TimeUnit.MILLISECONDS,
+                    ).withWriteTimeout(it.toMillis().toInt(), TimeUnit.MILLISECONDS)
         }
         profile.callTimeout?.let { chain.call().timeout().timeout(it.toMillis(), TimeUnit.MILLISECONDS) }
         return next.proceed(chain.request())
@@ -327,20 +332,26 @@ class SourceNetworks(
     /** Deletes a source's own cookie jar. */
     fun deleteCookies(sourceId: Long) {
         jars.remove(sourceId.toString())
-        java.nio.file.Files.deleteIfExists(cookieDir.resolve("$sourceId.json"))
+        java.nio.file.Files
+            .deleteIfExists(cookieDir.resolve("$sourceId.json"))
     }
 
     companion object {
+        private const val DEFAULT_TIMEOUT_SECONDS = 30L
+        private const val CALL_TIMEOUT_MINUTES = 2L
+        private const val MAX_REQUESTS = 256
+        private const val MAX_REQUESTS_PER_HOST = 16
+
         fun defaultBase(): OkHttpClient =
             OkHttpClient
                 .Builder()
-                .connectTimeout(30, TimeUnit.SECONDS)
-                .readTimeout(30, TimeUnit.SECONDS)
-                .callTimeout(2, TimeUnit.MINUTES)
+                .connectTimeout(DEFAULT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+                .readTimeout(DEFAULT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+                .callTimeout(CALL_TIMEOUT_MINUTES, TimeUnit.MINUTES)
                 .dispatcher(
                     okhttp3.Dispatcher().apply {
-                        maxRequests = 256
-                        maxRequestsPerHost = 16
+                        maxRequests = MAX_REQUESTS
+                        maxRequestsPerHost = MAX_REQUESTS_PER_HOST
                     },
                 ).build()
     }

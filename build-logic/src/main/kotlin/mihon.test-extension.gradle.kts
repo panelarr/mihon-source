@@ -19,6 +19,13 @@ kotlin {
 
 tasks.withType<JavaCompile>().configureEach { options.release = 11 }
 
+// The host API is built for JVM 21 but only used at compile time here.
+listOf("compileClasspath", "testCompileClasspath", "testRuntimeClasspath").forEach { name ->
+    configurations.named(name) {
+        attributes { attribute(TargetJvmVersion.TARGET_JVM_VERSION_ATTRIBUTE, 21) }
+    }
+}
+
 dependencies {
     "compileOnly"(project(":extension-api"))
 }

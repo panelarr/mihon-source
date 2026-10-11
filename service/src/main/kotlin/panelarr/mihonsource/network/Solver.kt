@@ -78,6 +78,7 @@ class SolverClient(
         return await(mine)
     }
 
+    @Suppress("SwallowedException") // The cause is unwrapped and rethrown.
     private fun await(future: CompletableFuture<Solution>): Solution =
         try {
             future.get()
@@ -116,7 +117,12 @@ class SolverClient(
                 .url(solver.url.trimEnd('/') + "/v1")
                 .post(body.toString().toRequestBody(JSON))
                 .build()
-        val call = http.newBuilder().readTimeout(maxTimeout.plusSeconds(EXTRA_WAIT_SECONDS)).build().newCall(request)
+        val call =
+            http
+                .newBuilder()
+                .readTimeout(maxTimeout.plusSeconds(EXTRA_WAIT_SECONDS))
+                .build()
+                .newCall(request)
         log.info("Asking solver '{}' to solve a challenge", solver.id)
         call.execute().use { response ->
             val text = response.body.string()

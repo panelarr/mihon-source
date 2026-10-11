@@ -25,10 +25,10 @@ import panelarr.mihon.v1.installExtensionResponse
 import panelarr.mihon.v1.listExtensionsResponse
 import panelarr.mihon.v1.reloadExtensionResponse
 import panelarr.mihon.v1.uninstallExtensionResponse
+import panelarr.mihonsource.extension.Expectations
 import panelarr.mihonsource.extension.ExtensionInstaller
 import panelarr.mihonsource.extension.ExtensionManager
 import panelarr.mihonsource.extension.ExtensionRecord
-import panelarr.mihonsource.extension.Expectations
 import panelarr.mihonsource.extension.InstalledExtension
 import java.time.Instant
 
@@ -52,10 +52,17 @@ class ExtensionsApi(
                 )
             val installed =
                 when (request.fileCase) {
-                    InstallExtensionRequest.FileCase.URL -> installer.installFromUrl(request.url, expectations)
-                    InstallExtensionRequest.FileCase.DATA ->
+                    InstallExtensionRequest.FileCase.URL -> {
+                        installer.installFromUrl(request.url, expectations)
+                    }
+
+                    InstallExtensionRequest.FileCase.DATA -> {
                         installer.installFromBytes(request.data.toByteArray(), request.fileName, expectations)
-                    else -> throw IllegalArgumentException("either url or data is required")
+                    }
+
+                    else -> {
+                        throw IllegalArgumentException("either url or data is required")
+                    }
                 }
             installExtensionResponse { extension = installed.toProto() }
         }

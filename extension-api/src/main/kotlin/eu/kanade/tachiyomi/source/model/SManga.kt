@@ -37,19 +37,20 @@ interface SManga : Serializable {
         if (!initialized) initialized = other.initialized
     }
 
-    fun copy(): SManga = create().also { copy ->
-        copy.url = url
-        copy.title = title
-        copy.artist = artist
-        copy.author = author
-        copy.description = description
-        copy.genre = genre
-        copy.status = status
-        copy.thumbnail_url = thumbnail_url
-        copy.update_strategy = update_strategy
-        copy.memo = memo
-        copy.initialized = initialized
-    }
+    fun copy(): SManga =
+        create().also { copy ->
+            copy.url = url
+            copy.title = title
+            copy.artist = artist
+            copy.author = author
+            copy.description = description
+            copy.genre = genre
+            copy.status = status
+            copy.thumbnail_url = thumbnail_url
+            copy.update_strategy = update_strategy
+            copy.memo = memo
+            copy.initialized = initialized
+        }
 
     companion object {
         const val UNKNOWN = 0

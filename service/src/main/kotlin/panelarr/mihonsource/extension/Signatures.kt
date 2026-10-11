@@ -11,6 +11,8 @@ import java.util.jar.JarFile
 
 /** Signature checks for extension files. Fingerprints are lowercase hex SHA-256 of the signing certificate. */
 object Signatures {
+    private const val MIN_CHECKED_PLATFORM = 24
+
     fun sha256Hex(bytes: ByteArray): String = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes))
 
     fun fingerprint(certificate: Certificate): String = sha256Hex(certificate.encoded)
@@ -23,7 +25,14 @@ object Signatures {
      * its signer. Fails when the APK isn't signed or the signature doesn't verify.
      */
     fun verifyApk(apk: Path): String {
-        val result = ApkVerifier.Builder(apk.toFile()).build().verify()
+        // Extensions target modern Android; checking for ancient platform versions would
+        // reject valid SHA-256 signatures that those versions couldn't verify.
+        val result =
+            ApkVerifier
+                .Builder(apk.toFile())
+                .setMinCheckedPlatformVersion(MIN_CHECKED_PLATFORM)
+                .build()
+                .verify()
         if (!result.isVerified) {
             val errors = result.allErrors.joinToString("; ").ifEmpty { "unknown error" }
             throw ExtensionException("the APK signature doesn't verify: $errors")

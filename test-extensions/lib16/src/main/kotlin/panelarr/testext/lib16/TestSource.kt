@@ -74,18 +74,32 @@ class TestSource(
                 .addQueryParameter("q", query)
         filters.forEach { filter ->
             when (filter) {
-                is AuthorFilter -> if (filter.state.isNotBlank()) url.addQueryParameter("author", filter.state)
-                is AdultFilter -> if (filter.state) url.addQueryParameter("adult", "1")
-                is StatusFilter -> url.addQueryParameter("status", STATUSES[filter.state])
-                is SortFilter -> filter.state?.let { url.addQueryParameter("sort", SORTS[it.index] + if (it.ascending) "+" else "-") }
-                is GenreGroup ->
+                is AuthorFilter -> {
+                    if (filter.state.isNotBlank()) url.addQueryParameter("author", filter.state)
+                }
+
+                is AdultFilter -> {
+                    if (filter.state) url.addQueryParameter("adult", "1")
+                }
+
+                is StatusFilter -> {
+                    url.addQueryParameter("status", STATUSES[filter.state])
+                }
+
+                is SortFilter -> {
+                    filter.state?.let { url.addQueryParameter("sort", SORTS[it.index] + if (it.ascending) "+" else "-") }
+                }
+
+                is GenreGroup -> {
                     filter.state.forEach { genre ->
                         when {
                             genre.isIncluded() -> url.addQueryParameter("genre", genre.name)
                             genre.isExcluded() -> url.addQueryParameter("exclude", genre.name)
                         }
                     }
-                else -> Unit
+                }
+
+                else -> {}
             }
         }
         if (preferences.getBoolean(PREF_ADULT, false)) url.addQueryParameter("pref_adult", "1")

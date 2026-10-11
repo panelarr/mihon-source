@@ -18,6 +18,5 @@ object ExtensionHost {
         networks = networkFor
     }
 
-    fun networkFor(source: HttpSource): NetworkHelper =
-        checkNotNull(networks) { "the extension host isn't set up" }.invoke(source)
+    fun networkFor(source: HttpSource): NetworkHelper = checkNotNull(networks) { "the extension host isn't set up" }.invoke(source)
 }

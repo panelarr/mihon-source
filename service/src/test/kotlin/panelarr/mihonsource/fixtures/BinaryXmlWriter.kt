@@ -44,6 +44,7 @@ class BinaryXmlWriter {
         // Attribute names with resource ids come first in the pool, matching the resource map.
         val androidNames = linkedSetOf<String>()
         val otherStrings = linkedSetOf(ANDROID_PREFIX, ANDROID_NS)
+
         fun collect(element: Element) {
             otherStrings += element.name
             element.attributes.forEach { attr ->

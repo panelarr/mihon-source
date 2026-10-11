@@ -2,6 +2,7 @@
 
 package panelarr.mihonsource.network
 
+import com.google.protobuf.Duration
 import panelarr.mihonsource.secret.SecretBox
 import panelarr.source.v1.NetworkProfile
 import panelarr.source.v1.RateLimitScope
@@ -21,70 +22,91 @@ class PushedProfiles(
     }
 
     private fun convert(profile: NetworkProfile): PushedProfile {
-        val solver =
-            if (profile.hasSolver() && profile.solver.url.isNotBlank()) {
-                SolverSettings(
-                    id = "pushed",
-                    name = "pushed",
-                    type = if (profile.solver.type == SolverType.SOLVER_TYPE_BYPARR) SolverSettings.Type.BYPARR else SolverSettings.Type.FLARESOLVERR,
-                    url = Urls.requireHttp(profile.solver.url, "solver URL"),
-                    sessionTtlSeconds = profile.solver.takeIf { it.hasSessionTtl() }?.sessionTtl?.seconds,
-                    maxTimeoutSeconds = profile.solver.takeIf { it.hasMaxTimeout() }?.maxTimeout?.seconds,
-                    asResponseFallback = profile.solver.asResponseFallback,
-                )
-            } else {
-                null
-            }
-        val proxy =
-            if (profile.hasProxy() && profile.proxy.url.isNotBlank()) {
-                ProxyUrls.parse(profile.proxy.url)
-                ProxySettings(
-                    url = profile.proxy.url.trim(),
-                    username = profile.proxy.username.ifBlank { null },
-                    sealedPassword = profile.proxy.password.ifEmpty { null }?.let(secrets::encrypt),
-                )
-            } else {
-                null
-            }
-        val (mode, agent) =
-            when (profile.userAgent.modeCase) {
-                UserAgent.ModeCase.FIXED -> UserAgentMode.FIXED to profile.userAgent.fixed
-                UserAgent.ModeCase.RANDOM_DESKTOP -> UserAgentMode.RANDOM_DESKTOP to null
-                UserAgent.ModeCase.FROM_SOLVER -> UserAgentMode.FROM_SOLVER to null
-                else -> UserAgentMode.DEFAULT to null
-            }
+        val solver = solver(profile)
+        val (mode, agent) = userAgent(profile.userAgent)
         return PushedProfile(
             profile =
                 ProfileSettings(
-                    id = "pushed",
-                    name = profile.name.ifBlank { "pushed" },
-                    proxy = proxy,
+                    id = PUSHED,
+                    name = profile.name.ifBlank { PUSHED },
+                    proxy = proxy(profile),
                     solverId = solver?.id,
-                    rateLimit =
-                        if (profile.hasRateLimit() && profile.rateLimit.requests > 0 && profile.rateLimit.hasPeriod()) {
-                            RateLimitSettings(
-                                requests = profile.rateLimit.requests,
-                                periodMillis = profile.rateLimit.period.seconds * MILLIS + profile.rateLimit.period.nanos / NANOS_PER_MILLI,
-                                burst = profile.rateLimit.burst,
-                                perHost = profile.rateLimit.scope == RateLimitScope.RATE_LIMIT_SCOPE_HOST,
-                            )
-                        } else {
-                            null
-                        },
+                    rateLimit = rateLimit(profile),
                     concurrency = profile.concurrency,
                     userAgentMode = mode,
                     userAgent = agent,
                     headers = profile.headersMap,
                     sharedCookieJar = profile.sharedCookieJar.ifBlank { null },
-                    connectTimeoutMillis = profile.timeouts.takeIf { it.hasConnect() }?.connect?.let { it.seconds * MILLIS + it.nanos / NANOS_PER_MILLI },
-                    readTimeoutMillis = profile.timeouts.takeIf { it.hasRead() }?.read?.let { it.seconds * MILLIS + it.nanos / NANOS_PER_MILLI },
-                    callTimeoutMillis = profile.timeouts.takeIf { it.hasCall() }?.call?.let { it.seconds * MILLIS + it.nanos / NANOS_PER_MILLI },
+                    connectTimeoutMillis =
+                        profile.timeouts
+                            .takeIf { it.hasConnect() }
+                            ?.connect
+                            ?.millis(),
+                    readTimeoutMillis =
+                        profile.timeouts
+                            .takeIf { it.hasRead() }
+                            ?.read
+                            ?.millis(),
+                    callTimeoutMillis =
+                        profile.timeouts
+                            .takeIf { it.hasCall() }
+                            ?.call
+                            ?.millis(),
                 ),
             solver = solver,
         )
     }
 
+    private fun solver(profile: NetworkProfile): SolverSettings? {
+        if (!profile.hasSolver() || profile.solver.url.isBlank()) return null
+        val solver = profile.solver
+        return SolverSettings(
+            id = PUSHED,
+            name = PUSHED,
+            type = if (solver.type == SolverType.SOLVER_TYPE_BYPARR) SolverSettings.Type.BYPARR else SolverSettings.Type.FLARESOLVERR,
+            url = Urls.requireHttp(solver.url, "solver URL"),
+            sessionTtlSeconds = solver.takeIf { it.hasSessionTtl() }?.sessionTtl?.seconds,
+            maxTimeoutSeconds = solver.takeIf { it.hasMaxTimeout() }?.maxTimeout?.seconds,
+            asResponseFallback = solver.asResponseFallback,
+        )
+    }
+
+    private fun proxy(profile: NetworkProfile): ProxySettings? {
+        if (!profile.hasProxy() || profile.proxy.url.isBlank()) return null
+        ProxyUrls.parse(profile.proxy.url)
+        return ProxySettings(
+            url = profile.proxy.url.trim(),
+            username = profile.proxy.username.ifBlank { null },
+            sealedPassword =
+                profile.proxy.password
+                    .ifEmpty { null }
+                    ?.let(secrets::encrypt),
+        )
+    }
+
+    private fun rateLimit(profile: NetworkProfile): RateLimitSettings? {
+        val limit = profile.rateLimit
+        if (!profile.hasRateLimit() || limit.requests <= 0 || !limit.hasPeriod()) return null
+        return RateLimitSettings(
+            requests = limit.requests,
+            periodMillis = limit.period.millis(),
+            burst = limit.burst,
+            perHost = limit.scope == RateLimitScope.RATE_LIMIT_SCOPE_HOST,
+        )
+    }
+
+    private fun userAgent(agent: UserAgent): Pair<UserAgentMode, String?> =
+        when (agent.modeCase) {
+            UserAgent.ModeCase.FIXED -> UserAgentMode.FIXED to agent.fixed
+            UserAgent.ModeCase.RANDOM_DESKTOP -> UserAgentMode.RANDOM_DESKTOP to null
+            UserAgent.ModeCase.FROM_SOLVER -> UserAgentMode.FROM_SOLVER to null
+            else -> UserAgentMode.DEFAULT to null
+        }
+
+    private fun Duration.millis(): Long = seconds * MILLIS + nanos / NANOS_PER_MILLI
+
     private companion object {
+        const val PUSHED = "pushed"
         const val MILLIS = 1000L
         const val NANOS_PER_MILLI = 1_000_000L
     }

@@ -68,7 +68,13 @@ class NetworkProfilesTest {
                 service.sources.setSettings(
                     setSettingsRequest {
                         sourceId = id
-                        values = Struct.newBuilder().putFields("base_url", Value.newBuilder().setStringValue("http://catalog.test").build()).build()
+                        values =
+                            Struct
+                                .newBuilder()
+                                .putFields(
+                                    "base_url",
+                                    Value.newBuilder().setStringValue("http://catalog.test").build(),
+                                ).build()
                     },
                 )
             }
@@ -130,12 +136,23 @@ class NetworkProfilesTest {
 
         popular(en)
         assertEquals(1, proxyA.requests.size)
-        assertEquals("catalog.test", proxyA.requests.single().url.host)
+        assertEquals(
+            "catalog.test",
+            proxyA.requests
+                .single()
+                .url.host,
+        )
         assertEquals(0, proxyB.requests.size)
 
         popular(fr)
         assertEquals(1, proxyB.requests.size)
-        assertEquals("fr", proxyB.requests.single().url.queryParameter("lang"))
+        assertEquals(
+            "fr",
+            proxyB.requests
+                .single()
+                .url
+                .queryParameter("lang"),
+        )
         assertEquals(1, proxyA.requests.size)
 
         // No JVM-wide proxy settings were touched.
@@ -164,7 +181,11 @@ class NetworkProfilesTest {
         popular(en)
         assertEquals(0, proxyA.requests.size)
         assertEquals(1, proxyB.requests.size)
-        val assignment = runBlocking { service.integrations.listAssignments(listAssignmentsRequest {}) }.assignmentsList.single { it.sourceId == en }
+        val assignment =
+            runBlocking { service.integrations.listAssignments(listAssignmentsRequest {}) }.assignmentsList.single {
+                it.sourceId ==
+                    en
+            }
         assertEquals(ProfileOrigin.PROFILE_ORIGIN_PUSHED, assignment.effective)
         assertEquals("from-host", assignment.pushedProfileName)
 
@@ -178,7 +199,11 @@ class NetworkProfilesTest {
     fun `proxy credentials are used, encrypted at rest and never returned`() {
         proxyA.override = { request ->
             if (request.headers["Proxy-Authorization"] == null) {
-                MockResponse.Builder().code(407).addHeader("Proxy-Authenticate", "Basic realm=\"test\"").build()
+                MockResponse
+                    .Builder()
+                    .code(407)
+                    .addHeader("Proxy-Authenticate", "Basic realm=\"test\"")
+                    .build()
             } else {
                 null
             }
@@ -216,8 +241,9 @@ class NetworkProfilesTest {
                         .Builder()
                         .addHeader("Content-Type", "application/json")
                         .body(
-                            """{"status":"ok","message":"","solution":{"url":"http://catalog.test/","status":200,"userAgent":"Solver UA",""" +
-                                """"cookies":[{"name":"cf_clearance","value":"ok","domain":"catalog.test","path":"/"}],"response":"<html></html>"}}""",
+                            """{"status":"ok","message":"","solution":{"url":"http://catalog.test/","status":200,""" +
+                                """"userAgent":"Solver UA","cookies":[{"name":"cf_clearance","value":"ok",""" +
+                                """"domain":"catalog.test","path":"/"}],"response":"<html></html>"}}""",
                         ).build()
                 }
             }
@@ -229,7 +255,12 @@ class NetworkProfilesTest {
                     assertEquals("Solver UA", request.headers["User-Agent"])
                     null
                 } else {
-                    MockResponse.Builder().code(503).addHeader("Server", "cloudflare").body("challenge").build()
+                    MockResponse
+                        .Builder()
+                        .code(503)
+                        .addHeader("Server", "cloudflare")
+                        .body("challenge")
+                        .build()
                 }
             }
             runBlocking {
@@ -250,7 +281,17 @@ class NetworkProfilesTest {
 
             val pages =
                 runBlocking {
-                    (1..3).map { page -> async { service.sources.popular(popularRequest { sourceId = en; this.page = page }) } }.awaitAll()
+                    (1..3)
+                        .map { page ->
+                            async {
+                                service.sources.popular(
+                                    popularRequest {
+                                        sourceId = en
+                                        this.page = page
+                                    },
+                                )
+                            }
+                        }.awaitAll()
                 }
             assertEquals(3, pages.size)
             assertEquals(1, solves.get())

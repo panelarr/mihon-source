@@ -7,12 +7,12 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
 import org.slf4j.LoggerFactory
+import panelarr.mihonsource.extension.Expectations
 import panelarr.mihonsource.extension.ExtensionDescriptor
 import panelarr.mihonsource.extension.ExtensionException
 import panelarr.mihonsource.extension.ExtensionInstaller
 import panelarr.mihonsource.extension.ExtensionManager
 import panelarr.mihonsource.extension.ExtensionRecord
-import panelarr.mihonsource.extension.Expectations
 import panelarr.mihonsource.extension.InstalledExtension
 import panelarr.mihonsource.extension.LibVersion
 import panelarr.mihonsource.extension.Signatures
@@ -87,7 +87,9 @@ class StoreManager(
             val snapshot = reader.read(url)
             expectedFingerprint?.let { expected ->
                 if (Signatures.normalize(expected) != snapshot.signingKey) {
-                    throw StoreException("the store announces signing key '${snapshot.signingKey.ifEmpty { "none" }}', not the expected one")
+                    throw StoreException(
+                        "the store announces signing key '${snapshot.signingKey.ifEmpty { "none" }}', not the expected one",
+                    )
                 }
             }
             val now = clock().toString()
@@ -182,7 +184,8 @@ class StoreManager(
         pkgName: String,
     ): InstalledExtension {
         val store = get(storeId)
-        val offer = snapshot(storeId).firstOrNull { it.pkgName == pkgName } ?: throw NoSuchElementException("the store doesn't offer '$pkgName'")
+        val offer =
+            snapshot(storeId).firstOrNull { it.pkgName == pkgName } ?: throw NoSuchElementException("the store doesn't offer '$pkgName'")
         LibVersion.requireSupported(offer.libVersion)
         extensions.find(pkgName)?.let { installed ->
             if (installed.record.versionCode > offer.versionCode) {
@@ -227,7 +230,8 @@ class StoreManager(
     }
 
     @Synchronized
-    private fun snapshot(id: String): List<StoreExtension> = snapshots.getOrPut(id) { snapshotFile(id).read().orEmpty().map { it.toExtension() } }
+    private fun snapshot(id: String): List<StoreExtension> =
+        snapshots.getOrPut(id) { snapshotFile(id).read().orEmpty().map { it.toExtension() } }
 
     @Synchronized
     private fun saveSnapshot(
@@ -253,17 +257,37 @@ class StoreManager(
         val iconUrl: String? = null,
         val sources: List<IndexSource> = emptyList(),
     ) {
-        fun toExtension() = StoreExtension(name, pkgName, versionName, versionCode, libVersion, contentWarning, apkUrl, jarUrl, iconUrl, sources)
+        fun toExtension() =
+            StoreExtension(name, pkgName, versionName, versionCode, libVersion, contentWarning, apkUrl, jarUrl, iconUrl, sources)
 
         companion object {
             fun of(e: StoreExtension) =
-                StoredExtension(e.name, e.pkgName, e.versionName, e.versionCode, e.libVersion, e.contentWarning, e.apkUrl, e.jarUrl, e.iconUrl, e.sources)
+                StoredExtension(
+                    e.name,
+                    e.pkgName,
+                    e.versionName,
+                    e.versionCode,
+                    e.libVersion,
+                    e.contentWarning,
+                    e.apkUrl,
+                    e.jarUrl,
+                    e.iconUrl,
+                    e.sources,
+                )
         }
     }
 
     companion object {
         /** Store ids are derived from the URL, so adding the same store twice is caught. */
-        fun idFor(url: String): String = Signatures.sha256Hex(url.trim().trimEnd('/').lowercase().toByteArray()).take(ID_LENGTH)
+        fun idFor(url: String): String =
+            Signatures
+                .sha256Hex(
+                    url
+                        .trim()
+                        .trimEnd('/')
+                        .lowercase()
+                        .toByteArray(),
+                ).take(ID_LENGTH)
 
         private const val ID_LENGTH = 12
     }

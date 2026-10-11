@@ -62,13 +62,34 @@ class StoreReader(
         val validated = Downloader.validate(url)
         val bytes = fetch(validated)
         return when (bytes.firstOrNull()?.toInt()?.toChar()) {
-            '[' -> legacy(validated, bytes, repo = sibling(validated, "repo.json")?.let { runCatching { repoJson(fetch(it)) }.getOrNull() })
-            '{' -> {
-                val obj = runCatching { json.parseToJsonElement(bytes.decodeToString()).jsonObject }.getOrElse { throw invalid(validated, it) }
-                if ("meta" in obj || "index_v2" in obj) fromRepo(validated, json.decodeFromJsonElement(RepoJson.serializer(), obj)) else index(validated, jsonIndex(obj))
+            '[' -> {
+                legacy(validated, bytes, repo = sibling(validated, "repo.json")?.let { runCatching { repoJson(fetch(it)) }.getOrNull() })
             }
-            null -> throw StoreException("$validated is empty")
-            else -> index(validated, protobufIndex(validated, bytes))
+
+            '{' -> {
+                val obj =
+                    runCatching {
+                        json
+                            .parseToJsonElement(
+                                bytes.decodeToString(),
+                            ).jsonObject
+                    }.getOrElse { throw invalid(validated, it) }
+                if ("meta" in obj ||
+                    "index_v2" in obj
+                ) {
+                    fromRepo(validated, json.decodeFromJsonElement(RepoJson.serializer(), obj))
+                } else {
+                    index(validated, jsonIndex(obj))
+                }
+            }
+
+            null -> {
+                throw StoreException("$validated is empty")
+            }
+
+            else -> {
+                index(validated, protobufIndex(validated, bytes))
+            }
         }
     }
 
@@ -137,9 +158,18 @@ class StoreReader(
                         versionCode = e.versionCode,
                         libVersion = e.extensionLib.ifEmpty { e.versionName.substringBeforeLast('.') },
                         contentWarning = e.contentWarning,
-                        apkUrl = e.resources.apkUrl.ifBlank { null }?.let { resolve(url, it) },
-                        jarUrl = e.resources.jarUrl.ifBlank { null }?.let { resolve(url, it) },
-                        iconUrl = e.resources.iconUrl.ifBlank { null }?.let { resolve(url, it) },
+                        apkUrl =
+                            e.resources.apkUrl
+                                .ifBlank { null }
+                                ?.let { resolve(url, it) },
+                        jarUrl =
+                            e.resources.jarUrl
+                                .ifBlank { null }
+                                ?.let { resolve(url, it) },
+                        iconUrl =
+                            e.resources.iconUrl
+                                .ifBlank { null }
+                                ?.let { resolve(url, it) },
                         sources = e.sources,
                     )
                 },
@@ -159,7 +189,12 @@ class StoreReader(
             name = repo?.meta?.name ?: url.toHttpUrl().host,
             badgeLabel = repo?.meta?.shortName ?: repo?.meta?.name ?: "",
             contact = repo?.meta?.website.orEmpty(),
-            signingKey = repo?.meta?.signingKeyFingerprint.orEmpty().lowercase(),
+            signingKey =
+                repo
+                    ?.meta
+                    ?.signingKeyFingerprint
+                    .orEmpty()
+                    .lowercase(),
             legacy = true,
             extensions =
                 entries.map { e ->
@@ -169,7 +204,14 @@ class StoreReader(
                         versionName = e.version,
                         versionCode = e.code,
                         libVersion = e.version.substringBeforeLast('.'),
-                        contentWarning = if (e.nsfw == 1) IndexContentWarning.CONTENT_WARNING_NSFW else IndexContentWarning.CONTENT_WARNING_SAFE,
+                        contentWarning =
+                            if (e.nsfw ==
+                                1
+                            ) {
+                                IndexContentWarning.CONTENT_WARNING_NSFW
+                            } else {
+                                IndexContentWarning.CONTENT_WARNING_SAFE
+                            },
                         apkUrl = "$base/apk/${e.apk}",
                         jarUrl = null,
                         iconUrl = "$base/icon/${e.pkg}.png",
@@ -203,7 +245,11 @@ class StoreReader(
         base: String,
         target: String,
     ): String =
-        base.toHttpUrl().resolve(target)?.toString()?.let(Downloader::validate)
+        base
+            .toHttpUrl()
+            .resolve(target)
+            ?.toString()
+            ?.let(Downloader::validate)
             ?: throw StoreException("invalid URL '$target' in the store")
 
     private fun sibling(

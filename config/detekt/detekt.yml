@@ -5,11 +5,37 @@ style:
     # Same limit as ktlint (.editorconfig).
     maxLineLength: 140
   ReturnCount:
-    max: 3
+    max: 4
     excludeGuardClauses: true
+  ThrowsCount:
+    max: 4
+    excludeGuardClauses: true
+  MagicNumber:
+    # Protobuf field numbers and named arguments are self-explanatory.
+    ignoreAnnotation: true
+    ignoreNamedArgument: true
+    ignorePropertyDeclaration: true
+    ignoreCompanionObjectPropertyDeclaration: true
+    excludes: ['**/test/**', '**/testFixtures/**']
+  LoopWithTooManyJumpStatements:
+    active: false
 
 complexity:
   TooManyFunctions:
-    allowedFunctionsPerClass: 15
-    allowedFunctionsPerFile: 20
-    allowedFunctionsPerObject: 15
+    allowedFunctionsPerClass: 20
+    allowedFunctionsPerFile: 25
+    allowedFunctionsPerObject: 20
+  CyclomaticComplexMethod:
+    ignoreSimpleWhenEntries: true
+    excludes: ['**/test/**']
+  LongMethod:
+    excludes: ['**/test/**']
+  NestedBlockDepth:
+    excludes: ['**/test/**']
+  LongParameterList:
+    excludes: ['**/test/**']
+
+naming:
+  FunctionNaming:
+    # Backtick test names.
+    excludes: ['**/test/**']

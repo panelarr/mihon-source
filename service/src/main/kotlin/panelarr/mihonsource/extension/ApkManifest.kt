@@ -119,8 +119,11 @@ data class ApkManifest(
             private fun stringValue(i: Int): String? =
                 when (parser.getAttributeValueType(i)) {
                     AndroidBinXmlParser.VALUE_TYPE_STRING -> parser.getAttributeStringValue(i)
+
                     AndroidBinXmlParser.VALUE_TYPE_INT -> parser.getAttributeIntValue(i).toString()
+
                     AndroidBinXmlParser.VALUE_TYPE_BOOLEAN -> parser.getAttributeBooleanValue(i).toString()
+
                     // A reference (e.g. @string/app_name) can't be resolved without resources.
                     else -> null
                 }

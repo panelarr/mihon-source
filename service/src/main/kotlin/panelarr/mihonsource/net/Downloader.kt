@@ -62,13 +62,15 @@ class Downloader(
 
     companion object {
         private val TIMEOUT: Duration = Duration.ofSeconds(60)
+        private val CONNECT_TIMEOUT: Duration = Duration.ofSeconds(15)
+        private val CALL_TIMEOUT: Duration = Duration.ofMinutes(5)
 
         fun defaultClient(): OkHttpClient =
             OkHttpClient
                 .Builder()
-                .connectTimeout(Duration.ofSeconds(15))
+                .connectTimeout(CONNECT_TIMEOUT)
                 .readTimeout(TIMEOUT)
-                .callTimeout(Duration.ofMinutes(5))
+                .callTimeout(CALL_TIMEOUT)
                 .build()
 
         /** Accepts absolute http(s) URLs only. */

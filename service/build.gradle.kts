@@ -6,10 +6,11 @@ plugins {
     application
 }
 
-val testExtensions: Configuration by configurations.creating {
-    isCanBeConsumed = false
-    isTransitive = false
-}
+val testExtensions: Configuration =
+    configurations.create("testExtensions") {
+        isCanBeConsumed = false
+        isTransitive = false
+    }
 
 dependencies {
     implementation(project(":api"))
@@ -63,7 +64,8 @@ tasks.named<Jar>("jar") {
 tasks.named<Test>("test") {
     // Test extensions are fixtures loaded by the extension loader, not test classpath entries.
     inputs.files(testExtensions)
-    val jars = testExtensions
+    dependsOn(testExtensions)
+    val jars = files(testExtensions)
     jvmArgumentProviders += CommandLineArgumentProvider { listOf("-Dtest.extensions=" + jars.files.joinToString(File.pathSeparator)) }
     systemProperty("java.awt.headless", "true")
 }

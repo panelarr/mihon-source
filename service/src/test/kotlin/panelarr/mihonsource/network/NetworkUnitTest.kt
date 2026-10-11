@@ -25,7 +25,10 @@ class NetworkUnitTest {
         var now = 0L
         val slept = mutableListOf<Long>()
         val limiter =
-            RateLimiter(2, TimeUnit.SECONDS.toNanos(1), burst = 0, nanoTime = { now }, sleep = { slept += it; now += it })
+            RateLimiter(2, TimeUnit.SECONDS.toNanos(1), burst = 0, nanoTime = { now }, sleep = {
+                slept += it
+                now += it
+            })
         repeat(2) { assertEquals(0, limiter.acquire()) }
         assertEquals(TimeUnit.MILLISECONDS.toNanos(500), limiter.acquire())
         now += TimeUnit.SECONDS.toNanos(10)
@@ -41,8 +44,20 @@ class NetworkUnitTest {
         jar.saveFromResponse(
             url,
             listOf(
-                Cookie.Builder().name("keep").value("1").domain("example.com").expiresAt(now + 60_000).build(),
-                Cookie.Builder().name("short").value("2").domain("example.com").expiresAt(now + 10).build(),
+                Cookie
+                    .Builder()
+                    .name("keep")
+                    .value("1")
+                    .domain("example.com")
+                    .expiresAt(now + 60_000)
+                    .build(),
+                Cookie
+                    .Builder()
+                    .name("short")
+                    .value("2")
+                    .domain("example.com")
+                    .expiresAt(now + 10)
+                    .build(),
             ),
         )
         assertEquals(setOf("keep", "short"), jar.loadForRequest(url).map { it.name }.toSet())
@@ -84,7 +99,13 @@ class NetworkUnitTest {
 
         store.deleteProfile("special")
         store.setPushed(1, null)
-        assertEquals(EffectiveProfile.Origin.DEFAULT, FileIntegrationsStore(dir).let { ProfileResolver(it, SecretBox.load(dir.resolve("secret.key"), null)).resolve(1) }.origin)
+        assertEquals(
+            EffectiveProfile.Origin.DEFAULT,
+            FileIntegrationsStore(dir)
+                .let {
+                    ProfileResolver(it, SecretBox.load(dir.resolve("secret.key"), null)).resolve(1)
+                }.origin,
+        )
     }
 
     @Test

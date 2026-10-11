@@ -75,7 +75,8 @@ class ExtensionManager(
 
     fun list(): List<InstalledExtension> = extensions.values.sortedBy { it.record.name.lowercase() }
 
-    fun get(pkgName: String): InstalledExtension = extensions[pkgName] ?: throw NoSuchElementException("extension '$pkgName' isn't installed")
+    fun get(pkgName: String): InstalledExtension =
+        extensions[pkgName] ?: throw NoSuchElementException("extension '$pkgName' isn't installed")
 
     fun find(pkgName: String): InstalledExtension? = extensions[pkgName]
 
@@ -202,7 +203,12 @@ class ExtensionManager(
         record: ExtensionRecord,
         sources: List<HostedSource>,
     ) {
-        val taken = extensions.filterKeys { it != record.pkgName }.values.flatMap { it.sources.orEmpty() }.associateBy { it.id }
+        val taken =
+            extensions
+                .filterKeys { it != record.pkgName }
+                .values
+                .flatMap { it.sources.orEmpty() }
+                .associateBy { it.id }
         sources.forEach { source ->
             taken[source.id]?.let { other ->
                 throw ExtensionException("source id ${source.id} ('${source.name}') is already used by '${other.name}'")

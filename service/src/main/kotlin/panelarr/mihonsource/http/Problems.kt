@@ -34,7 +34,12 @@ object Problems {
     ): HttpResponse {
         val details = StatusProto.fromStatusAndTrailers(status, trailers).detailsList
         val reason = details.firstOrNull { it.`is`(ErrorInfo::class.java) }?.unpack(ErrorInfo::class.java)?.reason
-        val retry = details.firstOrNull { it.`is`(RetryInfo::class.java) }?.unpack(RetryInfo::class.java)?.retryDelay?.seconds
+        val retry =
+            details
+                .firstOrNull { it.`is`(RetryInfo::class.java) }
+                ?.unpack(RetryInfo::class.java)
+                ?.retryDelay
+                ?.seconds
         return response(status, reason, retry)
     }
 
@@ -61,7 +66,11 @@ object Problems {
                 .contentType(PROBLEM_JSON)
                 .apply { retryAfterSeconds?.let { set(HttpHeaderNames.RETRY_AFTER, it.toString()) } }
                 .build()
-        return HttpResponse.of(headers, com.linecorp.armeria.common.HttpData.ofUtf8(JsonObject(body).toString()))
+        return HttpResponse.of(
+            headers,
+            com.linecorp.armeria.common.HttpData
+                .ofUtf8(JsonObject(body).toString()),
+        )
     }
 
     fun httpStatus(code: Status.Code): HttpStatus =

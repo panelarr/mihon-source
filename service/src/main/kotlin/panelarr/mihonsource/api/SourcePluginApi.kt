@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.flowOn
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import panelarr.mihonsource.BuildInfo
 import panelarr.mihonsource.SERVICE_NAME
+import panelarr.mihonsource.mihon.FilterMapping
 import panelarr.mihonsource.mihon.Mapping
 import panelarr.mihonsource.mihon.MihonSource
 import panelarr.mihonsource.mihon.MihonSources
@@ -95,7 +96,8 @@ class SourcePluginApi(
                     name = SERVICE_NAME
                     version = BuildInfo.version
                     contracts += listOf(CONTRACT_SOURCE, CONTRACT_MIHON)
-                    capabilities += listOf(PluginCapability.PLUGIN_CAPABILITY_DYNAMIC_SOURCES, PluginCapability.PLUGIN_CAPABILITY_NETWORK_PROFILES)
+                    capabilities +=
+                        listOf(PluginCapability.PLUGIN_CAPABILITY_DYNAMIC_SOURCES, PluginCapability.PLUGIN_CAPABILITY_NETWORK_PROFILES)
                     commonServices += listOf(CommonService.COMMON_SERVICE_NETWORK_PROFILE, CommonService.COMMON_SERVICE_SOLVER)
                 }
         }
@@ -111,7 +113,10 @@ class SourcePluginApi(
     override suspend fun listSources(request: ListSourcesRequest): ListSourcesResponse =
         rpc {
             listSourcesResponse {
-                sources += this@SourcePluginApi.sources.all().filter { request.lang.isEmpty() || it.lang == request.lang }.map(this@SourcePluginApi.sources::toProto)
+                sources +=
+                    this@SourcePluginApi.sources.all().filter { request.lang.isEmpty() || it.lang == request.lang }.map(
+                        this@SourcePluginApi.sources::toProto,
+                    )
             }
         }
 
@@ -122,7 +127,7 @@ class SourcePluginApi(
         rpc {
             val source = sources.get(request.sourceId)
             val list = sources.call(source) { it.source.getFilterList() }
-            getFiltersResponse { filters += Mapping.filters(list) }
+            getFiltersResponse { filters += FilterMapping.filters(list) }
         }
 
     override suspend fun popular(request: PopularRequest): PopularResponse =
@@ -130,7 +135,7 @@ class SourcePluginApi(
             val source = sources.get(request.sourceId)
             val page = sources.call(source) { it.source.getPopularManga(pageNumber(request.page)) }
             popularResponse {
-                series += seriesList(source, page)
+                series += seriesList(page)
                 hasNextPage = page.hasNextPage
             }
         }
@@ -141,7 +146,7 @@ class SourcePluginApi(
             if (!source.supportsLatest) throw SourceErrors.unsupported("this source has no latest list")
             val page = sources.call(source) { it.source.getLatestUpdates(pageNumber(request.page)) }
             latestResponse {
-                series += seriesList(source, page)
+                series += seriesList(page)
                 hasNextPage = page.hasNextPage
             }
         }
@@ -151,11 +156,11 @@ class SourcePluginApi(
             val source = sources.get(request.sourceId)
             val page =
                 sources.call(source) {
-                    val filters = Mapping.applyFilters(it.source.getFilterList(), request.filtersList)
+                    val filters = FilterMapping.applyFilters(it.source.getFilterList(), request.filtersList)
                     it.source.getSearchManga(pageNumber(request.page), request.query, filters)
                 }
             searchResponse {
-                series += seriesList(source, page)
+                series += seriesList(page)
                 hasNextPage = page.hasNextPage
             }
         }
@@ -201,7 +206,8 @@ class SourcePluginApi(
             val source = sources.get(request.sourceId)
             val update = sources.call(source) { it.source.getMangaUpdate(Mapping.mangaFor(request.seriesKey), emptyList(), false, true) }
             listChaptersResponse {
-                chapters += update.chapters.map { chapter -> Mapping.chapter(chapter, webUrl(source) { http -> http.getChapterUrl(chapter) }) }
+                chapters +=
+                    update.chapters.map { chapter -> Mapping.chapter(chapter, webUrl(source) { http -> http.getChapterUrl(chapter) }) }
             }
         }
 
@@ -270,10 +276,7 @@ class SourcePluginApi(
         return source
     }
 
-    private fun seriesList(
-        source: MihonSource,
-        page: MangasPage,
-    ): List<Series> = page.mangas.map { manga -> Mapping.series(manga, detailsLoaded = false) }
+    private fun seriesList(page: MangasPage): List<Series> = page.mangas.map { manga -> Mapping.series(manga, detailsLoaded = false) }
 
     private fun webUrl(
         source: MihonSource,

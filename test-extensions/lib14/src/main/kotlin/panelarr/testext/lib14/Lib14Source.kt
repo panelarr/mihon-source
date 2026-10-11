@@ -1,5 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+// Lib 1.4 extensions override what lib 1.6 deprecated; that is the point of this fixture.
+@file:Suppress("OVERRIDE_DEPRECATION")
+
 package panelarr.testext.lib14
 
 import eu.kanade.tachiyomi.network.GET
@@ -28,8 +31,11 @@ class Lib14Source : HttpSource() {
     /** Proves assets are readable through the extension's classloader. */
     val greeting: String =
         Properties()
-            .apply { javaClass.classLoader.getResourceAsStream("assets/i18n.properties")?.use { load(it) } }
-            .getProperty("greeting", "missing")
+            .apply {
+                Lib14Source::class.java.classLoader
+                    .getResourceAsStream("assets/i18n.properties")
+                    ?.use { load(it) }
+            }.getProperty("greeting", "missing")
 
     override fun popularMangaRequest(page: Int): Request = GET("$baseUrl/html/popular?page=$page", headers)
 

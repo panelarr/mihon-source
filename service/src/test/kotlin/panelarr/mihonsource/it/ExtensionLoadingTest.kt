@@ -71,8 +71,15 @@ class ExtensionLoadingTest {
         assertEquals("1.4", extension.libVersion)
         assertEquals(ContentWarning.CONTENT_WARNING_NSFW, extension.contentWarning)
 
-        val source = service.app.extensions.sources().single()
-        val greeting = (source as panelarr.mihonsource.mihon.MihonSource).source.javaClass.getMethod("getGreeting").invoke(source.source)
+        val source =
+            service.app.extensions
+                .sources()
+                .single()
+        val greeting =
+            (source as panelarr.mihonsource.mihon.MihonSource)
+                .source.javaClass
+                .getMethod("getGreeting")
+                .invoke(source.source)
         assertEquals("hello from assets", greeting)
     }
 
@@ -87,7 +94,9 @@ class ExtensionLoadingTest {
                 runBlocking {
                     service.admin.installExtension(
                         installExtensionRequest {
-                            data = com.google.protobuf.ByteString.copyFrom(bytes)
+                            data =
+                                com.google.protobuf.ByteString
+                                    .copyFrom(bytes)
                             expectedSigningFingerprint = "00".repeat(32)
                         },
                     )
@@ -101,7 +110,9 @@ class ExtensionLoadingTest {
                 runBlocking {
                     service.admin.installExtension(
                         installExtensionRequest {
-                            data = com.google.protobuf.ByteString.copyFrom(bytes)
+                            data =
+                                com.google.protobuf.ByteString
+                                    .copyFrom(bytes)
                             expectedSha256 = "ab".repeat(32)
                         },
                     )
@@ -111,13 +122,16 @@ class ExtensionLoadingTest {
 
         val installed =
             runBlocking {
-                service.admin.installExtension(
-                    installExtensionRequest {
-                        data = com.google.protobuf.ByteString.copyFrom(bytes)
-                        expectedSigningFingerprint = fingerprint.uppercase().chunked(2).joinToString(":")
-                        expectedSha256 = Signatures.sha256Hex(bytes)
-                    },
-                ).extension
+                service.admin
+                    .installExtension(
+                        installExtensionRequest {
+                            data =
+                                com.google.protobuf.ByteString
+                                    .copyFrom(bytes)
+                            expectedSigningFingerprint = fingerprint.uppercase().chunked(2).joinToString(":")
+                            expectedSha256 = Signatures.sha256Hex(bytes)
+                        },
+                    ).extension
             }
         assertEquals(fingerprint, installed.signingFingerprint)
         assertEquals(ExtensionStatus.EXTENSION_STATUS_LOADED, installed.status)
@@ -125,7 +139,10 @@ class ExtensionLoadingTest {
 
     @Test
     fun `unsupported lib versions are rejected`() {
-        val old = TestExtensions.withManifest(TestExtensions.lib16, dir.resolve("old.jar")) { it.replace("android:value=\"1.6\"", "android:value=\"1.3\"") }
+        val old =
+            TestExtensions.withManifest(TestExtensions.lib16, dir.resolve("old.jar")) {
+                it.replace("android:value=\"1.6\"", "android:value=\"1.3\"")
+            }
         val error = assertFailsWith<StatusException> { service.install(old) }
         assertEquals(Status.Code.INVALID_ARGUMENT, error.status.code)
         assertTrue("1.3 isn't supported" in error.status.description!!)
@@ -150,7 +167,12 @@ class ExtensionLoadingTest {
     @Test
     fun `reload, restart and uninstall`() {
         service.install(TestExtensions.lib16)
-        val reloaded = runBlocking { service.admin.reloadExtension(reloadExtensionRequest { pkgName = TestExtensions.LIB16_PKG }) }.extension
+        val reloaded =
+            runBlocking {
+                service.admin.reloadExtension(
+                    reloadExtensionRequest { pkgName = TestExtensions.LIB16_PKG },
+                )
+            }.extension
         assertEquals(ExtensionStatus.EXTENSION_STATUS_LOADED, reloaded.status)
 
         // A new service on the same data loads what was installed.
@@ -160,7 +182,17 @@ class ExtensionLoadingTest {
 
         runBlocking { service.admin.uninstallExtension(uninstallExtensionRequest { pkgName = TestExtensions.LIB16_PKG }) }
         assertEquals(0, runBlocking { service.sources.listSources(listSourcesRequest {}) }.sourcesCount)
-        val error = assertFailsWith<StatusException> { runBlocking { service.admin.getExtension(getExtensionRequest { pkgName = TestExtensions.LIB16_PKG }) } }
+        val error =
+            assertFailsWith<StatusException> {
+                runBlocking {
+                    service.admin.getExtension(
+                        getExtensionRequest {
+                            pkgName =
+                                TestExtensions.LIB16_PKG
+                        },
+                    )
+                }
+            }
         assertEquals(Status.Code.NOT_FOUND, error.status.code)
     }
 

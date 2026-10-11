@@ -10,14 +10,14 @@ import com.linecorp.armeria.common.MediaType
 import com.linecorp.armeria.common.multipart.Multipart
 import com.linecorp.armeria.server.HttpService
 import com.linecorp.armeria.server.ServiceRequestContext
-import kotlinx.coroutines.future.future
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.future.future
 import org.slf4j.LoggerFactory
 import panelarr.mihon.v1.installExtensionResponse
 import panelarr.mihonsource.api.toProto
+import panelarr.mihonsource.extension.Expectations
 import panelarr.mihonsource.extension.ExtensionException
 import panelarr.mihonsource.extension.ExtensionInstaller
-import panelarr.mihonsource.extension.Expectations
 
 /**
  * `POST /v1/admin/extensions/upload`: installs an extension from a multipart form, which

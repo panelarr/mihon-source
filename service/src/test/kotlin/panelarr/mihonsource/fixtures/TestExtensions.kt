@@ -26,7 +26,8 @@ object TestExtensions {
     const val LIB16_PKG = "panelarr.testext.lib16"
     const val LIB14_PKG = "panelarr.testext.lib14"
 
-    private fun jar(name: String): Path = jars.firstOrNull { it.fileName.toString().startsWith(name) } ?: error("test extension $name not built")
+    private fun jar(name: String): Path =
+        jars.firstOrNull { it.fileName.toString().startsWith(name) } ?: error("test extension $name not built")
 
     /** A v1-signed copy of [jar] (JAR signature, as extension stores publish them). */
     fun signedJar(

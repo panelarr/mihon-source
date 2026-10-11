@@ -82,14 +82,19 @@ class SourceSettings(
     private fun propertySchema(pref: Preference): Value? {
         val base =
             when (pref) {
-                is TwoStatePreference -> struct { putFields("type", string("boolean")) }
-                is ListPreference ->
+                is TwoStatePreference -> {
+                    struct { putFields("type", string("boolean")) }
+                }
+
+                is ListPreference -> {
                     struct {
                         putFields("type", string("string"))
                         putFields("enum", list(pref.entryValues.orEmpty().map { string(it.toString()) }))
                         putFields("x-enumNames", list(pref.entries.orEmpty().map { string(it.toString()) }))
                     }
-                is MultiSelectListPreference ->
+                }
+
+                is MultiSelectListPreference -> {
                     struct {
                         putFields("type", string("array"))
                         putFields("uniqueItems", Value.newBuilder().setBoolValue(true).build())
@@ -106,8 +111,15 @@ class SourceSettings(
                                 ).build(),
                         )
                     }
-                is EditTextPreference -> struct { putFields("type", string("string")) }
-                else -> return null
+                }
+
+                is EditTextPreference -> {
+                    struct { putFields("type", string("string")) }
+                }
+
+                else -> {
+                    return null
+                }
             }.toBuilder()
         pref.title?.let { base.putFields("title", string(it.toString())) }
         description(pref)?.let { base.putFields("description", string(it)) }
@@ -133,12 +145,21 @@ class SourceSettings(
     private fun current(pref: Preference): Value? {
         val key = pref.key
         return when (pref) {
-            is TwoStatePreference ->
+            is TwoStatePreference -> {
                 if (prefs.contains(key)) Value.newBuilder().setBoolValue(prefs.getBoolean(key, false)).build() else defaultValue(pref)
-            is MultiSelectListPreference ->
+            }
+
+            is MultiSelectListPreference -> {
                 prefs.getStringSet(key, null)?.let { set -> list(set.sorted().map(::string)) } ?: defaultValue(pref)
-            is ListPreference, is EditTextPreference -> prefs.getString(key, null)?.let(::string) ?: defaultValue(pref)
-            else -> null
+            }
+
+            is ListPreference, is EditTextPreference -> {
+                prefs.getString(key, null)?.let(::string) ?: defaultValue(pref)
+            }
+
+            else -> {
+                null
+            }
         } ?: Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build()
     }
 
@@ -152,24 +173,39 @@ class SourceSettings(
                 require(value.hasBoolValue()) { "'$key' must be a boolean" }
                 value.boolValue
             }
+
             is ListPreference -> {
                 require(value.hasStringValue()) { "'$key' must be a string" }
                 val allowed = pref.entryValues.orEmpty().map { it.toString() }
                 require(value.stringValue in allowed) { "'$key' must be one of ${allowed.joinToString()}" }
                 value.stringValue
             }
+
             is MultiSelectListPreference -> {
-                require(value.hasListValue() && value.listValue.valuesList.all { it.hasStringValue() }) { "'$key' must be a list of strings" }
-                val allowed = pref.entryValues.orEmpty().map { it.toString() }.toSet()
-                val chosen = value.listValue.valuesList.map { it.stringValue }.toSet()
+                require(
+                    value.hasListValue() && value.listValue.valuesList.all { it.hasStringValue() },
+                ) { "'$key' must be a list of strings" }
+                val allowed =
+                    pref.entryValues
+                        .orEmpty()
+                        .map { it.toString() }
+                        .toSet()
+                val chosen =
+                    value.listValue.valuesList
+                        .map { it.stringValue }
+                        .toSet()
                 require(allowed.containsAll(chosen)) { "'$key' only takes ${allowed.joinToString()}" }
                 chosen
             }
+
             is EditTextPreference -> {
                 require(value.hasStringValue()) { "'$key' must be a string" }
                 value.stringValue
             }
-            else -> throw IllegalArgumentException("setting '$key' can't be changed")
+
+            else -> {
+                throw IllegalArgumentException("setting '$key' can't be changed")
+            }
         }
     }
 

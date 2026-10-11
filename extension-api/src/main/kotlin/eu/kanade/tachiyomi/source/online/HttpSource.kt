@@ -57,8 +57,7 @@ abstract class HttpSource : CatalogueSource {
         return (0..7).map { bytes[it].toLong() and BYTE_MASK shl BITS_PER_BYTE * (7 - it) }.reduce(Long::or) and Long.MAX_VALUE
     }
 
-    protected open fun headersBuilder(): Headers.Builder =
-        Headers.Builder().apply { add("User-Agent", network.defaultUserAgentProvider()) }
+    protected open fun headersBuilder(): Headers.Builder = Headers.Builder().apply { add("User-Agent", network.defaultUserAgentProvider()) }
 
     override fun toString(): String = "$name (${lang.uppercase()})"
 
@@ -82,14 +81,15 @@ abstract class HttpSource : CatalogueSource {
         query: String,
         filters: FilterList,
     ): Observable<MangasPage> =
-        Observable.defer {
-            try {
-                client.newCall(searchMangaRequest(page, query, filters)).asObservableSuccess()
-            } catch (e: NoClassDefFoundError) {
-                // RxJava doesn't handle errors, which tend to happen during global search.
-                throw RuntimeException(e)
-            }
-        }.map { searchMangaParse(it) }
+        Observable
+            .defer {
+                try {
+                    client.newCall(searchMangaRequest(page, query, filters)).asObservableSuccess()
+                } catch (e: NoClassDefFoundError) {
+                    // RxJava doesn't handle errors, which tend to happen during global search.
+                    throw RuntimeException(e)
+                }
+            }.map { searchMangaParse(it) }
 
     @Deprecated("Use the suspend API")
     protected open fun searchMangaRequest(

@@ -15,7 +15,8 @@ import org.jsoup.nodes.Element
 @Deprecated("Use HttpSource")
 @Suppress("TooManyFunctions")
 abstract class ParsedHttpSource : HttpSource() {
-    override fun popularMangaParse(response: Response): MangasPage = parseList(response.asJsoup(), popularMangaSelector(), popularMangaNextPageSelector(), ::popularMangaFromElement)
+    override fun popularMangaParse(response: Response): MangasPage =
+        parseList(response.asJsoup(), popularMangaSelector(), popularMangaNextPageSelector(), ::popularMangaFromElement)
 
     protected abstract fun popularMangaSelector(): String
 
@@ -23,7 +24,8 @@ abstract class ParsedHttpSource : HttpSource() {
 
     protected abstract fun popularMangaNextPageSelector(): String?
 
-    override fun searchMangaParse(response: Response): MangasPage = parseList(response.asJsoup(), searchMangaSelector(), searchMangaNextPageSelector(), ::searchMangaFromElement)
+    override fun searchMangaParse(response: Response): MangasPage =
+        parseList(response.asJsoup(), searchMangaSelector(), searchMangaNextPageSelector(), ::searchMangaFromElement)
 
     protected abstract fun searchMangaSelector(): String
 
@@ -31,7 +33,8 @@ abstract class ParsedHttpSource : HttpSource() {
 
     protected abstract fun searchMangaNextPageSelector(): String?
 
-    override fun latestUpdatesParse(response: Response): MangasPage = parseList(response.asJsoup(), latestUpdatesSelector(), latestUpdatesNextPageSelector(), ::latestUpdatesFromElement)
+    override fun latestUpdatesParse(response: Response): MangasPage =
+        parseList(response.asJsoup(), latestUpdatesSelector(), latestUpdatesNextPageSelector(), ::latestUpdatesFromElement)
 
     protected abstract fun latestUpdatesSelector(): String
 

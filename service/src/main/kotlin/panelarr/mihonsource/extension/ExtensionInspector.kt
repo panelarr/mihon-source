@@ -67,7 +67,12 @@ class ExtensionInspector(
     private fun kindOf(file: Path): Kind =
         try {
             ZipFile(file.toFile()).use { zip ->
-                val names = zip.entries().asSequence().map { it.name }.toList()
+                val names =
+                    zip
+                        .entries()
+                        .asSequence()
+                        .map { it.name }
+                        .toList()
                 when {
                     "AndroidManifest.xml" in names && names.any { it.matches(DEX_ENTRY) } -> Kind.APK
                     names.any { it.endsWith(".class") } -> Kind.JAR

@@ -38,15 +38,30 @@ object SourceErrors {
         if (error is CancellationException && error !is TimeoutCancellationException) throw error
         val cause = rootCause(error)
         return when {
-            error is TimeoutCancellationException || cause is SocketTimeoutException || cause is TimeoutException ->
+            error is TimeoutCancellationException || cause is SocketTimeoutException || cause is TimeoutException -> {
                 status(Code.UNAVAILABLE, "SOURCE_DOWN", "the source timed out")
-            cause is ChallengeException -> status(Code.UNAVAILABLE, "CLOUDFLARE_CHALLENGE", cause.message ?: "blocked by a challenge")
-            cause is HttpException -> http(cause.code)
-            cause is UnsupportedOperationException || cause is NotImplementedError ->
+            }
+
+            cause is ChallengeException -> {
+                status(Code.UNAVAILABLE, "CLOUDFLARE_CHALLENGE", cause.message ?: "blocked by a challenge")
+            }
+
+            cause is HttpException -> {
+                http(cause.code)
+            }
+
+            cause is UnsupportedOperationException || cause is NotImplementedError -> {
                 status(Code.UNIMPLEMENTED, "UNSUPPORTED", cause.message?.takeIf { it.isNotBlank() } ?: "the source doesn't support this")
-            cause is UnknownHostException || cause is IOException ->
+            }
+
+            cause is UnknownHostException || cause is IOException -> {
                 status(Code.UNAVAILABLE, "SOURCE_DOWN", "couldn't reach the source: ${cause.message}")
-            cause is IllegalArgumentException -> status(Code.INVALID_ARGUMENT, null, cause.message ?: "invalid request")
+            }
+
+            cause is IllegalArgumentException -> {
+                status(Code.INVALID_ARGUMENT, null, cause.message ?: "invalid request")
+            }
+
             else -> {
                 log.warn("Source {} failed", sourceId, error)
                 status(Code.INTERNAL, null, "the source failed: ${cause.javaClass.simpleName}: ${cause.message}")
@@ -56,12 +71,34 @@ object SourceErrors {
 
     private fun http(code: Int): StatusException =
         when (code) {
-            HTTP_NOT_FOUND, HTTP_GONE -> status(Code.NOT_FOUND, "NOT_FOUND", "the source answered HTTP $code")
-            HTTP_TOO_MANY -> status(Code.RESOURCE_EXHAUSTED, "RATE_LIMITED", "the source is rate limiting (HTTP 429)", DEFAULT_RETRY_SECONDS)
-            HTTP_UNAUTHORIZED -> status(Code.UNAUTHENTICATED, "LOGIN_REQUIRED", "the source needs a login (HTTP 401)")
-            HTTP_FORBIDDEN -> status(Code.PERMISSION_DENIED, "LOGIN_REQUIRED", "the source refused the request (HTTP 403)")
-            in SERVER_ERRORS -> status(Code.UNAVAILABLE, "SOURCE_DOWN", "the source answered HTTP $code")
-            else -> status(Code.UNKNOWN, null, "the source answered HTTP $code")
+            HTTP_NOT_FOUND, HTTP_GONE -> {
+                status(Code.NOT_FOUND, "NOT_FOUND", "the source answered HTTP $code")
+            }
+
+            HTTP_TOO_MANY -> {
+                status(
+                    Code.RESOURCE_EXHAUSTED,
+                    "RATE_LIMITED",
+                    "the source is rate limiting (HTTP 429)",
+                    DEFAULT_RETRY_SECONDS,
+                )
+            }
+
+            HTTP_UNAUTHORIZED -> {
+                status(Code.UNAUTHENTICATED, "LOGIN_REQUIRED", "the source needs a login (HTTP 401)")
+            }
+
+            HTTP_FORBIDDEN -> {
+                status(Code.PERMISSION_DENIED, "LOGIN_REQUIRED", "the source refused the request (HTTP 403)")
+            }
+
+            in SERVER_ERRORS -> {
+                status(Code.UNAVAILABLE, "SOURCE_DOWN", "the source answered HTTP $code")
+            }
+
+            else -> {
+                status(Code.UNKNOWN, null, "the source answered HTTP $code")
+            }
         }
 
     fun notFound(message: String): StatusException = status(Code.NOT_FOUND, "NOT_FOUND", message)
@@ -80,7 +117,15 @@ object SourceErrors {
                 .setCode(code.number)
                 .setMessage(message)
         if (reason != null) {
-            builder.addDetails(Any.pack(ErrorInfo.newBuilder().setReason(reason).setDomain(DOMAIN).build()))
+            builder.addDetails(
+                Any.pack(
+                    ErrorInfo
+                        .newBuilder()
+                        .setReason(reason)
+                        .setDomain(DOMAIN)
+                        .build(),
+                ),
+            )
         }
         if (retryAfterSeconds != null) {
             builder.addDetails(Any.pack(RetryInfo.newBuilder().setRetryDelay(Duration.newBuilder().setSeconds(retryAfterSeconds)).build()))

@@ -22,7 +22,12 @@ class MihonSources(
     private val extensions: ExtensionManager,
     private val callTimeout: Duration = Duration.ofMinutes(2),
 ) {
-    fun all(): List<MihonSource> = extensions.sources().filterIsInstance<MihonSource>().sortedWith(compareBy({ it.name.lowercase() }, { it.lang }))
+    fun all(): List<MihonSource> =
+        extensions.sources().filterIsInstance<MihonSource>().sortedWith(
+            compareBy({
+                it.name.lowercase()
+            }, { it.lang }),
+        )
 
     fun get(id: String): MihonSource {
         val parsed = id.trim().toLongOrNull() ?: throw IllegalArgumentException("invalid source id '$id'")
@@ -57,7 +62,12 @@ class MihonSources(
         buildList {
             if (runCatching { source.supportsLatest }.getOrDefault(false)) add(SourceCapability.SOURCE_CAPABILITY_LATEST)
             if (source.source is CatalogueSource) add(SourceCapability.SOURCE_CAPABILITY_SEARCH)
-            if (runCatching { source.source.getFilterList().isNotEmpty() }.getOrDefault(false)) add(SourceCapability.SOURCE_CAPABILITY_FILTERS)
+            if (runCatching { source.source.getFilterList().isNotEmpty() }.getOrDefault(
+                    false,
+                )
+            ) {
+                add(SourceCapability.SOURCE_CAPABILITY_FILTERS)
+            }
             if (source.resolvable) add(SourceCapability.SOURCE_CAPABILITY_RESOLVE_URL)
             if (source.configurable) add(SourceCapability.SOURCE_CAPABILITY_SETTINGS)
             if (source.needsWebView) add(SourceCapability.SOURCE_CAPABILITY_NEEDS_WEBVIEW)
@@ -83,15 +93,23 @@ class MihonSources(
             if (pageRef == null) {
                 val url = ref.trim()
                 require(url.startsWith("http://") || url.startsWith("https://")) { "ref must be a page ref or an http(s) URL" }
-                val request = Request.Builder().url(url).headers(http.headers).build()
+                val request =
+                    Request
+                        .Builder()
+                        .url(url)
+                        .headers(http.headers)
+                        .build()
                 val response = http.client.newCall(request).execute()
                 if (!response.isSuccessful) {
                     response.close()
-                    throw eu.kanade.tachiyomi.network.HttpException(response.code)
+                    throw eu.kanade.tachiyomi.network
+                        .HttpException(response.code)
                 }
                 response
             } else {
-                val page = eu.kanade.tachiyomi.source.model.Page(pageRef.i, pageRef.u, pageRef.iu)
+                val page =
+                    eu.kanade.tachiyomi.source.model
+                        .Page(pageRef.i, pageRef.u, pageRef.iu)
                 if (page.imageUrl == null) page.imageUrl = http.getImageUrl(page)
                 http.getImage(page)
             }

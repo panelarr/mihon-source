@@ -18,6 +18,7 @@ object ApkConverter {
     fun convert(
         apk: Path,
         jar: Path,
+        host: ClassLoader = ApkConverter::class.java.classLoader,
     ) {
         val classes = Files.createTempFile(jar.parent, "classes", ".jar")
         try {
@@ -29,7 +30,7 @@ object ApkConverter {
                 .noCode(false)
                 .skipExceptions(false)
                 .to(classes)
-            merge(classes, apk, jar)
+            merge(classes, apk, jar, host)
         } catch (e: java.io.IOException) {
             throw ExtensionException("couldn't convert the APK: ${e.message}", e)
         } finally {
@@ -41,15 +42,23 @@ object ApkConverter {
         classes: Path,
         apk: Path,
         jar: Path,
+        host: ClassLoader,
     ) {
-        ZipOutputStream(Files.newOutputStream(jar)).use { out ->
+        val classBytes =
             ZipFile(classes.toFile()).use { zip ->
-                for (entry in zip.entries()) {
-                    if (entry.isDirectory) continue
-                    out.putNextEntry(ZipEntry(entry.name))
-                    zip.getInputStream(entry).use { it.copyTo(out) }
-                    out.closeEntry()
-                }
+                zip
+                    .entries()
+                    .asSequence()
+                    .filter { !it.isDirectory && it.name.endsWith(".class") }
+                    .associate { it.name.removeSuffix(".class") to zip.getInputStream(it).use { input -> input.readAllBytes() } }
+            }
+        // dex2jar writes no stack map frames; the JVM's verifier needs them.
+        val frames = FrameComputer(classBytes, host)
+        ZipOutputStream(Files.newOutputStream(jar)).use { out ->
+            classBytes.forEach { (name, bytes) ->
+                out.putNextEntry(ZipEntry("$name.class"))
+                out.write(frames.compute(bytes))
+                out.closeEntry()
             }
             ZipFile(apk.toFile()).use { zip ->
                 for (entry in zip.entries()) {

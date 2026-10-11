@@ -63,7 +63,16 @@ class IntegrationsApi(
     private val sourceIds: () -> List<Long>,
 ) : MihonIntegrationsServiceGrpcKt.MihonIntegrationsServiceCoroutineImplBase() {
     override suspend fun listSolvers(request: ListSolversRequest): ListSolversResponse =
-        rpc { listSolversResponse { solvers += store.state().solvers.sortedBy { it.id }.map { it.toProto() } } }
+        rpc {
+            listSolversResponse {
+                solvers +=
+                    store
+                        .state()
+                        .solvers
+                        .sortedBy { it.id }
+                        .map { it.toProto() }
+            }
+        }
 
     override suspend fun putSolver(request: PutSolverRequest): PutSolverResponse =
         rpc { putSolverResponse { solver = store.putSolver(request.solver.toSettings()).toProto() } }
@@ -144,9 +153,13 @@ class IntegrationsApi(
             name = name.trim(),
             type =
                 when (type) {
-                    SolverType.SOLVER_TYPE_BYPARR -> SolverSettings.Type.BYPARR
-                    SolverType.SOLVER_TYPE_FLARESOLVERR, SolverType.SOLVER_TYPE_UNSPECIFIED, SolverType.UNRECOGNIZED, null ->
+                    SolverType.SOLVER_TYPE_BYPARR -> {
+                        SolverSettings.Type.BYPARR
+                    }
+
+                    SolverType.SOLVER_TYPE_FLARESOLVERR, SolverType.SOLVER_TYPE_UNSPECIFIED, SolverType.UNRECOGNIZED, null -> {
                         SolverSettings.Type.FLARESOLVERR
+                    }
                 },
             url = Urls.requireHttp(url, "solver URL"),
             sessionTtlSeconds = if (hasSessionTtl()) sessionTtl.seconds else null,

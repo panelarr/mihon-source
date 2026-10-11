@@ -34,7 +34,12 @@ class ExtensionInstaller(
     ): InstalledExtension {
         require(bytes.isNotEmpty()) { "the uploaded file is empty" }
         require(bytes.size <= maxBytes) { "the file is too large (limit $maxBytes bytes)" }
-        val name = fileName.substringAfterLast('/').substringAfterLast('\\').take(MAX_FILE_NAME).ifBlank { "upload" }
+        val name =
+            fileName
+                .substringAfterLast('/')
+                .substringAfterLast('\\')
+                .take(MAX_FILE_NAME)
+                .ifBlank { "upload" }
         return install(bytes, ExtensionRecord.Origin.Upload(name), expectations, null, null)
     }
 
