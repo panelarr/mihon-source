@@ -8,11 +8,16 @@ import {
   type RouterHistory,
   redirect,
 } from "@tanstack/react-router";
+import type { JobRunStatus } from "./api/types";
 import { session } from "./auth/session";
+import { runStatuses } from "./lib/jobs";
 import { AppLayout, NotFound, RootLayout } from "./pages/AppLayout";
 import { ClientsPage } from "./pages/ClientsPage";
 import { ExtensionsPage } from "./pages/ExtensionsPage";
 import { IntegrationsPage } from "./pages/IntegrationsPage";
+import { JobPage } from "./pages/jobs/JobPage";
+import { JobRunPage } from "./pages/jobs/JobRunPage";
+import { JobsPage } from "./pages/jobs/JobsPage";
 import { LoginPage } from "./pages/LoginPage";
 import { StoresPage } from "./pages/StoresPage";
 import { ChapterPage } from "./pages/sources/ChapterPage";
@@ -137,6 +142,27 @@ const integrationsRoute = createRoute({
   component: IntegrationsPage,
 });
 
+const jobsRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: "/jobs",
+  component: JobsPage,
+});
+
+const jobRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: "/jobs/$jobId",
+  validateSearch: (search: Search): { status?: JobRunStatus } => ({
+    status: runStatuses.find((status) => status === search.status),
+  }),
+  component: JobPage,
+});
+
+const jobRunRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: "/job-runs/$runId",
+  component: JobRunPage,
+});
+
 const routeTree = rootRoute.addChildren([
   loginRoute,
   appRoute.addChildren([
@@ -149,6 +175,9 @@ const routeTree = rootRoute.addChildren([
     storesRoute,
     clientsRoute,
     integrationsRoute,
+    jobsRoute,
+    jobRoute,
+    jobRunRoute,
   ]),
 ]);
 

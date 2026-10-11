@@ -644,6 +644,25 @@ p.success {
   user-select: all;
 }
 
+/* Jobs */
+
+.table .group-row th {
+  background: var(--bg);
+  color: var(--text);
+}
+
+.job-progress {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.job-progress progress {
+  flex: 1 1 200px;
+  max-width: 420px;
+}
+
 /* Login */
 
 .login {

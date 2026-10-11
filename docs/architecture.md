@@ -22,9 +22,10 @@ mihon-source is one JVM process with no database. Its state is plain files under
 | `api` | gRPC service implementations. Plain grpc-kotlin services that don't know about Armeria |
 | `auth` | Admin token, client API keys, scopes, and the interceptor that checks them on every call |
 | `extension` | Installing extensions: inspection, signatures, APK conversion, classloaders, the extension manager |
-| `mihon` | Running Mihon sources: the host setup, instantiation, mapping to the protos, settings, errors |
+| `mihon` | Running Mihon sources: the host setup, instantiation, mapping to the protos, settings, errors, source checks and the `source-health` job |
 | `network` | Per-source networking: profiles and their store, the per-source client, solvers, cookies, rate limits |
-| `store` | Extension stores: index formats, pinning, install and update |
+| `store` | Extension stores: index formats, pinning, install and update, and the `store-refresh` job |
+| `jobs` | Background jobs: the runner (schedules, one run at a time, cancelling), run history files and params. Each job is a `BackgroundJob` next to the code it drives, such as `mihon/SourceHealthJob` |
 | `secret`, `storage`, `config`, `net` | Encryption of secrets at rest, atomic JSON files, environment settings, downloads |
 
 ## Loading an extension

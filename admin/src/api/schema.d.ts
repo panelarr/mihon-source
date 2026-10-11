@@ -194,6 +194,113 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/admin/job-runs/{runId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description GetJobRun returns a run with its parameters, notes and, while it runs, progress. */
+        get: operations["MihonJobsService_GetJobRun"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/job-runs/{runId}:cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * @description CancelJobRun stops a running run. Fails with FAILED_PRECONDITION when the run
+         *      isn't running or its job can't be cancelled.
+         */
+        post: operations["MihonJobsService_CancelJobRun"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/jobs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["MihonJobsService_ListJobs"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/jobs/{jobId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["MihonJobsService_GetJob"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/jobs/{jobId}/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description ListJobRuns lists a job's runs, newest first. */
+        get: operations["MihonJobsService_ListJobRuns"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/jobs/{jobId}:run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * @description RunJob starts a run now and returns at once. A job runs once at a time: if it is
+         *      already running, the call fails with ALREADY_EXISTS (HTTP 409, reason
+         *      `ALREADY_RUNNING`) and a JobAlreadyRunning error detail with the running run's ID.
+         */
+        post: operations["MihonJobsService_RunJob"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/admin/profiles": {
         parameters: {
             query?: never;
@@ -764,6 +871,12 @@ export interface components {
             lang?: string;
             homeUrl?: string;
         };
+        "panelarr.mihon.v1.CancelJobRunRequest": {
+            runId?: string;
+        };
+        "panelarr.mihon.v1.CancelJobRunResponse": {
+            run?: components["schemas"]["panelarr.mihon.v1.JobRunSummary"];
+        };
         "panelarr.mihon.v1.CheckSourcesRequest": {
             /** @description Sources to check. Empty means every loaded source. */
             sourceIds?: string[];
@@ -856,6 +969,12 @@ export interface components {
         "panelarr.mihon.v1.GetExtensionResponse": {
             extension?: components["schemas"]["panelarr.mihon.v1.Extension"];
         };
+        "panelarr.mihon.v1.GetJobResponse": {
+            job?: components["schemas"]["panelarr.mihon.v1.Job"];
+        };
+        "panelarr.mihon.v1.GetJobRunResponse": {
+            run?: components["schemas"]["panelarr.mihon.v1.JobRun"];
+        };
         "panelarr.mihon.v1.InstallExtensionRequest": {
             /** @description http(s) URL of a .jar or .apk. */
             url?: string;
@@ -885,6 +1004,94 @@ export interface components {
         "panelarr.mihon.v1.InstallFromStoreResponse": {
             extension?: components["schemas"]["panelarr.mihon.v1.Extension"];
         };
+        "panelarr.mihon.v1.Job": {
+            /**
+             * @description Stable ID, such as `store-refresh`. Matches `^[a-z0-9][a-z0-9._-]*$`: never a `:`,
+             *      which HTTP paths would read as a custom verb (as in `:run`).
+             */
+            id?: string;
+            name?: string;
+            description?: string;
+            schedule?: components["schemas"]["panelarr.mihon.v1.Schedule"];
+            running?: boolean;
+            /** @description The running run, when `running`. */
+            currentRunId?: string;
+            lastRun?: components["schemas"]["panelarr.mihon.v1.JobRunSummary"];
+            /**
+             * Format: date-time
+             * @description When the next scheduled run starts. Unset when the job only runs on request.
+             */
+            nextRunAt?: string;
+            cancellable?: boolean;
+            /** @description What RunJob accepts in `params`. */
+            params?: components["schemas"]["panelarr.mihon.v1.JobParam"][];
+            /** @description A label to group jobs by, such as "Stores". */
+            group?: string;
+        };
+        "panelarr.mihon.v1.JobParam": {
+            name?: string;
+            /** @description `bool`, `int`, `string` or `string_list` (comma-separated in RunJob). */
+            type?: string;
+            description?: string;
+            required?: boolean;
+            /** @description The value used when the param isn't given, if any. */
+            default?: string;
+            /** @description The allowed values, when there is a fixed set. For a `string_list`, any subset. */
+            choices?: string[];
+        };
+        "panelarr.mihon.v1.JobProgress": {
+            phase?: string;
+            done?: string;
+            total?: string;
+            /** @description What is counted, such as "sources". */
+            unit?: string;
+        };
+        "panelarr.mihon.v1.JobRun": {
+            summary?: components["schemas"]["panelarr.mihon.v1.JobRunSummary"];
+            /** @description The parameters it ran with. */
+            params?: {
+                [key: string]: string;
+            };
+            /** @description Warnings, errors and notable events, oldest first (at most 200). */
+            notes?: components["schemas"]["panelarr.mihon.v1.JobRunNote"][];
+            /** @description While running. */
+            progress?: components["schemas"]["panelarr.mihon.v1.JobProgress"];
+        };
+        "panelarr.mihon.v1.JobRunNote": {
+            /** Format: date-time */
+            at?: string;
+            /** @description `info`, `warn` or `error`. */
+            level?: string;
+            message?: string;
+            /** @description What the note is about, such as a store or source ID. */
+            ref?: string;
+        };
+        "panelarr.mihon.v1.JobRunSummary": {
+            id?: string;
+            jobId?: string;
+            /**
+             * Format: enum
+             * @enum {string}
+             */
+            status?: "JOB_RUN_STATUS_UNSPECIFIED" | "JOB_RUN_STATUS_RUNNING" | "JOB_RUN_STATUS_SUCCEEDED" | "JOB_RUN_STATUS_FAILED" | "JOB_RUN_STATUS_CANCELLED" | "JOB_RUN_STATUS_SKIPPED";
+            /**
+             * Format: enum
+             * @enum {string}
+             */
+            trigger?: "JOB_TRIGGER_UNSPECIFIED" | "JOB_TRIGGER_SCHEDULE" | "JOB_TRIGGER_MANUAL" | "JOB_TRIGGER_STARTUP";
+            /** Format: date-time */
+            startedAt?: string;
+            /** Format: date-time */
+            finishedAt?: string;
+            /** @description One line: the outcome, or the error. */
+            message?: string;
+            /** @description What the run did, such as {"stores": 2, "updates": 5}. */
+            counts?: {
+                [key: string]: string;
+            };
+            /** @description Who started a manual run: "admin" or the client's name. */
+            triggeredBy?: string;
+        };
         "panelarr.mihon.v1.ListAssignmentsResponse": {
             /** @description One entry per installed source. */
             assignments?: components["schemas"]["panelarr.mihon.v1.Assignment"][];
@@ -898,6 +1105,14 @@ export interface components {
         };
         "panelarr.mihon.v1.ListExtensionsResponse": {
             extensions?: components["schemas"]["panelarr.mihon.v1.Extension"][];
+        };
+        "panelarr.mihon.v1.ListJobRunsResponse": {
+            runs?: components["schemas"]["panelarr.mihon.v1.JobRunSummary"][];
+            /** @description Empty on the last page. */
+            nextPageToken?: string;
+        };
+        "panelarr.mihon.v1.ListJobsResponse": {
+            jobs?: components["schemas"]["panelarr.mihon.v1.Job"][];
         };
         "panelarr.mihon.v1.ListProfilesResponse": {
             profiles?: components["schemas"]["panelarr.mihon.v1.NetworkProfile"][];
@@ -989,6 +1204,27 @@ export interface components {
             client?: components["schemas"]["panelarr.mihon.v1.Client"];
             /** @description The new API key. Shown only in this response. */
             apiKey?: string;
+        };
+        "panelarr.mihon.v1.RunJobRequest": {
+            jobId?: string;
+            /** @description Values for the job's params; lists are comma-separated. */
+            params?: {
+                [key: string]: string;
+            };
+        };
+        "panelarr.mihon.v1.RunJobResponse": {
+            run?: components["schemas"]["panelarr.mihon.v1.JobRunSummary"];
+        };
+        /**
+         * @description When a job runs on its own. With neither `cron` nor `interval`, it only runs on
+         *      request.
+         */
+        "panelarr.mihon.v1.Schedule": {
+            cron?: string;
+            interval?: string;
+            enabled?: boolean;
+            /** @description Where the schedule is configured, such as an environment variable. */
+            source?: string;
         };
         "panelarr.mihon.v1.SetDefaultProfileRequest": {
             profileId?: string;
@@ -1809,6 +2045,151 @@ export interface operations {
             };
         };
     };
+    MihonJobsService_GetJobRun: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                runId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["panelarr.mihon.v1.GetJobRunResponse"];
+                };
+            };
+        };
+    };
+    MihonJobsService_CancelJobRun: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                runId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["panelarr.mihon.v1.CancelJobRunRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["panelarr.mihon.v1.CancelJobRunResponse"];
+                };
+            };
+        };
+    };
+    MihonJobsService_ListJobs: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["panelarr.mihon.v1.ListJobsResponse"];
+                };
+            };
+        };
+    };
+    MihonJobsService_GetJob: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                jobId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["panelarr.mihon.v1.GetJobResponse"];
+                };
+            };
+        };
+    };
+    MihonJobsService_ListJobRuns: {
+        parameters: {
+            query?: {
+                /** @description At most 100; 20 when unset. */
+                pageSize?: number;
+                /** @description From the previous response's `next_page_token`. */
+                pageToken?: string;
+                /** @description Only runs with this status, when set. */
+                status?: "JOB_RUN_STATUS_UNSPECIFIED" | "JOB_RUN_STATUS_RUNNING" | "JOB_RUN_STATUS_SUCCEEDED" | "JOB_RUN_STATUS_FAILED" | "JOB_RUN_STATUS_CANCELLED" | "JOB_RUN_STATUS_SKIPPED";
+            };
+            header?: never;
+            path: {
+                jobId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["panelarr.mihon.v1.ListJobRunsResponse"];
+                };
+            };
+        };
+    };
+    MihonJobsService_RunJob: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                jobId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["panelarr.mihon.v1.RunJobRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["panelarr.mihon.v1.RunJobResponse"];
+                };
+            };
+        };
+    };
     MihonIntegrationsService_ListProfiles: {
         parameters: {
             query?: never;
@@ -2232,6 +2613,11 @@ export interface operations {
         parameters: {
             query?: {
                 seriesKey?: string;
+                /**
+                 * @description Load from the source even if the plugin has a recent result cached, e.g. to check
+                 *      for new chapters now. The fresh result replaces the cached one.
+                 */
+                refresh?: boolean;
             };
             header?: never;
             path: {
@@ -2404,6 +2790,11 @@ export interface operations {
         parameters: {
             query?: {
                 key?: string;
+                /**
+                 * @description Load from the source even if the plugin has a recent result cached, e.g. to check
+                 *      for new chapters now. The fresh result replaces the cached one.
+                 */
+                refresh?: boolean;
             };
             header?: never;
             path: {

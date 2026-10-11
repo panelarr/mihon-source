@@ -29,6 +29,8 @@ data class AppConfig(
     /** Result cache lifetimes per kind of result; zero turns caching off for that kind. */
     val cacheTtls: Map<String, java.time.Duration> = DEFAULT_CACHE_TTLS,
     val cacheMaxBytes: Long = DEFAULT_CACHE_MB * MB,
+    /** Finished runs kept per job. */
+    val jobHistory: Int = DEFAULT_JOB_HISTORY,
 ) {
     companion object {
         const val DEFAULT_PORT = 8902
@@ -37,6 +39,7 @@ data class AppConfig(
 
         val DEFAULT_STORE_REFRESH: java.time.Duration = java.time.Duration.ofHours(12)
         const val DEFAULT_CACHE_MB = 64L
+        const val DEFAULT_JOB_HISTORY = 100
 
         /** Lists change often, pages rarely. Keys match ResultCache.Kind names. */
         val DEFAULT_CACHE_TTLS: Map<String, java.time.Duration> =
@@ -65,6 +68,10 @@ data class AppConfig(
                 .getOrElse { error("'$text' isn't a duration (e.g. 30m, 6h, 1d)") }
         }
 
+        /** MIHON_CACHE_TTL_<KIND> for each kind, else its default. */
+        private fun cacheTtls(value: (String) -> String?): Map<String, java.time.Duration> =
+            DEFAULT_CACHE_TTLS.mapValues { (kind, default) -> value("MIHON_CACHE_TTL_${kind.uppercase()}")?.let(::duration) ?: default }
+
         fun fromEnv(env: Map<String, String> = System.getenv()): AppConfig {
             // NAME_FILE (a path, e.g. a Docker secret) is read when NAME itself isn't set.
             fun value(name: String): String? =
@@ -90,11 +97,9 @@ data class AppConfig(
                 metricsPort = number("MIHON_METRICS_PORT")?.toInt(),
                 healthCheckInterval = value("MIHON_HEALTH_CHECK_INTERVAL")?.let(::duration)?.takeIf { !it.isZero },
                 storeRefreshInterval = value("MIHON_STORE_REFRESH_INTERVAL")?.let(::duration) ?: DEFAULT_STORE_REFRESH,
-                cacheTtls =
-                    DEFAULT_CACHE_TTLS.mapValues { (kind, default) ->
-                        value("MIHON_CACHE_TTL_${kind.uppercase()}")?.let(::duration) ?: default
-                    },
+                cacheTtls = cacheTtls(::value),
                 cacheMaxBytes = (number("MIHON_CACHE_MAX_MB") ?: DEFAULT_CACHE_MB) * MB,
+                jobHistory = number("MIHON_JOB_HISTORY")?.toInt() ?: DEFAULT_JOB_HISTORY,
             )
         }
     }

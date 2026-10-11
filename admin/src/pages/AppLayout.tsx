@@ -16,6 +16,7 @@ const nav = [
   { to: "/stores", label: "Stores" },
   { to: "/clients", label: "Clients" },
   { to: "/integrations", label: "Integrations" },
+  { to: "/jobs", label: "Jobs" },
 ] as const;
 
 export function AppLayout() {

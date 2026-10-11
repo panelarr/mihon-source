@@ -292,6 +292,153 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/panelarr.mihon.v1.ReloadExtensionResponse'
+    /v1/admin/job-runs/{runId}:
+        get:
+            tags:
+                - MihonJobsService
+            description: GetJobRun returns a run with its parameters, notes and, while it runs, progress.
+            operationId: MihonJobsService_GetJobRun
+            parameters:
+                - name: runId
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/panelarr.mihon.v1.GetJobRunResponse'
+    /v1/admin/job-runs/{runId}:cancel:
+        post:
+            tags:
+                - MihonJobsService
+            description: |-
+                CancelJobRun stops a running run. Fails with FAILED_PRECONDITION when the run
+                 isn't running or its job can't be cancelled.
+            operationId: MihonJobsService_CancelJobRun
+            parameters:
+                - name: runId
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/panelarr.mihon.v1.CancelJobRunRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/panelarr.mihon.v1.CancelJobRunResponse'
+    /v1/admin/jobs:
+        get:
+            tags:
+                - MihonJobsService
+            operationId: MihonJobsService_ListJobs
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/panelarr.mihon.v1.ListJobsResponse'
+    /v1/admin/jobs/{jobId}:
+        get:
+            tags:
+                - MihonJobsService
+            operationId: MihonJobsService_GetJob
+            parameters:
+                - name: jobId
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/panelarr.mihon.v1.GetJobResponse'
+    /v1/admin/jobs/{jobId}/runs:
+        get:
+            tags:
+                - MihonJobsService
+            description: ListJobRuns lists a job's runs, newest first.
+            operationId: MihonJobsService_ListJobRuns
+            parameters:
+                - name: jobId
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+                - name: pageSize
+                  in: query
+                  description: At most 100; 20 when unset.
+                  schema:
+                    type: integer
+                    format: int32
+                - name: pageToken
+                  in: query
+                  description: From the previous response's `next_page_token`.
+                  schema:
+                    type: string
+                - name: status
+                  in: query
+                  description: Only runs with this status, when set.
+                  schema:
+                    enum:
+                        - JOB_RUN_STATUS_UNSPECIFIED
+                        - JOB_RUN_STATUS_RUNNING
+                        - JOB_RUN_STATUS_SUCCEEDED
+                        - JOB_RUN_STATUS_FAILED
+                        - JOB_RUN_STATUS_CANCELLED
+                        - JOB_RUN_STATUS_SKIPPED
+                    type: string
+                    format: enum
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/panelarr.mihon.v1.ListJobRunsResponse'
+    /v1/admin/jobs/{jobId}:run:
+        post:
+            tags:
+                - MihonJobsService
+            description: |-
+                RunJob starts a run now and returns at once. A job runs once at a time: if it is
+                 already running, the call fails with ALREADY_EXISTS (HTTP 409, reason
+                 `ALREADY_RUNNING`) and a JobAlreadyRunning error detail with the running run's ID.
+            operationId: MihonJobsService_RunJob
+            parameters:
+                - name: jobId
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/panelarr.mihon.v1.RunJobRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/panelarr.mihon.v1.RunJobResponse'
     /v1/admin/profiles:
         get:
             tags:
@@ -682,6 +829,13 @@ paths:
                   in: query
                   schema:
                     type: string
+                - name: refresh
+                  in: query
+                  description: |-
+                    Load from the source even if the plugin has a recent result cached, e.g. to check
+                     for new chapters now. The fresh result replaces the cached one.
+                  schema:
+                    type: boolean
             responses:
                 "200":
                     description: OK
@@ -850,6 +1004,13 @@ paths:
                   in: query
                   schema:
                     type: string
+                - name: refresh
+                  in: query
+                  description: |-
+                    Load from the source even if the plugin has a recent result cached, e.g. to check
+                     for new chapters now. The fresh result replaces the cached one.
+                  schema:
+                    type: boolean
             responses:
                 "200":
                     description: OK
@@ -1041,6 +1202,16 @@ components:
                     type: string
                 homeUrl:
                     type: string
+        panelarr.mihon.v1.CancelJobRunRequest:
+            type: object
+            properties:
+                runId:
+                    type: string
+        panelarr.mihon.v1.CancelJobRunResponse:
+            type: object
+            properties:
+                run:
+                    $ref: '#/components/schemas/panelarr.mihon.v1.JobRunSummary'
         panelarr.mihon.v1.CheckSourcesRequest:
             type: object
             properties:
@@ -1210,6 +1381,16 @@ components:
             properties:
                 extension:
                     $ref: '#/components/schemas/panelarr.mihon.v1.Extension'
+        panelarr.mihon.v1.GetJobResponse:
+            type: object
+            properties:
+                job:
+                    $ref: '#/components/schemas/panelarr.mihon.v1.Job'
+        panelarr.mihon.v1.GetJobRunResponse:
+            type: object
+            properties:
+                run:
+                    $ref: '#/components/schemas/panelarr.mihon.v1.JobRun'
         panelarr.mihon.v1.InstallExtensionRequest:
             type: object
             properties:
@@ -1250,6 +1431,148 @@ components:
             properties:
                 extension:
                     $ref: '#/components/schemas/panelarr.mihon.v1.Extension'
+        panelarr.mihon.v1.Job:
+            type: object
+            properties:
+                id:
+                    type: string
+                    description: |-
+                        Stable ID, such as `store-refresh`. Matches `^[a-z0-9][a-z0-9._-]*$`: never a `:`,
+                         which HTTP paths would read as a custom verb (as in `:run`).
+                name:
+                    type: string
+                description:
+                    type: string
+                schedule:
+                    $ref: '#/components/schemas/panelarr.mihon.v1.Schedule'
+                running:
+                    type: boolean
+                currentRunId:
+                    type: string
+                    description: The running run, when `running`.
+                lastRun:
+                    $ref: '#/components/schemas/panelarr.mihon.v1.JobRunSummary'
+                nextRunAt:
+                    type: string
+                    description: When the next scheduled run starts. Unset when the job only runs on request.
+                    format: date-time
+                cancellable:
+                    type: boolean
+                params:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/panelarr.mihon.v1.JobParam'
+                    description: What RunJob accepts in `params`.
+                group:
+                    type: string
+                    description: A label to group jobs by, such as "Stores".
+        panelarr.mihon.v1.JobParam:
+            type: object
+            properties:
+                name:
+                    type: string
+                type:
+                    type: string
+                    description: '`bool`, `int`, `string` or `string_list` (comma-separated in RunJob).'
+                description:
+                    type: string
+                required:
+                    type: boolean
+                default:
+                    type: string
+                    description: The value used when the param isn't given, if any.
+                choices:
+                    type: array
+                    items:
+                        type: string
+                    description: The allowed values, when there is a fixed set. For a `string_list`, any subset.
+        panelarr.mihon.v1.JobProgress:
+            type: object
+            properties:
+                phase:
+                    type: string
+                done:
+                    type: string
+                total:
+                    type: string
+                unit:
+                    type: string
+                    description: What is counted, such as "sources".
+        panelarr.mihon.v1.JobRun:
+            type: object
+            properties:
+                summary:
+                    $ref: '#/components/schemas/panelarr.mihon.v1.JobRunSummary'
+                params:
+                    type: object
+                    additionalProperties:
+                        type: string
+                    description: The parameters it ran with.
+                notes:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/panelarr.mihon.v1.JobRunNote'
+                    description: Warnings, errors and notable events, oldest first (at most 200).
+                progress:
+                    allOf:
+                        - $ref: '#/components/schemas/panelarr.mihon.v1.JobProgress'
+                    description: While running.
+        panelarr.mihon.v1.JobRunNote:
+            type: object
+            properties:
+                at:
+                    type: string
+                    format: date-time
+                level:
+                    type: string
+                    description: '`info`, `warn` or `error`.'
+                message:
+                    type: string
+                ref:
+                    type: string
+                    description: What the note is about, such as a store or source ID.
+        panelarr.mihon.v1.JobRunSummary:
+            type: object
+            properties:
+                id:
+                    type: string
+                jobId:
+                    type: string
+                status:
+                    enum:
+                        - JOB_RUN_STATUS_UNSPECIFIED
+                        - JOB_RUN_STATUS_RUNNING
+                        - JOB_RUN_STATUS_SUCCEEDED
+                        - JOB_RUN_STATUS_FAILED
+                        - JOB_RUN_STATUS_CANCELLED
+                        - JOB_RUN_STATUS_SKIPPED
+                    type: string
+                    format: enum
+                trigger:
+                    enum:
+                        - JOB_TRIGGER_UNSPECIFIED
+                        - JOB_TRIGGER_SCHEDULE
+                        - JOB_TRIGGER_MANUAL
+                        - JOB_TRIGGER_STARTUP
+                    type: string
+                    format: enum
+                startedAt:
+                    type: string
+                    format: date-time
+                finishedAt:
+                    type: string
+                    format: date-time
+                message:
+                    type: string
+                    description: 'One line: the outcome, or the error.'
+                counts:
+                    type: object
+                    additionalProperties:
+                        type: string
+                    description: 'What the run did, such as {"stores": 2, "updates": 5}.'
+                triggeredBy:
+                    type: string
+                    description: 'Who started a manual run: "admin" or the client''s name.'
         panelarr.mihon.v1.ListAssignmentsResponse:
             type: object
             properties:
@@ -1281,6 +1604,23 @@ components:
                     type: array
                     items:
                         $ref: '#/components/schemas/panelarr.mihon.v1.Extension'
+        panelarr.mihon.v1.ListJobRunsResponse:
+            type: object
+            properties:
+                runs:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/panelarr.mihon.v1.JobRunSummary'
+                nextPageToken:
+                    type: string
+                    description: Empty on the last page.
+        panelarr.mihon.v1.ListJobsResponse:
+            type: object
+            properties:
+                jobs:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/panelarr.mihon.v1.Job'
         panelarr.mihon.v1.ListProfilesResponse:
             type: object
             properties:
@@ -1430,6 +1770,37 @@ components:
                 apiKey:
                     type: string
                     description: The new API key. Shown only in this response.
+        panelarr.mihon.v1.RunJobRequest:
+            type: object
+            properties:
+                jobId:
+                    type: string
+                params:
+                    type: object
+                    additionalProperties:
+                        type: string
+                    description: Values for the job's params; lists are comma-separated.
+        panelarr.mihon.v1.RunJobResponse:
+            type: object
+            properties:
+                run:
+                    $ref: '#/components/schemas/panelarr.mihon.v1.JobRunSummary'
+        panelarr.mihon.v1.Schedule:
+            type: object
+            properties:
+                cron:
+                    type: string
+                interval:
+                    pattern: ^-?(?:0|[1-9][0-9]{0,11})(?:\.[0-9]{1,9})?s$
+                    type: string
+                enabled:
+                    type: boolean
+                source:
+                    type: string
+                    description: Where the schedule is configured, such as an environment variable.
+            description: |-
+                When a job runs on its own. With neither `cron` nor `interval`, it only runs on
+                 request.
         panelarr.mihon.v1.SetDefaultProfileRequest:
             type: object
             properties:
@@ -2265,6 +2636,15 @@ tags:
          A source uses, in order: a profile pushed by a host (SetNetworkProfile in
          panelarr.source.v1), the profile assigned to it here, the default profile, or a
          direct connection when there is none.
+    - name: MihonJobsService
+      description: |-
+        MihonJobsService shows the service's background jobs and their past runs, and runs
+         them on request. Needs the `admin` scope.
+
+         The messages and paths are the same in every Panelarr service that has jobs, so
+         clients can share code. Schedules come from the service's configuration and are
+         read-only here. Runs are kept as history (by default the last 100 per job); a run
+         that was going on when the service stopped is marked failed ("interrupted").
     - name: MihonStoresService
       description: |-
         MihonStoresService manages extension stores: indexes of extensions published by a

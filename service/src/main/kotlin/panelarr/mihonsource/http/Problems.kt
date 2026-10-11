@@ -16,12 +16,14 @@ import io.grpc.protobuf.StatusProto
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
+import panelarr.mihon.v1.JobAlreadyRunning
 
 /**
  * Errors over HTTP/JSON as RFC 9457 problem details (`application/problem+json`):
  * `type`, `title`, `status`, `detail`, plus `code` (the gRPC code name), `reason` (from
- * google.rpc.ErrorInfo) and `retryAfter` (seconds, from google.rpc.RetryInfo). `message`
- * repeats `detail` for clients that read gRPC-style errors.
+ * google.rpc.ErrorInfo), `retryAfter` (seconds, from google.rpc.RetryInfo) and
+ * `currentRunId` (from JobAlreadyRunning). `message` repeats `detail` for clients that
+ * read gRPC-style errors.
  */
 object Problems {
     val PROBLEM_JSON: MediaType = MediaType.parse("application/problem+json; charset=utf-8")
@@ -40,7 +42,14 @@ object Problems {
                 ?.unpack(RetryInfo::class.java)
                 ?.retryDelay
                 ?.seconds
-        return response(status, reason, retry)
+        // A job that is already running names its run, so clients can show it.
+        val extras =
+            details
+                .firstOrNull { it.`is`(JobAlreadyRunning::class.java) }
+                ?.unpack(JobAlreadyRunning::class.java)
+                ?.let { mapOf("currentRunId" to it.currentRunId) }
+                .orEmpty()
+        return response(status, reason, retry, extras = extras)
     }
 
     fun response(
@@ -48,6 +57,7 @@ object Problems {
         reason: String?,
         retryAfterSeconds: Long?,
         http: HttpStatus = httpStatus(status.code),
+        extras: Map<String, String> = emptyMap(),
     ): HttpResponse {
         val body =
             buildJsonObject {
@@ -59,6 +69,7 @@ object Problems {
                 put("message", JsonPrimitive(status.description ?: http.reasonPhrase()))
                 reason?.let { put("reason", JsonPrimitive(it)) }
                 retryAfterSeconds?.let { put("retryAfter", JsonPrimitive(it)) }
+                extras.forEach { (name, value) -> put(name, JsonPrimitive(value)) }
             }
         val headers =
             ResponseHeaders

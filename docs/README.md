@@ -2,7 +2,7 @@
 
 | Doc | What it covers |
 |---|---|
-| [api.md](api.md) | The two APIs, protocols, authentication and scopes, errors |
+| [api.md](api.md) | The two APIs, protocols, authentication and scopes, background jobs, errors |
 | [compat-check.md](compat-check.md) | Checking which extensions of a store work |
 | [deployment.md](deployment.md) | Running it safely: container hardening, secrets, TLS, solvers, VPNs |
 | [configuration.md](configuration.md) | Environment variables and the data directory |

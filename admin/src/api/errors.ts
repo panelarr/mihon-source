@@ -1,20 +1,23 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 /**
- * An API failure. Over HTTP the service answers errors with
- * `{"code": 7, "grpc-code": "PERMISSION_DENIED", "message": "..."}` (see docs/api.md).
+ * An API failure. Over HTTP the service answers errors with problem details such as
+ * `{"code": "PERMISSION_DENIED", "reason": "...", "message": "..."}` (see docs/api.md).
  */
 export class ApiError extends Error {
   /** HTTP status, or 0 when the server couldn't be reached. */
   readonly status: number;
   /** gRPC status name, e.g. "NOT_FOUND", when the body carried one. */
   readonly grpcCode: string | undefined;
+  /** The error body's other fields, e.g. `reason` or `currentRunId`. */
+  readonly details: Record<string, unknown>;
 
-  constructor(status: number, message: string, grpcCode?: string) {
+  constructor(status: number, message: string, grpcCode?: string, details: Record<string, unknown> = {}) {
     super(message);
     this.name = "ApiError";
     this.status = status;
     this.grpcCode = grpcCode;
+    this.details = details;
   }
 
   get unauthenticated(): boolean {
@@ -49,9 +52,10 @@ export function toApiError(status: number, body: unknown): ApiError {
   }
   if (parsed && typeof parsed === "object") {
     const record = parsed as Record<string, unknown>;
-    const grpcCode = typeof record["grpc-code"] === "string" ? record["grpc-code"] : undefined;
+    const named = record["grpc-code"] ?? record.code;
+    const grpcCode = typeof named === "string" ? named : undefined;
     const message = typeof record.message === "string" && record.message.trim() !== "" ? record.message : undefined;
-    return new ApiError(status, message ?? fallbackMessage(status, grpcCode), grpcCode);
+    return new ApiError(status, message ?? fallbackMessage(status, grpcCode), grpcCode, record);
   }
   if (typeof parsed === "string" && isReadableText(parsed)) return new ApiError(status, parsed.trim());
   return new ApiError(status, fallbackMessage(status));

@@ -118,5 +118,39 @@ class Metrics {
             .increment()
     }
 
+    /** A finished job run: [status] and [trigger] are lower-case names, e.g. "succeeded", "schedule". */
+    fun jobRun(
+        job: String,
+        status: String,
+        trigger: String,
+        duration: Duration,
+    ) {
+        Counter
+            .builder("mihon_job_runs")
+            .description("Finished job runs")
+            .tags("job", job, "status", status, "trigger", trigger)
+            .register(registry)
+            .increment()
+        Timer
+            .builder("mihon_job_duration")
+            .description("How long job runs took")
+            .tag("job", job)
+            .register(registry)
+            .record(duration)
+    }
+
+    /** Whether a job is running now: 1 or 0, read at scrape time. */
+    fun jobRunning(
+        job: String,
+        running: () -> Int,
+    ) {
+        Gauge
+            .builder("mihon_job_running", running) { it().toDouble() }
+            .description("Whether the job is running: 1 or 0")
+            .tag("job", job)
+            .strongReference(true)
+            .register(registry)
+    }
+
     fun scrape(): String = registry.scrape()
 }

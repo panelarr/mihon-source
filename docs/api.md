@@ -32,7 +32,7 @@ Two HTTP routes have no RPC of their own:
 | `GET /v1/health` | The source API's Health: `DEGRADED` when some extensions failed to load. No credentials. |
 | `GET /metrics` | Prometheus metrics. Needs the `metrics` scope (or `admin`), or use the separate `MIHON_METRICS_PORT`. |
 
-Metrics include the JVM's, `mihon_source_call_seconds` (count, sum and max per `source`, `operation` and `outcome`, where the outcome is `ok`, an error reason such as `SOURCE_DOWN`, or a gRPC code name), `mihon_solver_solves_total` (per `solver` and `outcome`), `mihon_extensions` (per `status`) and `mihon_sources`. Labels never contain URLs, queries or credentials.
+Metrics include the JVM's, `mihon_source_call_seconds` (count, sum and max per `source`, `operation` and `outcome`, where the outcome is `ok`, an error reason such as `SOURCE_DOWN`, or a gRPC code name), `mihon_solver_solves_total` (per `solver` and `outcome`), `mihon_extensions` (per `status`), `mihon_sources`, `mihon_source_health` (per `source`), `mihon_cache_lookups_total` (per `operation` and `result`: `hit`, `miss`, `shared` or `bypass`), and for [jobs](#jobs) `mihon_job_runs_total` (per `job`, `status` and `trigger`), `mihon_job_duration_seconds` (per `job`) and `mihon_job_running` (per `job`, 1 while it runs). Labels never contain URLs, queries or credentials.
 
 A Prometheus scrape config with a key:
 
@@ -110,7 +110,31 @@ curl -H "Authorization: Bearer $ADMIN" -X POST localhost:8902/v1/admin/checks \
   -d '{"sourceIds": ["123"], "steps": ["CHECK_STEP_IMAGE"]}'
 ```
 
-The result becomes the source's health: `Source.health` in `ListSources`/`GetSource` has the status (`OK` or `FAILING` with a reason such as `SOURCE_DOWN`, `CLOUDFLARE_CHALLENGE` or `NEEDS_WEBVIEW`), the latency, when it was checked, and whether scheduled checks are off for it. Scheduled checks (see `MIHON_HEALTH_CHECK_INTERVAL` in [configuration](configuration.md)) record the same. `SetHealthCheck` (`PUT /v1/admin/sources/{sourceId}/health-check`) turns them off or on per source. The metric `mihon_source_health{source}` is 1 for OK and 0 for failing.
+The result becomes the source's health: `Source.health` in `ListSources`/`GetSource` has the status (`OK` or `FAILING` with a reason such as `SOURCE_DOWN`, `CLOUDFLARE_CHALLENGE` or `NEEDS_WEBVIEW`), the latency, when it was checked, and whether scheduled checks are off for it. The `source-health` [job](#jobs) records the same, on its schedule (see `MIHON_HEALTH_CHECK_INTERVAL` in [configuration](configuration.md)) or when run by hand. `SetHealthCheck` (`PUT /v1/admin/sources/{sourceId}/health-check`) turns them off or on per source. The metric `mihon_source_health{source}` is 1 for OK and 0 for failing.
+
+## Jobs
+
+Background work runs as jobs. `MihonJobsService` (admin scope) lists them, keeps their run history and runs them on request:
+
+| Job | Does | Params | Schedule |
+|---|---|---|---|
+| `store-refresh` | Refreshes the stores' indexes, so updates show up. Never installs anything. Fails when a store fails to refresh (the store keeps its last good index). | `store_id`: one store only | `MIHON_STORE_REFRESH_INTERVAL` |
+| `source-health` | Checks sources and records their [health](#checking-sources). Without `source_ids`, only sources whose scheduled checks are on. | `source_ids` (list), `steps` (list of `popular`, `latest`, `search`, `details`, `chapters`, `pages`, `image`; default `popular`) | `MIHON_HEALTH_CHECK_INTERVAL` |
+
+```sh
+curl -H "Authorization: Bearer $ADMIN" localhost:8902/v1/admin/jobs
+curl -H "Authorization: Bearer $ADMIN" -X POST localhost:8902/v1/admin/jobs/source-health:run \
+  -d '{"params": {"steps": "popular,latest"}}'
+curl -H "Authorization: Bearer $ADMIN" localhost:8902/v1/admin/job-runs/$RUN
+curl -H "Authorization: Bearer $ADMIN" "localhost:8902/v1/admin/jobs/source-health/runs?pageSize=20&status=JOB_RUN_STATUS_FAILED"
+curl -H "Authorization: Bearer $ADMIN" -X POST localhost:8902/v1/admin/job-runs/$RUN:cancel
+```
+
+- **Jobs** have a stable ID, a schedule (an interval, read-only: it comes from the configuration; without one the job only runs on request), the next scheduled run, the last finished run and the params `RunJob` accepts. List params are comma-separated.
+- **Runs** have a status (`RUNNING`, `SUCCEEDED`, `FAILED`, `CANCELLED`, `SKIPPED`), a trigger (`SCHEDULE` or `MANUAL`, with who started it), start and finish times, a one-line result, counts such as `{"ok": 18, "failing": 2}`, and notes: the warnings and errors of the run (at most 200). A running run also reports its progress.
+- **One run at a time:** `RunJob` returns the new run at once. While the job runs, another `RunJob` fails with `ALREADY_EXISTS` (HTTP 409, reason `ALREADY_RUNNING`) and the running run's ID (the `JobAlreadyRunning` detail; `currentRunId` over HTTP). A scheduled run that comes due meanwhile is recorded as `SKIPPED`.
+- **Cancelling** stops a run between steps. Cancelling a run that isn't running fails with `FAILED_PRECONDITION`.
+- **History** keeps the last `MIHON_JOB_HISTORY` runs per job (100). A run that was going on when the service stopped is marked `FAILED` with the message `interrupted`.
 
 ## Errors
 

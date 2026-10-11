@@ -5,6 +5,8 @@ package panelarr.mihonsource.mihon
 import eu.kanade.tachiyomi.source.CatalogueSource
 import eu.kanade.tachiyomi.source.online.HttpSource
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import okhttp3.Request
@@ -61,6 +63,8 @@ class MihonSources(
             @Suppress("TooGenericExceptionCaught") e: Throwable,
         ) {
             if (e is VirtualMachineError && e !is OutOfMemoryError && e !is StackOverflowError) throw e
+            // The caller was cancelled (not a call timeout): that isn't the source's failure.
+            currentCoroutineContext().ensureActive()
             val status = SourceErrors.toStatus(e, source.id)
             metrics?.sourceCall(source.id, operation, SourceErrors.outcome(status), Duration.ofNanos(System.nanoTime() - started))
             throw status

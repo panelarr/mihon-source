@@ -8,6 +8,8 @@ import type {
   Client,
   Extension,
   Filter,
+  Job,
+  JobRun,
   JsonObject,
   NetworkProfile,
   Page,
@@ -387,6 +389,97 @@ export function mockProfiles(): NetworkProfile[] {
       headers: { "Accept-Language": "en-US" },
       sharedCookieJar: "shared-example",
       callTimeout: "90s",
+    },
+  ];
+}
+
+export function mockJobs(): Job[] {
+  return [
+    {
+      id: "store-refresh",
+      name: "Refresh stores",
+      description:
+        "Downloads every store's index again, so new extensions and updates show up. Never installs anything.",
+      group: "Stores",
+      schedule: { interval: "43200s", enabled: true, source: "MIHON_STORE_REFRESH_INTERVAL" },
+      cancellable: true,
+      params: [
+        {
+          name: "store_id",
+          type: "string",
+          description: "Refresh only this store (its ID). All stores when empty.",
+          required: false,
+          default: "",
+          choices: [],
+        },
+      ],
+    },
+    {
+      id: "source-health",
+      name: "Check sources",
+      description: "Fetches from each source to see whether it works, and records the result as the source's health.",
+      group: "Sources",
+      schedule: { enabled: false, source: "MIHON_HEALTH_CHECK_INTERVAL" },
+      cancellable: true,
+      params: [
+        {
+          name: "source_ids",
+          type: "string_list",
+          description: "Check only these sources (IDs). Sources with checks on when empty.",
+          required: false,
+          default: "",
+          choices: [],
+        },
+        {
+          name: "steps",
+          type: "string_list",
+          description: "What to check.",
+          required: false,
+          default: "popular",
+          choices: ["popular", "latest", "search", "details", "chapters", "pages", "image"],
+        },
+      ],
+    },
+  ];
+}
+
+/** Finished runs, newest first. */
+export function mockJobRuns(): JobRun[] {
+  const hoursAgo = (hours: number, seconds = 0) =>
+    new Date(Date.now() - hours * 3_600_000 + seconds * 1000).toISOString();
+  return [
+    {
+      summary: {
+        id: "0190a1b2c3d4e5",
+        jobId: "store-refresh",
+        status: "JOB_RUN_STATUS_FAILED",
+        trigger: "JOB_TRIGGER_SCHEDULE",
+        startedAt: hoursAgo(2),
+        finishedAt: hoursAgo(2, 3),
+        message: "1 of 2 stores failed to refresh; 1 update available",
+        counts: { stores: "1", failed: "1", updates: "1" },
+      },
+      notes: [
+        {
+          at: hoursAgo(2, 2),
+          level: "warn",
+          message: "Legacy Example Store: Fetching the index failed: HTTP 503",
+          ref: "legacy-example",
+        },
+      ],
+    },
+    {
+      summary: {
+        id: "0190a0a1b2c3d4",
+        jobId: "store-refresh",
+        status: "JOB_RUN_STATUS_SUCCEEDED",
+        trigger: "JOB_TRIGGER_MANUAL",
+        triggeredBy: "admin",
+        startedAt: hoursAgo(14),
+        finishedAt: hoursAgo(14, 2),
+        message: "Refreshed 2 stores; 1 update available",
+        counts: { stores: "2", updates: "1" },
+      },
     },
   ];
 }

@@ -35,6 +35,12 @@ export type NetworkProfile = Schemas["panelarr.mihon.v1.NetworkProfile"];
 export type UserAgentMode = NonNullable<NetworkProfile["userAgentMode"]>;
 export type Assignment = Schemas["panelarr.mihon.v1.Assignment"];
 export type ProfileOrigin = NonNullable<Assignment["effective"]>;
+export type Job = Schemas["panelarr.mihon.v1.Job"];
+export type JobParam = Schemas["panelarr.mihon.v1.JobParam"];
+export type JobRun = Schemas["panelarr.mihon.v1.JobRun"];
+export type JobRunSummary = Schemas["panelarr.mihon.v1.JobRunSummary"];
+export type JobRunStatus = NonNullable<JobRunSummary["status"]>;
+export type JobTrigger = NonNullable<JobRunSummary["trigger"]>;
 
 /** A JSON object as sent in google.protobuf.Struct fields (settings, schemas). */
 export type JsonObject = { [key: string]: unknown };

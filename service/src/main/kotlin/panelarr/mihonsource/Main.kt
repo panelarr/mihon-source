@@ -12,6 +12,7 @@ import org.slf4j.LoggerFactory
 import panelarr.mihonsource.api.ClientsApi
 import panelarr.mihonsource.api.ExtensionsApi
 import panelarr.mihonsource.api.IntegrationsApi
+import panelarr.mihonsource.api.JobsApi
 import panelarr.mihonsource.api.SourcePluginApi
 import panelarr.mihonsource.api.StoresApi
 import panelarr.mihonsource.auth.AdminToken
@@ -35,11 +36,13 @@ import panelarr.mihonsource.http.ImageService
 import panelarr.mihonsource.http.OpsService
 import panelarr.mihonsource.http.SpaFiles
 import panelarr.mihonsource.http.UploadService
+import panelarr.mihonsource.jobs.JobRunner
 import panelarr.mihonsource.metrics.Metrics
 import panelarr.mihonsource.mihon.MihonHost
 import panelarr.mihonsource.mihon.MihonInstantiator
 import panelarr.mihonsource.mihon.MihonSources
 import panelarr.mihonsource.mihon.ResultCache
+import panelarr.mihonsource.mihon.SourceHealthJob
 import panelarr.mihonsource.mihon.SourceHealthService
 import panelarr.mihonsource.mihon.SourceProber
 import panelarr.mihonsource.net.Downloader
@@ -52,7 +55,7 @@ import panelarr.mihonsource.secret.SecretBox
 import panelarr.mihonsource.store.StoreIcons
 import panelarr.mihonsource.store.StoreManager
 import panelarr.mihonsource.store.StoreReader
-import panelarr.mihonsource.store.StoreRefresher
+import panelarr.mihonsource.store.StoreRefreshJob
 import java.nio.file.Files
 
 /** Name the service reports about itself. */
@@ -71,8 +74,7 @@ class Application(
     val extensions: ExtensionManager
     val networks: SourceNetworks
     val metrics = Metrics()
-    private val health: SourceHealthService
-    val storeRefresher: StoreRefresher
+    val jobs: JobRunner
     private val server: ApiServer
 
     @Volatile
@@ -110,7 +112,6 @@ class Application(
             }
         }
         val stores = StoreManager(dataDir.resolve("stores"), StoreReader(downloader), extensions, installer, iconFetcher)
-        storeRefresher = StoreRefresher(stores, config.storeRefreshInterval)
         val storeIcons = StoreIcons(dataDir.resolve("cache/store-icons"), stores, downloader)
 
         metrics.extensionGauges(
@@ -120,7 +121,18 @@ class Application(
         )
         val sources = MihonSources(extensions, metrics)
         val prober = SourceProber(sources)
-        health = SourceHealthService(dataDir.resolve("config/source-health.json"), sources, prober, metrics, config.healthCheckInterval)
+        val health = SourceHealthService(dataDir.resolve("config/source-health.json"), metrics)
+        jobs =
+            JobRunner(
+                dataDir.resolve("jobs"),
+                listOf(
+                    StoreRefreshJob(stores, config.storeRefreshInterval),
+                    SourceHealthJob(sources, prober, health, config.healthCheckInterval),
+                ),
+                scope,
+                keep = config.jobHistory.coerceAtLeast(1),
+                metrics = metrics,
+            )
         sources.healthOf = health::get
         sources.checksEnabled = health::enabled
         val metricsService = OpsService.metrics(metrics::scrape)
@@ -148,6 +160,7 @@ class Application(
                         SourcePluginApi(sources, PushedProfiles(integrations, secrets), cache) { extensions.list().count { !it.loaded } },
                         ExtensionsApi(extensions, installer, sources, prober, health),
                         StoresApi(stores),
+                        JobsApi(jobs),
                         ClientsApi(clients),
                         IntegrationsApi(integrations, resolver, secrets) { extensions.sources().map { it.id } },
                         // Lets tools such as grpcurl discover the API. Needs the admin scope.
@@ -181,16 +194,14 @@ class Application(
     fun start(): Int =
         server.start().also {
             ready = true
-            health.start(scope)
-            storeRefresher.start(scope)
+            jobs.startSchedules()
         }
 
     /** The bound separate metrics port, if one was configured. */
     fun metricsPort(): Int? = server.metricsLocalPort()
 
     fun stop() {
-        health.stop()
-        storeRefresher.stop()
+        jobs.stop()
         server.stop().join()
         extensions.close()
         scope.cancel()

@@ -13,8 +13,9 @@ mihon-source reads a few environment variables at start. Each one can also be gi
 | `MIHON_LOG_FORMAT` | `json` | `json` (one JSON object per line: `time`, `level`, `logger`, `thread`, `msg`, `error`) or `text`. |
 | `MIHON_LOG_LEVEL` | `INFO` | `TRACE`, `DEBUG`, `INFO`, `WARN` or `ERROR`. |
 | `MIHON_METRICS_PORT` | *(none)* | Also serve `GET /metrics` on this port **without credentials**, e.g. for a scraper on an internal network. Without it, `/metrics` is only on the main port and needs a token with the `metrics` scope. |
-| `MIHON_HEALTH_CHECK_INTERVAL` | *(off)* | Check every source's health this often, e.g. `6h` or `1d`. Each source gets its first page of popular fetched once per interval, at a random moment within it, through its own network profile and rate limits. Off by default; per-source opt-out in the admin UI or with `SetHealthCheck`. |
-| `MIHON_STORE_REFRESH_INTERVAL` | `12h` | How often every store's index is refreshed (plus up to 10% random delay), so updates show up. Refreshing never installs anything. `0` or `off` turns it off; stores can always be refreshed by hand. |
+| `MIHON_HEALTH_CHECK_INTERVAL` | *(off)* | How often the `source-health` job checks every source, e.g. `6h` or `1d` (plus up to 10% random delay). A round fetches each source's first page of popular, two sources at a time in random order with a short random pause before each, through the source's own network profile and rate limits. Off by default; per-source opt-out in the admin UI or with `SetHealthCheck`. The job can always be run by hand. |
+| `MIHON_STORE_REFRESH_INTERVAL` | `12h` | How often the `store-refresh` job refreshes every store's index (plus up to 10% random delay), so updates show up. Refreshing never installs anything. `0` or `off` turns the schedule off; the job and single stores can always be refreshed by hand. |
+| `MIHON_JOB_HISTORY` | `100` | How many runs of each job are kept. |
 | `MIHON_CACHE_TTL_LIST` | `5m` | How long popular, latest and search results are reused. `0` or `off` turns caching off for them. |
 | `MIHON_CACHE_TTL_DETAILS` | `10m` | The same for series details and chapter lists. |
 | `MIHON_CACHE_TTL_PAGES` | `30m` | The same for a chapter's page list. Images themselves are never cached. |
@@ -52,6 +53,8 @@ A request counts as an anti-bot challenge when the site answers 403 or 503 with 
 | `config/pushed-profiles.json` | Network profiles pushed by a host (SetNetworkProfile) |
 | `stores/stores.json` | Added extension stores and their pinned signing keys |
 | `stores/<store id>.json` | The last good copy of each store's extension list |
+| `config/source-health.json` | Each source's last health check, and the sources scheduled checks skip |
+| `jobs/<job id>.json` | Each job's recent runs, newest first |
 
 Files that hold hashes, keys, cookies or encrypted secrets are created readable by their owner only.
 
