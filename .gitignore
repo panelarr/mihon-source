@@ -1,0 +1,22 @@
+# Gradle / Kotlin
+.gradle/
+build/
+.kotlin/
+!gradle/wrapper/gradle-wrapper.jar
+
+# IDEs
+.idea/
+*.iml
+.vscode/
+.fleet/
+
+# Node
+node_modules/
+dist/
+
+# Local runtime data
+/data/
+*.log
+
+# OS
+.DS_Store

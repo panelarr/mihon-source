@@ -1,0 +1,36 @@
+# mihon-source
+
+> **Status: early development.** Nothing here works yet. See [PROGRESS.md](PROGRESS.md).
+
+mihon-source is a small, self-hosted service that runs [Mihon](https://mihon.app) extensions on a plain JVM and serves their sources over a typed API. It is part of the Panelarr project, but it runs fine on its own.
+
+- **Extensions:** install them by URL, by upload or from extension stores you add yourself. Jar and APK are both supported (APKs are converted with dex2jar). Each extension gets its own classloader, and a broken extension can't take the service down.
+- **API:** the Panelarr source API (`panelarr.source.v1`) and a small admin API (`panelarr.mihon.v1`), both over gRPC and HTTP/JSON, with OpenAPI docs.
+- **Per-source networking:** every source gets its own HTTP client with its own proxy, user agent, rate limit, cookie jar and optional FlareSolverr/Byparr solver.
+- **Minimal admin:** a small web UI to browse and test sources, manage extensions, stores, API clients and network settings.
+- **Small:** no database and no users. All state is plain files under `/data`.
+
+mihon-source ships with **no extensions and no extension stores**. You choose and add them yourself.
+
+## Quick start
+
+The Docker image doesn't exist yet. Until then, run from source:
+
+```sh
+make setup   # downloads Gradle, a JDK 21 toolchain and dependencies
+make run
+```
+
+## Development
+
+Everything runs through `make`, which wraps Gradle (`make help` lists the targets). You need a JDK 17+ to start Gradle. Gradle downloads JDK 21 for the build if you don't have it.
+
+```sh
+make check   # lint + tests, run before every commit
+```
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) and [docs/](docs/README.md).
+
+## Licence
+
+To be decided. Until a licence is added, no rights are granted beyond what GitHub's terms of service allow.
