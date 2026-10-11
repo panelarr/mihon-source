@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link, Outlet } from "@tanstack/react-router";
 import { api, unwrap } from "../api/client";
 import { session } from "../auth/session";
+import { BrandIcon, Wordmark } from "../components/Brand";
 
 export function RootLayout() {
   return <Outlet />;
@@ -34,7 +35,8 @@ export function AppLayout() {
     <div className="shell">
       <header className="topbar">
         <Link to="/sources" className="brand">
-          mihon-source <span className="muted">admin</span>
+          <BrandIcon size={26} />
+          <Wordmark />
         </Link>
         <nav className="nav" aria-label="Main">
           {nav.map((item) => (

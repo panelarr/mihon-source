@@ -5,6 +5,7 @@ import { getRouteApi, useNavigate } from "@tanstack/react-router";
 import { type FormEvent, useState } from "react";
 import { safeRedirect, verifyAdminToken } from "../auth/login";
 import { session } from "../auth/session";
+import { BrandIcon, Wordmark } from "../components/Brand";
 import { ErrorBox, Field } from "../components/ui";
 
 const route = getRouteApi("/login");
@@ -30,7 +31,12 @@ export function LoginPage() {
   return (
     <main className="login">
       <form className="card login-card" onSubmit={submit}>
-        <h1>mihon-source admin</h1>
+        <div className="login-brand">
+          <BrandIcon size={56} />
+          <h1>
+            <Wordmark />
+          </h1>
+        </div>
         {search.expired ? (
           <p className="notice" role="status">
             Your session ended: the server no longer accepts the token. Sign in again.

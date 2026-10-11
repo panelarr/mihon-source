@@ -1,0 +1,1 @@
+The Panelarr logo files here (`panelarr-icon.svg`, `panelarr-icon-mono.svg`) and the favicons made from them in `../../public/` are licensed under Creative Commons Attribution 4.0 International (https://creativecommons.org/licenses/by/4.0/), © the Panelarr authors.

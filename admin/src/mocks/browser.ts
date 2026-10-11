@@ -11,5 +11,7 @@ export async function startMockWorker(): Promise<void> {
     onUnhandledRequest: "bypass",
     quiet: false,
   });
-  console.info('mihon-source admin: mock mode. Sign in with any token ("bad" is rejected, "msk_…" is a client key).');
+  console.info(
+    'Panelarr Mihon Source: mock mode. Sign in with any token ("bad" is rejected, "msk_…" is a client key).',
+  );
 }

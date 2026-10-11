@@ -64,3 +64,5 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) and [docs/](docs/README.md).
 mihon-source is licensed under the [GNU General Public License v3.0 or later](LICENSE).
 
 The protobuf definitions in [`proto/`](proto) are licensed under the [Apache License 2.0](proto/LICENSE), so that other implementations of the API can use them freely.
+
+The Panelarr logo ([`admin/src/assets/panelarr-icon.svg`](admin/src/assets/panelarr-icon.svg), [`panelarr-icon-mono.svg`](admin/src/assets/panelarr-icon-mono.svg), and the favicons in [`admin/public/`](admin/public)) is licensed under [Creative Commons Attribution 4.0](https://creativecommons.org/licenses/by/4.0/), © the Panelarr authors.
