@@ -25,6 +25,7 @@ class AppConfigTest {
     fun `secrets can come from files`() {
         val file = dir.resolve("token").also { Files.writeString(it, "from-file\n") }
         assertEquals("from-file", AppConfig.fromEnv(mapOf("MIHON_ADMIN_TOKEN_FILE" to file.toString())).adminToken)
-        assertEquals("direct", AppConfig.fromEnv(mapOf("MIHON_ADMIN_TOKEN" to "direct", "MIHON_ADMIN_TOKEN_FILE" to file.toString())).adminToken)
+        val both = mapOf("MIHON_ADMIN_TOKEN" to "direct", "MIHON_ADMIN_TOKEN_FILE" to file.toString())
+        assertEquals("direct", AppConfig.fromEnv(both).adminToken)
     }
 }
