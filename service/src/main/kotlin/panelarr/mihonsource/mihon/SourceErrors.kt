@@ -101,6 +101,16 @@ object SourceErrors {
             }
         }
 
+    /** A short, bounded outcome label for [status]: its ErrorInfo reason, else its code name. */
+    fun outcome(status: StatusException): String =
+        StatusProto
+            .fromThrowable(status)
+            ?.detailsList
+            ?.firstOrNull { it.`is`(ErrorInfo::class.java) }
+            ?.unpack(ErrorInfo::class.java)
+            ?.reason
+            ?: status.status.code.name
+
     fun notFound(message: String): StatusException = status(Code.NOT_FOUND, "NOT_FOUND", message)
 
     fun unsupported(message: String): StatusException = status(Code.UNIMPLEMENTED, "UNSUPPORTED", message)

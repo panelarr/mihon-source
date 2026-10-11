@@ -47,8 +47,14 @@ class ApiServer(
     private val maxRequestLength: Long = DEFAULT_MAX_REQUEST_LENGTH,
     /** The admin SPA's files, or null when it isn't bundled. */
     private val spa: SpaFiles? = null,
+    /** A second port serving only GET /metrics, without credentials. Null means none. */
+    private val metricsPort: Int? = null,
+    private val metrics: HttpService? = null,
+    /** Where Armeria records its own request metrics. */
+    private val meterRegistry: io.micrometer.core.instrument.MeterRegistry? = null,
 ) {
     private var server: Server? = null
+    private var metricsServer: Server? = null
 
     fun start(): Int {
         val grpc =
@@ -72,6 +78,7 @@ class ApiServer(
                 .http(InetSocketAddress(host, port))
                 .maxRequestLength(maxRequestLength)
                 .requestTimeoutMillis(REQUEST_TIMEOUT_MILLIS)
+                .apply { meterRegistry?.let(::meterRegistry) }
         routes.forEach { (path, service) -> builder.service(path, service) }
         val built =
             builder
@@ -88,10 +95,29 @@ class ApiServer(
                 .build()
         built.start().join()
         server = built
+        if (metricsPort != null && metrics != null) {
+            metricsServer =
+                Server
+                    .builder()
+                    .http(InetSocketAddress(host, metricsPort))
+                    // Its own throwaway registry, so its executor meters don't clash with the API server's.
+                    .meterRegistry(
+                        io.micrometer.core.instrument.simple
+                            .SimpleMeterRegistry(),
+                    ).service("/metrics", metrics)
+                    .build()
+                    .also { it.start().join() }
+        }
         return built.activeLocalPort()
     }
 
-    fun stop(): CompletableFuture<Void> = server?.stop() ?: CompletableFuture.completedFuture(null)
+    /** The bound metrics port, or null when there's no separate one. */
+    fun metricsLocalPort(): Int? = metricsServer?.activeLocalPort()
+
+    fun stop(): CompletableFuture<Void> {
+        metricsServer?.stop()?.join()
+        return server?.stop() ?: CompletableFuture.completedFuture(null)
+    }
 
     private fun openApiDocument(): HttpService {
         val bytes =

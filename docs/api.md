@@ -23,9 +23,31 @@ Two HTTP routes have no RPC of their own:
 | `GET /v1/admin/stores/{storeId}/extensions/{pkgName}/icon` | A store's icon for an extension it offers, fetched through the service and cached for a week, so clients never load images from the store. Scope `admin`. |
 | `POST /v1/admin/extensions/upload` | Installs an extension from `multipart/form-data`: field `file`, optional `expectedSha256` and `expectedSigningFingerprint`. Answers like `InstallExtension`. Scope `admin`. |
 
+## Health and metrics
+
+| Route | Does |
+|---|---|
+| `GET /healthz` | Liveness: 200 while the process serves requests. No credentials. |
+| `GET /readyz` | Readiness: 200 once installed extensions are loaded and the server is up, 503 before. No credentials. |
+| `GET /v1/health` | The source API's Health: `DEGRADED` when some extensions failed to load. No credentials. |
+| `GET /metrics` | Prometheus metrics. Needs the `metrics` scope (or `admin`), or use the separate `MIHON_METRICS_PORT`. |
+
+Metrics include the JVM's, `mihon_source_call_seconds` (count, sum and max per `source`, `operation` and `outcome`, where the outcome is `ok`, an error reason such as `SOURCE_DOWN`, or a gRPC code name), `mihon_solver_solves_total` (per `solver` and `outcome`), `mihon_extensions` (per `status`) and `mihon_sources`. Labels never contain URLs, queries or credentials.
+
+A Prometheus scrape config with a key:
+
+```yaml
+scrape_configs:
+  - job_name: mihon-source
+    authorization:
+      credentials: msk_...   # a client key with the metrics scope
+    static_configs:
+      - targets: ["mihon-source:8902"]
+```
+
 ## Authentication
 
-Every call except `GET /v1/health` (gRPC `Health`) needs a bearer token:
+Every call except `GET /v1/health` (gRPC `Health`), `/healthz` and `/readyz` needs a bearer token:
 
 ```sh
 curl -H "Authorization: Bearer $TOKEN" localhost:8902/v1/sources
@@ -42,6 +64,7 @@ There are two kinds of token:
 |---|---|
 | `sources:read` | Every read of the source API |
 | `sources:write` | `sources:read`, plus changing source settings and pushing network profiles |
+| `metrics` | Reading `/metrics`, nothing else |
 | `admin` | Everything, including the admin API |
 
 Any valid token may call `GET /v1/whoami` to see who it is and which scopes it holds.

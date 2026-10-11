@@ -10,10 +10,13 @@ object Scopes {
     /** Change source settings and push network profiles. */
     const val SOURCES_WRITE = "sources:write"
 
+    /** Read the Prometheus metrics at /metrics, and nothing else. For a metrics scraper. */
+    const val METRICS = "metrics"
+
     /** Everything, including the admin API. */
     const val ADMIN = "admin"
 
-    val all: Set<String> = linkedSetOf(SOURCES_READ, SOURCES_WRITE, ADMIN)
+    val all: Set<String> = linkedSetOf(SOURCES_READ, SOURCES_WRITE, METRICS, ADMIN)
 
     /** Whether [granted] allows a call that needs [required]. */
     fun allows(

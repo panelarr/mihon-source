@@ -15,6 +15,7 @@ coroutines = "1.11.0"
 serialization = "1.11.0"
 logback = "1.5.20"
 swaggerUi = "5.33.1"
+micrometer = "1.17.1"
 apksig = "9.4.1"
 dex2jar = "2.4.38"
 asm = "9.11"
@@ -53,6 +54,7 @@ protobuf-java-util = { module = "com.google.protobuf:protobuf-java-util", versio
 coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }
 serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "serialization" }
 logback = { module = "ch.qos.logback:logback-classic", version.ref = "logback" }
+micrometer-prometheus = { module = "io.micrometer:micrometer-registry-prometheus", version.ref = "micrometer" }
 swagger-ui = { module = "org.webjars:swagger-ui", version.ref = "swaggerUi" }
 apksig = { module = "com.android.tools.build:apksig", version.ref = "apksig" }
 dex2jar = { module = "de.femtopedia.dex2jar:dex-translator", version.ref = "dex2jar" }

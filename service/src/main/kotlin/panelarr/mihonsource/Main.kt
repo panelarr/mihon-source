@@ -28,8 +28,10 @@ import panelarr.mihonsource.http.ApiServer
 import panelarr.mihonsource.http.HttpAuth
 import panelarr.mihonsource.http.IconService
 import panelarr.mihonsource.http.ImageService
+import panelarr.mihonsource.http.OpsService
 import panelarr.mihonsource.http.SpaFiles
 import panelarr.mihonsource.http.UploadService
+import panelarr.mihonsource.metrics.Metrics
 import panelarr.mihonsource.mihon.MihonHost
 import panelarr.mihonsource.mihon.MihonInstantiator
 import panelarr.mihonsource.mihon.MihonSources
@@ -60,7 +62,11 @@ class Application(
     val clients: ClientRegistry
     val extensions: ExtensionManager
     val networks: SourceNetworks
+    val metrics = Metrics()
     private val server: ApiServer
+
+    @Volatile
+    private var ready = false
 
     init {
         Files.createDirectories(dataDir)
@@ -71,7 +77,7 @@ class Application(
         val secrets = SecretBox.load(dataDir.resolve("secret.key"), config.secretKey)
         val integrations = FileIntegrationsStore(dataDir.resolve("config"))
         val resolver = ProfileResolver(integrations, secrets)
-        networks = SourceNetworks(resolver, dataDir.resolve("cookies"), SolverClient(Downloader.defaultClient()))
+        networks = SourceNetworks(resolver, dataDir.resolve("cookies"), SolverClient(Downloader.defaultClient(), metrics))
         integrations.addListener(networks::configurationChanged)
         MihonHost.install(dataDir, networks)
 
@@ -96,7 +102,13 @@ class Application(
         val stores = StoreManager(dataDir.resolve("stores"), StoreReader(downloader), extensions, installer, iconFetcher)
         val storeIcons = StoreIcons(dataDir.resolve("cache/store-icons"), stores, downloader)
 
-        val sources = MihonSources(extensions)
+        metrics.extensionGauges(
+            loaded = { extensions.list().count { it.loaded } },
+            failed = { extensions.list().count { !it.loaded } },
+            sources = { extensions.sources().size },
+        )
+        val sources = MihonSources(extensions, metrics)
+        val metricsService = OpsService.metrics(metrics::scrape)
         server =
             ApiServer(
                 host = config.host,
@@ -114,6 +126,9 @@ class Application(
                 interceptors = listOf(AuthInterceptor(authenticator)),
                 routes =
                     mapOf(
+                        "/healthz" to OpsService.liveness(),
+                        "/readyz" to OpsService.readiness { ready },
+                        "/metrics" to HttpAuth(metricsService, authenticator, Scopes.METRICS),
                         "/v1/sources/{sourceId}/image" to HttpAuth(ImageService(sources, scope), authenticator, Scopes.SOURCES_READ),
                         "/v1/admin/extensions/upload" to HttpAuth(UploadService(installer, scope), authenticator, Scopes.ADMIN),
                         "/v1/sources/{sourceId}/icon" to
@@ -126,11 +141,17 @@ class Application(
                 // Base64 in JSON makes uploads a third larger.
                 maxRequestLength = config.maxExtensionBytes * 4 / 3 + REQUEST_OVERHEAD,
                 spa = SpaFiles.find(config.adminDir),
+                metricsPort = config.metricsPort,
+                metrics = metricsService,
+                meterRegistry = metrics.registry,
             )
     }
 
     /** Starts serving and returns the bound port. */
-    fun start(): Int = server.start()
+    fun start(): Int = server.start().also { ready = true }
+
+    /** The bound separate metrics port, if one was configured. */
+    fun metricsPort(): Int? = server.metricsLocalPort()
 
     fun stop() {
         server.stop().join()

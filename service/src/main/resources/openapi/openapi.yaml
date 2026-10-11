@@ -2062,6 +2062,7 @@ tags:
          Scopes:
          - `sources:read`: browse sources (panelarr.source.v1 reads).
          - `sources:write`: change source settings and push network profiles.
+         - `metrics`: read the Prometheus metrics at /metrics.
          - `admin`: everything, including this service.
 
          Keys are shown once, when created or rotated, and stored only as hashes.

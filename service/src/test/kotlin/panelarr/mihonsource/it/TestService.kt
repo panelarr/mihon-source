@@ -22,8 +22,9 @@ import java.nio.file.Path
 /** A running service on a random port with an admin token, plus typed gRPC stubs. */
 class TestService(
     val dataDir: Path,
+    metricsPort: Int? = null,
 ) : AutoCloseable {
-    val app = Application(AppConfig(dataDir = dataDir, host = "127.0.0.1", port = 0, adminToken = ADMIN))
+    val app = Application(AppConfig(dataDir = dataDir, host = "127.0.0.1", port = 0, adminToken = ADMIN, metricsPort = metricsPort))
     val base = "http://127.0.0.1:${app.start()}"
     private val http = HttpClient.newHttpClient()
 

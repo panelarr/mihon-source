@@ -25,6 +25,7 @@ dependencies {
     implementation(libs.coroutines.core)
     implementation(libs.serialization.json)
     implementation(libs.logback)
+    implementation(libs.micrometer.prometheus)
     implementation(libs.okhttp)
     implementation(libs.apksig)
     implementation(libs.dex2jar)

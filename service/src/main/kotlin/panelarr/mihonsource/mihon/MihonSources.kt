@@ -11,6 +11,7 @@ import okhttp3.Request
 import okhttp3.Response
 import panelarr.mihonsource.extension.ExtensionManager
 import panelarr.mihonsource.extension.ExtensionRecord
+import panelarr.mihonsource.metrics.Metrics
 import panelarr.source.v1.ContentRating
 import panelarr.source.v1.SourceCapability
 import panelarr.source.v1.source
@@ -20,6 +21,7 @@ import panelarr.source.v1.Source as ProtoSource
 /** Looks up loaded Mihon sources and runs calls into them with a timeout and error mapping. */
 class MihonSources(
     private val extensions: ExtensionManager,
+    private val metrics: Metrics? = null,
     private val callTimeout: Duration = Duration.ofMinutes(2),
 ) {
     fun all(): List<MihonSource> =
@@ -37,16 +39,23 @@ class MihonSources(
     /** Runs [block] against the source off the request thread, mapping failures to statuses. */
     suspend fun <T> call(
         source: MihonSource,
+        operation: String,
         block: suspend (MihonSource) -> T,
-    ): T =
+    ): T {
+        val started = System.nanoTime()
         try {
-            withContext(Dispatchers.IO) { withTimeout(callTimeout.toMillis()) { block(source) } }
+            val result = withContext(Dispatchers.IO) { withTimeout(callTimeout.toMillis()) { block(source) } }
+            metrics?.sourceCall(source.id, operation, OK, Duration.ofNanos(System.nanoTime() - started))
+            return result
         } catch (
             @Suppress("TooGenericExceptionCaught") e: Throwable,
         ) {
             if (e is VirtualMachineError && e !is OutOfMemoryError && e !is StackOverflowError) throw e
-            throw SourceErrors.toStatus(e, source.id)
+            val status = SourceErrors.toStatus(e, source.id)
+            metrics?.sourceCall(source.id, operation, SourceErrors.outcome(status), Duration.ofNanos(System.nanoTime() - started))
+            throw status
         }
+    }
 
     fun toProto(source: MihonSource): ProtoSource =
         source {
@@ -88,7 +97,7 @@ class MihonSources(
         source: MihonSource,
         ref: String,
     ): Response =
-        call(source) { mihon ->
+        call(source, "image") { mihon ->
             val http = mihon.source as? HttpSource ?: throw SourceErrors.unsupported("this source can't fetch images")
             val pageRef = Mapping.decodeRef(ref)
             if (pageRef == null) {
@@ -115,4 +124,8 @@ class MihonSources(
                 http.getImage(page)
             }
         }
+
+    private companion object {
+        const val OK = "ok"
+    }
 }

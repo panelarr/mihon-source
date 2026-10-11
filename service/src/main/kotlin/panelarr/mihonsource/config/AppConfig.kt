@@ -20,6 +20,8 @@ data class AppConfig(
     val secretKey: String? = null,
     /** Directory with a built admin SPA, overriding the one bundled in the jar (development). */
     val adminDir: Path? = null,
+    /** Port for unauthenticated GET /metrics on its own listener. Null means /metrics only on the API port, with a token. */
+    val metricsPort: Int? = null,
 ) {
     companion object {
         const val DEFAULT_PORT = 8902
@@ -40,6 +42,7 @@ data class AppConfig(
                 maxExtensionBytes = (number("MIHON_MAX_EXTENSION_MB") ?: DEFAULT_MAX_EXTENSION_MB) * MB,
                 secretKey = value("MIHON_SECRET_KEY"),
                 adminDir = value("MIHON_ADMIN_DIR")?.let(Path::of),
+                metricsPort = number("MIHON_METRICS_PORT")?.toInt(),
             )
         }
     }

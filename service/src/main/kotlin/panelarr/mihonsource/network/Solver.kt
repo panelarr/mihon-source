@@ -51,6 +51,7 @@ class SolverException(
  */
 class SolverClient(
     private val http: OkHttpClient,
+    private val metrics: panelarr.mihonsource.metrics.Metrics? = null,
 ) {
     private val log = LoggerFactory.getLogger(SolverClient::class.java)
     private val json = Json { ignoreUnknownKeys = true }
@@ -68,9 +69,11 @@ class SolverClient(
         if (running != null) return await(running)
         try {
             mine.complete(request(solver, url, proxy))
+            metrics?.solve(solver.id, "ok")
         } catch (
             @Suppress("TooGenericExceptionCaught") e: Exception,
         ) {
+            metrics?.solve(solver.id, "error")
             mine.completeExceptionally(e)
         } finally {
             inFlight.remove(key, mine)
