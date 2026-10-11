@@ -8,6 +8,33 @@ import java.util.Iterator;
 public final class TextUtils {
     private TextUtils() {}
 
+    public enum TruncateAt { START, MIDDLE, END, MARQUEE }
+
+    public static boolean isGraphic(CharSequence str) {
+        for (int i = 0; i < str.length(); i++) {
+            if (!Character.isWhitespace(str.charAt(i)) && !Character.isISOControl(str.charAt(i))) return true;
+        }
+        return false;
+    }
+
+    public static CharSequence concat(CharSequence... text) {
+        StringBuilder sb = new StringBuilder();
+        for (CharSequence piece : text) sb.append(piece);
+        return sb.toString();
+    }
+
+    public static String substring(CharSequence source, int start, int end) {
+        return source.subSequence(start, end).toString();
+    }
+
+    public static int getTrimmedLength(CharSequence s) {
+        int start = 0;
+        int end = s.length();
+        while (start < end && s.charAt(start) <= ' ') start++;
+        while (end > start && s.charAt(end - 1) <= ' ') end--;
+        return end - start;
+    }
+
     public static boolean isEmpty(CharSequence str) {
         return str == null || str.length() == 0;
     }
