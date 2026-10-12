@@ -21,35 +21,43 @@ import kotlin.random.Random
 
 /**
  * Checks sources and records the result as their health. A round covers the sources
- * whose scheduled checks are on, limited to [langs] (all when empty) and to a [sample] of
- * them (all when null). The sample takes the least recently checked sources first, ties
- * in random order, so rounds rotate through every eligible source. Given source IDs
+ * whose scheduled checks are on, limited to the schedule's languages (all when empty) and
+ * to a sample of them (all when null); [schedules] says which, and how often. The sample
+ * takes the least recently checked sources first, ties in random order, so rounds rotate
+ * through every eligible source. Given source IDs
  * override all of that. Sources are checked in random order, two at a time, each after a
  * short random pause, so checks don't arrive at sites together. Checks use each source's
- * own client, so its rate limits apply.
+ * own client, so its rate limits apply. A run for given sources also notes each step's
+ * result, so whoever asked sees what worked.
  */
 class SourceHealthJob(
     private val sources: MihonSources,
     private val prober: SourceProber,
     private val health: SourceHealthService,
-    interval: Duration?,
-    private val langs: Set<String> = emptySet(),
-    private val sample: Int? = null,
+    private val schedules: HealthCheckSchedules,
     private val random: Random = Random.Default,
     private val pause: Duration = MAX_PAUSE,
 ) : BackgroundJob {
-    override val id = "source-health"
+    override val id = ID
     override val name = "Check sources"
     override val description =
         "Fetches from each source to see whether it works, and records the result as the source's health. " +
             "Rounds skip sources whose checks are turned off, and take the least recently checked sources first."
     override val group = "Sources"
-    override val schedule = JobSchedule(interval?.takeIf { !it.isZero && !it.isNegative }, "MIHON_HEALTH_CHECK_INTERVAL")
+    override val schedule: JobSchedule
+        get() =
+            schedules.current().let {
+                JobSchedule(
+                    it.interval?.takeIf { interval -> !interval.isZero && !interval.isNegative },
+                    if (it.fromApi) "SetHealthCheckSchedule" else "MIHON_HEALTH_CHECK_INTERVAL",
+                )
+            }
 
     // The language choices are the installed sources' languages, so they're worked out each time.
     override val params: List<JobParamSpec>
-        get() =
-            listOf(
+        get() {
+            val (_, langs, sample) = schedules.current()
+            return listOf(
                 JobParamSpec(SOURCE_IDS, JobParamSpec.Type.STRING_LIST, "Check only these sources (IDs). Overrides langs and sample."),
                 JobParamSpec(
                     LANGS,
@@ -72,6 +80,7 @@ class SourceHealthJob(
                     choices = CheckStepKind.entries.map { it.name.lowercase() },
                 ),
             )
+        }
 
     override fun validate(params: Map<String, String>) {
         params[SOURCE_IDS]
@@ -111,6 +120,7 @@ class SourceHealthJob(
         }
         run.count("eligible", eligible.toLong())
         val steps = run.list(STEPS).map { CheckStepKind.valueOf(it.uppercase()) }.toSet()
+        val targeted = run.list(SOURCE_IDS).isNotEmpty()
         val total = selected.size.toLong()
         val done = AtomicLong()
         run.count("sources", total)
@@ -126,17 +136,21 @@ class SourceHealthJob(
                             val result = prober.probe(source, steps)
                             ensureActive()
                             health.record(result)
+                            if (targeted) noteSteps(run, result)
                             if (result.ok) {
                                 run.increment("ok")
                             } else {
                                 run.increment("failing")
                                 val failure = result.failure
-                                run.note(
-                                    JobNote.Level.WARN,
-                                    "${source.name} (${source.lang}): ${failure?.reason ?: "failed"}" +
-                                        failure?.message?.let { " – $it" }.orEmpty(),
-                                    source.id.toString(),
-                                )
+                                // A run for given sources noted the failing step already.
+                                if (!targeted) {
+                                    run.note(
+                                        JobNote.Level.WARN,
+                                        "${source.name} (${source.lang}): ${failure?.reason ?: "failed"}" +
+                                            failure?.message?.let { " – $it" }.orEmpty(),
+                                        source.id.toString(),
+                                    )
+                                }
                             }
                             run.progress("Checking", done.incrementAndGet(), total, "sources")
                         }
@@ -148,9 +162,34 @@ class SourceHealthJob(
         run.message = if (eligible > total) "$checked ($total of $eligible eligible)" else checked
     }
 
+    /** Notes each step of [result]: what it found, or why it failed or was skipped. */
+    private fun noteSteps(
+        run: JobRunContext,
+        result: SourceCheckResult,
+    ) {
+        val source = result.source
+        for (step in result.steps) {
+            val (level, outcome) =
+                when {
+                    step.skipped -> JobNote.Level.INFO to "skipped"
+                    step.ok -> JobNote.Level.INFO to "ok"
+                    else -> JobNote.Level.WARN to (step.reason ?: "failed")
+                }
+            val detail = listOfNotNull(step.detail?.takeIf { it.isNotBlank() }, step.message?.takeIf { it.isNotBlank() })
+            val took = if (step.skipped) "" else " (${step.duration.toMillis()} ms)"
+            run.note(
+                level,
+                "${source.name} (${source.lang}) ${step.step.name.lowercase()}: $outcome$took" +
+                    detail.joinToString(" – ").let { if (it.isEmpty()) "" else " – $it" },
+                source.id.toString(),
+            )
+        }
+    }
+
     private fun sourceCount(count: Long) = if (count == 1L) "1 source" else "$count sources"
 
-    private companion object {
+    companion object {
+        const val ID = "source-health"
         const val SOURCE_IDS = "source_ids"
         const val LANGS = "langs"
         const val SAMPLE = "sample"

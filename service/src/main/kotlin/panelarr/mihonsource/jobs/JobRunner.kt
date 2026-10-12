@@ -54,7 +54,7 @@ class JobRunner(
     private val histories: Map<String, JobHistory> = jobs.associate { it.id to JobHistory(dir.resolve("${it.id}.json"), keep, now) }
     private val active = ConcurrentHashMap<String, Active>()
     private val nextRuns = ConcurrentHashMap<String, Instant>()
-    private val schedules = ArrayList<kotlinx.coroutines.Job>()
+    private val schedules = ConcurrentHashMap<String, kotlinx.coroutines.Job>()
     private val lock = Any()
 
     @Volatile
@@ -155,12 +155,34 @@ class JobRunner(
         return run(runId)
     }
 
+    @Volatile
+    private var scheduling = false
+
     /** Starts the schedules of the jobs that have one. */
     fun startSchedules() {
-        for (job in jobs.values) {
-            val interval = job.schedule.interval?.takeIf { job.schedule.enabled } ?: continue
+        scheduling = true
+        jobs.values.forEach(::schedule)
+    }
+
+    /**
+     * Follows a change of [jobId]'s schedule: the next run comes one new interval from
+     * now, or never when the schedule is off. A run going on carries on.
+     */
+    fun reschedule(jobId: String) {
+        if (scheduling && !stopping) schedule(job(jobId))
+    }
+
+    private fun schedule(job: BackgroundJob) =
+        synchronized(schedules) {
+            schedules.remove(job.id)?.cancel()
+            nextRuns.remove(job.id)
+            val interval = job.schedule.interval?.takeIf { job.schedule.enabled }
+            if (interval == null) {
+                log.info("Job {} runs on request only", job.id)
+                return@synchronized
+            }
             log.info("Running job {} every {}", job.id, interval)
-            schedules +=
+            schedules[job.id] =
                 scope.launch {
                     fun nextWait() = interval.toMillis() + random.nextLong(interval.toMillis() / JITTER_DIVISOR + 1)
                     var wait = nextWait()
@@ -175,12 +197,11 @@ class JobRunner(
                     }
                 }
         }
-    }
 
     /** Stops the schedules and running runs; those runs are recorded as interrupted. */
     fun stop() {
         stopping = true
-        schedules.forEach { it.cancel() }
+        schedules.values.forEach { it.cancel() }
         val tasks = active.values.map { it.task }
         tasks.forEach { it.cancel() }
         runBlocking { withTimeoutOrNull(CANCEL_WAIT.toMillis()) { tasks.joinAll() } }

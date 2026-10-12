@@ -13,7 +13,7 @@ mihon-source reads a few environment variables at start. Each one can also be gi
 | `MIHON_LOG_FORMAT` | `json` | `json` (one JSON object per line: `time`, `level`, `logger`, `thread`, `msg`, `error`) or `text`. |
 | `MIHON_LOG_LEVEL` | `INFO` | `TRACE`, `DEBUG`, `INFO`, `WARN` or `ERROR`. |
 | `MIHON_METRICS_PORT` | *(none)* | Also serve `GET /metrics` on this port **without credentials**, e.g. for a scraper on an internal network. Without it, `/metrics` is only on the main port and needs a token with the `metrics` scope. |
-| `MIHON_HEALTH_CHECK_INTERVAL` | *(off)* | How often the `source-health` job checks sources, e.g. `6h` or `1d` (plus up to 10% random delay). A round fetches the first page of popular from the selected sources (see the next two settings), two sources at a time in random order with a short random pause before each, through the source's own network profile and rate limits. Off by default; per-source opt-out in the admin UI or with `SetHealthCheck`. The job can always be run by hand. |
+| `MIHON_HEALTH_CHECK_INTERVAL` | *(off)* | How often the `source-health` job checks sources, e.g. `6h` or `1d` (plus up to 10% random delay). A round fetches the first page of popular from the selected sources (see the next two settings), two sources at a time in random order with a short random pause before each, through the source's own network profile and rate limits. Off by default; per-source opt-out in the admin UI or with `SetHealthCheck`. The job can always be run by hand. `SetHealthCheckSchedule` overrides this and the next two settings at runtime (see the [API](api.md#checking-sources)). |
 | `MIHON_HEALTH_CHECK_LANGS` | *(all)* | Source languages scheduled health checks cover, comma-separated, e.g. `en,fr`. |
 | `MIHON_HEALTH_CHECK_SAMPLE` | `10` | How many sources each scheduled round checks: the least recently checked first (ties in random order), so rounds rotate through every eligible source. `all` checks every eligible source each round. Combined with `MIHON_HEALTH_CHECK_LANGS`, the sample comes from those languages. |
 | `MIHON_STORE_REFRESH_INTERVAL` | `12h` | How often the `store-refresh` job refreshes every store's index (plus up to 10% random delay), so updates show up. Refreshing never installs anything. `0` or `off` turns the schedule off; the job and single stores can always be refreshed by hand. |
@@ -56,6 +56,7 @@ A request counts as an anti-bot challenge when the site answers 403 or 503 with 
 | `stores/stores.json` | Added extension stores and their pinned signing keys |
 | `stores/<store id>.json` | The last good copy of each store's extension list |
 | `config/source-health.json` | Each source's last health check, and the sources scheduled checks skip |
+| `config/health-check-schedule.json` | The health-check schedule set with `SetHealthCheckSchedule`, which overrides the `MIHON_HEALTH_CHECK_*` variables; absent until set |
 | `jobs/<job id>.json` | Each job's recent runs, newest first |
 
 Files that hold hashes, keys, cookies or encrypted secrets are created readable by their owner only.

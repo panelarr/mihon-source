@@ -40,6 +40,8 @@ import panelarr.mihonsource.http.SpaFiles
 import panelarr.mihonsource.http.UploadService
 import panelarr.mihonsource.jobs.JobRunner
 import panelarr.mihonsource.metrics.Metrics
+import panelarr.mihonsource.mihon.HealthCheckSchedule
+import panelarr.mihonsource.mihon.HealthCheckSchedules
 import panelarr.mihonsource.mihon.MihonHost
 import panelarr.mihonsource.mihon.MihonInstantiator
 import panelarr.mihonsource.mihon.MihonSources
@@ -131,24 +133,23 @@ class Application(
         val sources = MihonSources(extensions, metrics)
         val prober = SourceProber(sources)
         val health = SourceHealthService(dataDir.resolve("config/source-health.json"), metrics)
+        val healthSchedules =
+            HealthCheckSchedules(
+                dataDir.resolve("config/health-check-schedule.json"),
+                HealthCheckSchedule(config.healthCheckInterval, config.healthCheckLangs, config.healthCheckSample),
+            )
         jobs =
             JobRunner(
                 dataDir.resolve("jobs"),
                 listOf(
                     StoreRefreshJob(stores, config.storeRefreshInterval),
-                    SourceHealthJob(
-                        sources,
-                        prober,
-                        health,
-                        config.healthCheckInterval,
-                        config.healthCheckLangs,
-                        config.healthCheckSample,
-                    ),
+                    SourceHealthJob(sources, prober, health, healthSchedules),
                 ),
                 scope,
                 keep = config.jobHistory.coerceAtLeast(1),
                 metrics = metrics,
             )
+        healthSchedules.addListener { jobs.reschedule(SourceHealthJob.ID) }
         sources.healthOf = health::get
         sources.checksEnabled = health::enabled
         val metricsService = OpsService.metrics(metrics::scrape)
@@ -181,7 +182,7 @@ class Application(
                             instanceId = instanceId,
                             profiles = resolver::resolve,
                         ),
-                        ExtensionsApi(extensions, installer, sources, prober, health),
+                        ExtensionsApi(extensions, installer, sources, prober, health, healthSchedules),
                         StoresApi(stores),
                         JobsApi(jobs),
                         ClientsApi(clients),

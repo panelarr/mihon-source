@@ -16,6 +16,8 @@ import panelarr.mihon.v1.ExtensionFormat
 import panelarr.mihon.v1.ExtensionStatus
 import panelarr.mihon.v1.GetExtensionRequest
 import panelarr.mihon.v1.GetExtensionResponse
+import panelarr.mihon.v1.GetHealthCheckScheduleRequest
+import panelarr.mihon.v1.GetHealthCheckScheduleResponse
 import panelarr.mihon.v1.InstallExtensionRequest
 import panelarr.mihon.v1.InstallExtensionResponse
 import panelarr.mihon.v1.ListExtensionsRequest
@@ -27,6 +29,8 @@ import panelarr.mihon.v1.SetExtensionLanguagesRequest
 import panelarr.mihon.v1.SetExtensionLanguagesResponse
 import panelarr.mihon.v1.SetHealthCheckRequest
 import panelarr.mihon.v1.SetHealthCheckResponse
+import panelarr.mihon.v1.SetHealthCheckScheduleRequest
+import panelarr.mihon.v1.SetHealthCheckScheduleResponse
 import panelarr.mihon.v1.SourceCheck
 import panelarr.mihon.v1.UninstallExtensionRequest
 import panelarr.mihon.v1.UninstallExtensionResponse
@@ -35,11 +39,14 @@ import panelarr.mihon.v1.extension
 import panelarr.mihon.v1.extensionOrigin
 import panelarr.mihon.v1.extensionSource
 import panelarr.mihon.v1.getExtensionResponse
+import panelarr.mihon.v1.getHealthCheckScheduleResponse
+import panelarr.mihon.v1.healthCheckSchedule
 import panelarr.mihon.v1.installExtensionResponse
 import panelarr.mihon.v1.listExtensionsResponse
 import panelarr.mihon.v1.reloadExtensionResponse
 import panelarr.mihon.v1.setExtensionLanguagesResponse
 import panelarr.mihon.v1.setHealthCheckResponse
+import panelarr.mihon.v1.setHealthCheckScheduleResponse
 import panelarr.mihon.v1.sourceCheck
 import panelarr.mihon.v1.stepResult
 import panelarr.mihon.v1.uninstallExtensionResponse
@@ -49,11 +56,15 @@ import panelarr.mihonsource.extension.ExtensionManager
 import panelarr.mihonsource.extension.ExtensionRecord
 import panelarr.mihonsource.extension.InstalledExtension
 import panelarr.mihonsource.mihon.CheckStepKind
+import panelarr.mihonsource.mihon.HealthCheckSchedule
+import panelarr.mihonsource.mihon.HealthCheckSchedules
 import panelarr.mihonsource.mihon.MihonSources
 import panelarr.mihonsource.mihon.SourceCheckResult
 import panelarr.mihonsource.mihon.SourceHealthService
 import panelarr.mihonsource.mihon.SourceProber
+import java.time.Duration
 import java.time.Instant
+import panelarr.mihon.v1.HealthCheckSchedule as ScheduleProto
 
 /** `panelarr.mihon.v1.MihonAdminService`: installed extensions. */
 class ExtensionsApi(
@@ -62,6 +73,7 @@ class ExtensionsApi(
     private val sources: MihonSources,
     private val prober: SourceProber,
     private val health: SourceHealthService,
+    private val schedules: HealthCheckSchedules,
 ) : MihonAdminServiceGrpcKt.MihonAdminServiceCoroutineImplBase() {
     override suspend fun checkSources(request: CheckSourcesRequest): CheckSourcesResponse =
         rpc {
@@ -90,6 +102,30 @@ class ExtensionsApi(
         rpc {
             health.setEnabled(sources.get(request.sourceId).id, request.enabled)
             setHealthCheckResponse {}
+        }
+
+    override suspend fun getHealthCheckSchedule(request: GetHealthCheckScheduleRequest): GetHealthCheckScheduleResponse =
+        rpc { getHealthCheckScheduleResponse { schedule = schedules.current().toProto() } }
+
+    override suspend fun setHealthCheckSchedule(request: SetHealthCheckScheduleRequest): SetHealthCheckScheduleResponse =
+        rpc {
+            val wanted =
+                if (!request.hasSchedule()) {
+                    null
+                } else {
+                    val s = request.schedule
+                    HealthCheckSchedule(
+                        interval = if (s.hasInterval()) Duration.ofSeconds(s.interval.seconds, s.interval.nanos.toLong()) else null,
+                        langs =
+                            s.langsList
+                                .map { it.trim() }
+                                .filter { it.isNotEmpty() }
+                                .toSet(),
+                        sample = s.sample.takeIf { it > 0 },
+                    )
+                }
+            schedules.set(wanted)
+            setHealthCheckScheduleResponse { schedule = schedules.current().toProto() }
         }
 
     override suspend fun listExtensions(request: ListExtensionsRequest): ListExtensionsResponse =
@@ -222,3 +258,13 @@ internal fun ExtensionRecord.ContentWarning?.toProto(nsfw: Boolean): ContentWarn
         ExtensionRecord.ContentWarning.NSFW -> ContentWarning.CONTENT_WARNING_NSFW
         null -> if (nsfw) ContentWarning.CONTENT_WARNING_NSFW else ContentWarning.CONTENT_WARNING_UNSPECIFIED
     }
+
+private fun HealthCheckSchedule.toProto(): ScheduleProto =
+    healthCheckSchedule {
+        this@toProto.interval?.let { interval = millis(it.toMillis()) }
+        langs += this@toProto.langs.sorted()
+        sample = this@toProto.sample ?: 0
+        source = if (fromApi) "SetHealthCheckSchedule" else ENV_SCHEDULE
+    }
+
+private const val ENV_SCHEDULE = "MIHON_HEALTH_CHECK_INTERVAL, MIHON_HEALTH_CHECK_LANGS, MIHON_HEALTH_CHECK_SAMPLE"

@@ -113,7 +113,11 @@ curl -H "Authorization: Bearer $ADMIN" -X POST localhost:8902/v1/admin/checks \
   -d '{"sourceIds": ["123"], "steps": ["CHECK_STEP_IMAGE"]}'
 ```
 
-The result becomes the source's health: `Source.health` in `ListSources`/`GetSource` has the status (`OK` or `FAILING` with a reason such as `SOURCE_DOWN`, `CLOUDFLARE_CHALLENGE` or `NEEDS_WEBVIEW`), the latency, when it was checked, and whether scheduled checks are off for it. The `source-health` [job](#jobs) records the same, on its schedule (see `MIHON_HEALTH_CHECK_INTERVAL` in [configuration](configuration.md)) or when run by hand. `SetHealthCheck` (`PUT /v1/admin/sources/{sourceId}/health-check`) turns them off or on per source. The metric `mihon_source_health{source}` is 1 for OK and 0 for failing.
+The result becomes the source's health: `Source.health` in `ListSources`/`GetSource` has the status (`OK` or `FAILING` with a reason such as `SOURCE_DOWN`, `CLOUDFLARE_CHALLENGE` or `NEEDS_WEBVIEW`), the latency, when it was checked, and whether scheduled checks are off for it. The `source-health` [job](#jobs) records the same, on its schedule (see `MIHON_HEALTH_CHECK_INTERVAL` in [configuration](configuration.md)) or when run by hand. `SetHealthCheck` (`PUT /v1/admin/sources/{sourceId}/health-check`) turns them off or on per source.
+
+The schedule (interval, languages, sample) comes from the `MIHON_HEALTH_CHECK_*` environment variables until it's set over the API: `GetHealthCheckSchedule` and `SetHealthCheckSchedule` (`GET`/`PUT /v1/admin/health-checks/schedule`, body `{"schedule": {"interval": "21600s", "langs": ["en"], "sample": 10}}`). No interval turns scheduled checks off; at least a minute otherwise. The job's next run follows the new interval at once, the schedule's languages and sample become its params' defaults, and the setting survives restarts. Sending no `schedule` goes back to the environment's. The `source` field says where the schedule in effect comes from.
+
+A `source-health` run for given `source_ids` notes every step's result (what it found, or why it failed or was skipped), so asking for a check of one source shows the same detail as `CheckSources`. The metric `mihon_source_health{source}` is 1 for OK and 0 for failing.
 
 ## Jobs
 
@@ -122,7 +126,7 @@ Background work runs as jobs. `MihonJobsService` (admin scope) lists them, keeps
 | Job | Does | Params | Schedule |
 |---|---|---|---|
 | `store-refresh` | Refreshes the stores' indexes, so updates show up. Never installs anything. Fails when a store fails to refresh (the store keeps its last good index). | `store_id`: one store only | `MIHON_STORE_REFRESH_INTERVAL` |
-| `source-health` | Checks sources and records their [health](#checking-sources). Without `source_ids`: the sources whose scheduled checks are on, in `langs`, at most `sample` of them, least recently checked first. | `source_ids` (list; overrides `langs` and `sample`), `langs` (list of installed languages or `all`; default `MIHON_HEALTH_CHECK_LANGS`), `sample` (int, `0` for all; default `MIHON_HEALTH_CHECK_SAMPLE`), `steps` (list of `popular`, `latest`, `search`, `details`, `chapters`, `pages`, `image`; default `popular`) | `MIHON_HEALTH_CHECK_INTERVAL` |
+| `source-health` | Checks sources and records their [health](#checking-sources). Without `source_ids`: the sources whose scheduled checks are on, in `langs`, at most `sample` of them, least recently checked first. | `source_ids` (list; overrides `langs` and `sample`), `langs` (list of installed languages or `all`; default `MIHON_HEALTH_CHECK_LANGS`), `sample` (int, `0` for all; default `MIHON_HEALTH_CHECK_SAMPLE`), `steps` (list of `popular`, `latest`, `search`, `details`, `chapters`, `pages`, `image`; default `popular`) | `MIHON_HEALTH_CHECK_INTERVAL`, or `SetHealthCheckSchedule` |
 
 ```sh
 curl -H "Authorization: Bearer $ADMIN" localhost:8902/v1/admin/jobs
