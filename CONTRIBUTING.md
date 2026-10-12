@@ -26,6 +26,10 @@ make check   # detekt, ktlint and all tests
 - **No third-party extensions, extension stores or links to them.** Not in code, tests, fixtures, docs or issues. Tests use the small test extensions built in this repo.
 - No site names or URLs of content sources.
 
+## The fixture store for other repos
+
+Other Panelarr repos test against a real mihon-source and an extension store. `./gradlew :service:exportFixtureStore -PfixtureStoreDir=DIR` writes the test store to `DIR`: `v1/` and `v2/` (the lib 1.6 test extension at 1.6.2 and 1.6.3, with an English and a French source) and `FINGERPRINT` (the test signing key). Serve `v1` or `v2` at one URL to test an update.
+
 ## Changing the API
 
 The admin API protos in `proto/` are the source of truth for `panelarr.mihon.v1`. The source API (`panelarr.source.v1`) is shared by every Panelarr source plugin and lives in [source-api](https://github.com/panelarr/source-api). mihon-source pins a copy in `third_party/source-api/`: don't edit it (the build fails if you do). Change the protos in source-api, then pin the new version:

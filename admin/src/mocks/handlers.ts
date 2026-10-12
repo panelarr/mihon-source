@@ -563,6 +563,25 @@ export function createHandlers(db: Db = createDb(), latency = 0) {
       return ok({ extension });
     }),
 
+    http.put(`${base}/admin/extensions/:pkgName/languages`, async ({ request, params }) => {
+      await wait();
+      const denied = guard(request, true);
+      if (denied) return denied;
+      const extension = db.extensions.find((e) => e.pkgName === params.pkgName);
+      if (!extension) return grpcError("NOT_FOUND", `no extension ${params.pkgName}`);
+      const body = (await request.json()) as { enabledLangs?: string[] };
+      const enabled = body.enabledLangs ?? [];
+      const known = new Set((extension.sources ?? []).map((s) => s.lang));
+      const unknown = enabled.find((lang) => !known.has(lang));
+      if (unknown) return grpcError("INVALID_ARGUMENT", `${extension.name} has no sources in '${unknown}'`);
+      extension.enabledLangs = enabled;
+      extension.sources = (extension.sources ?? []).map((s) => ({
+        ...s,
+        available: enabled.length === 0 || enabled.includes(s.lang ?? ""),
+      }));
+      return ok({ extension });
+    }),
+
     // ----- MihonStoresService -----------------------------------------------------
     http.get(`${base}/admin/stores`, async ({ request }) => {
       await wait();

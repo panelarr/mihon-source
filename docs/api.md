@@ -95,6 +95,7 @@ curl -H "Authorization: Bearer $KEY" "localhost:8902/v1/sources/$SOURCE/chapters
 curl -H "Authorization: Bearer $KEY" "localhost:8902/v1/sources/$SOURCE/pages?chapterKey=$CHAPTER"
 ```
 
+- **Languages:** an extension's enabled languages (`SetExtensionLanguages`) decide which of its sources are listed; the others answer NOT_FOUND. `Extension.enabled_langs` and `ExtensionSource.available` show the setting. See [extensions](extensions.md#languages).
 - **Pasted URLs:** `ResolveUrl` (`POST /v1/resolve-url`) turns a web URL into a series. Sources with their own resolver handle it; for the others on the URL's site, mihon-source searches the source for the URL (many accept that) and takes the result whose web URL matches, or the only result. Those answers set `bestEffort`.
 - **Keys** (series keys, chapter keys, page refs) are opaque: store them and pass them back unchanged.
 - **Filters** have no stable names, so a `FilterValue` addresses a filter by its position in `GetFilters`: `[index]`, or `[group index, child index]` inside a group. Filters you don't send keep their defaults.

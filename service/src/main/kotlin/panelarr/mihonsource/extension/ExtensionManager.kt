@@ -81,7 +81,8 @@ class ExtensionManager(
 
     fun find(pkgName: String): InstalledExtension? = extensions[pkgName]
 
-    fun sources(): List<HostedSource> = extensions.values.flatMap { it.sources.orEmpty() }
+    /** Sources of the loaded extensions, in the languages each extension offers. */
+    fun sources(): List<HostedSource> = extensions.values.flatMap { ext -> ext.sources.orEmpty().filter { ext.record.offers(it.lang) } }
 
     /** Loads every installed extension. Called once at start. */
     suspend fun loadAll() {
@@ -143,6 +144,8 @@ class ExtensionManager(
                         sha256 = prepared.sha256,
                         origin = origin,
                         installedAt = clock().toString(),
+                        // An update keeps the languages chosen for the package.
+                        enabledLangs = extensions[descriptor.pkgName]?.record?.enabledLangs.orEmpty(),
                     )
                 unload(record.pkgName)
                 val extDir = Files.createDirectories(dir.resolve(record.pkgName))
@@ -164,6 +167,41 @@ class ExtensionManager(
             dir.resolve(PackageNames.require(pkgName)).toFile().deleteRecursively()
             log.info("Uninstalled {}", pkgName)
             removed
+        }
+
+    /**
+     * Sets the languages [pkgName] offers sources in (empty means all) and tells listeners
+     * which sources appeared or went away.
+     */
+    suspend fun setLanguages(
+        pkgName: String,
+        langs: List<String>,
+    ): InstalledExtension =
+        mutex.withLock {
+            val current = get(pkgName)
+            val known =
+                current.sources
+                    .orEmpty()
+                    .map { it.lang }
+                    .toSet()
+            val wanted = langs.map { it.trim() }.filter { it.isNotEmpty() }.distinct()
+            if (current.loaded) {
+                wanted.firstOrNull { it !in known }?.let {
+                    throw IllegalArgumentException(
+                        "${current.record.name} has no sources in '$it'",
+                    )
+                }
+            }
+            val record = current.record.copy(enabledLangs = wanted)
+            recordFile(dir.resolve(PackageNames.require(pkgName))).write(record)
+            val updated = InstalledExtension(record, current.sources, current.loadError, current.classLoader)
+            extensions[pkgName] = updated
+            val before = current.sources.orEmpty().filter { current.record.offers(it.lang) }
+            val after = current.sources.orEmpty().filter { record.offers(it.lang) }
+            (before - after.toSet()).takeIf { it.isNotEmpty() }?.let { gone -> listeners.forEach { it.onSourcesRemoved(gone) } }
+            (after - before.toSet()).takeIf { it.isNotEmpty() }?.let { added -> listeners.forEach { it.onSourcesAdded(added) } }
+            log.info("Languages of {}: {}", pkgName, wanted.ifEmpty { listOf("all") })
+            updated
         }
 
     suspend fun reload(pkgName: String): InstalledExtension =

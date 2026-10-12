@@ -177,6 +177,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/admin/extensions/{pkgName}/languages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * @description SetExtensionLanguages sets which of an extension's languages it offers sources in.
+         *      Its sources in other languages aren't listed, and calls to them answer NOT_FOUND.
+         *      The setting survives updates. Languages must be among the extension's sources'
+         *      languages; none means all of them. "all" and "multi" are languages like any other:
+         *      list them to keep multi-language sources.
+         */
+        put: operations["MihonAdminService_SetExtensionLanguages"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/admin/extensions/{pkgName}/reload": {
         parameters: {
             query?: never;
@@ -981,6 +1004,8 @@ export interface components {
             origin?: components["schemas"]["panelarr.mihon.v1.ExtensionOrigin"];
             /** Format: date-time */
             installedAt?: string;
+            /** @description Languages the extension offers sources in (SetExtensionLanguages). Empty means all. */
+            enabledLangs?: string[];
         };
         "panelarr.mihon.v1.ExtensionOrigin": {
             /** @description Installed from this URL. */
@@ -994,6 +1019,8 @@ export interface components {
             id?: string;
             name?: string;
             lang?: string;
+            /** @description Its language is enabled, so the source is listed. */
+            available?: boolean;
         };
         "panelarr.mihon.v1.GetExtensionResponse": {
             extension?: components["schemas"]["panelarr.mihon.v1.Extension"];
@@ -1259,6 +1286,14 @@ export interface components {
             profileId?: string;
         };
         "panelarr.mihon.v1.SetDefaultProfileResponse": Record<string, never>;
+        "panelarr.mihon.v1.SetExtensionLanguagesRequest": {
+            pkgName?: string;
+            /** @description Languages to offer sources in; empty means all. */
+            enabledLangs?: string[];
+        };
+        "panelarr.mihon.v1.SetExtensionLanguagesResponse": {
+            extension?: components["schemas"]["panelarr.mihon.v1.Extension"];
+        };
         "panelarr.mihon.v1.SetHealthCheckRequest": {
             sourceId?: string;
             enabled?: boolean;
@@ -2053,6 +2088,32 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["panelarr.mihon.v1.UninstallExtensionResponse"];
+                };
+            };
+        };
+    };
+    MihonAdminService_SetExtensionLanguages: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                pkgName: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["panelarr.mihon.v1.SetExtensionLanguagesRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["panelarr.mihon.v1.SetExtensionLanguagesResponse"];
                 };
             };
         };

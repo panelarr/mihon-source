@@ -22,7 +22,12 @@ data class ExtensionRecord(
     val sha256: String,
     val origin: Origin,
     val installedAt: String,
+    /** Languages to offer sources in; empty means all. Kept across updates. */
+    val enabledLangs: List<String> = emptyList(),
 ) {
+    /** Whether a source in [lang] is offered. */
+    fun offers(lang: String): Boolean = enabledLangs.isEmpty() || lang in enabledLangs
+
     enum class Format { JAR, APK }
 
     enum class ContentWarning { SAFE, MIXED, NSFW }

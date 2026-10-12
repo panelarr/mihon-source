@@ -13,6 +13,12 @@ Icons: an extension's launcher icon is taken from its file when it uses the usua
 
 What's reported for each installed extension: version, lib version, sources, the SHA-256 of the file, the signing certificate fingerprint (empty when unsigned), and load errors.
 
+## Languages
+
+Many extensions provide one source per language. An extension's **languages** setting (the Languages control on its card in the admin, or `SetExtensionLanguages`, `PUT /v1/admin/extensions/{pkgName}/languages`) decides which of them exist: sources in other languages aren't listed, health checks skip them, and calls to them answer NOT_FOUND. None set means all. The setting survives updates. `"all"` and `"multi"` are languages like any other: tick them to keep multi-language sources.
+
+Installing the version that's already installed (and working) is a no-op, so retrying an install is safe. An install that's cancelled while downloading leaves the previous version in place; once the download is done, it runs to the end.
+
 ## Store formats
 
 `repo.json` with an `index_v2` pointer to a protobuf index (`index.pb`, possibly gzipped) or a JSON index, including the optional `jarUrl` field some stores add (jars skip the APK conversion). A legacy `index.min.json` works as a fallback; it has no signing key.

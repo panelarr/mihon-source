@@ -142,6 +142,20 @@ describe("sources", () => {
 });
 
 describe("extensions", () => {
+  it("narrows a multi-language extension to some languages", async () => {
+    const db = createDb();
+    server.resetHandlers(...createHandlers(db));
+    const app = renderApp("/extensions");
+    const card = (await screen.findByRole("heading", { name: "Example Source" })).closest("article") as HTMLElement;
+    await userEvent.click(within(card).getByText("Languages: all"));
+    expect(within(card).getByText(/tick them to keep multi-language sources/)).toBeInTheDocument();
+    await userEvent.click(within(card).getByRole("checkbox", { name: /^en/ }));
+    await userEvent.click(within(card).getByRole("button", { name: "Save languages" }));
+    await waitFor(() => expect(db.extensions.find((e) => e.name === "Example Source")?.enabledLangs).toEqual(["fr"]));
+    expect(await within(card).findByText(/not listed \(language off\)/)).toBeInTheDocument();
+    app.dispose();
+  });
+
   it("lists extensions with load errors and installs by URL", async () => {
     const app = renderApp("/extensions");
     expect(await screen.findByText(/Unsupported extensions-lib version 1.2/)).toBeInTheDocument();

@@ -141,12 +141,14 @@ function ExtensionCard({ extension, onUninstall }: { extension: Extension; onUni
                 </Link>{" "}
                 <span className="muted small">
                   {languageLabel(source.lang)} · <Mono>{source.id}</Mono>
+                  {source.available === false ? " · not listed (language off)" : ""}
                 </span>
               </li>
             ))}
           </ul>
         </details>
       ) : null}
+      <LanguagesControl extension={extension} />
       <ErrorBox error={reload.error} title="Reload" />
       <div className="actions">
         <button type="button" onClick={() => reload.mutate()} disabled={reload.isPending}>
@@ -310,5 +312,69 @@ function InstallFromFile() {
         </button>
       </div>
     </form>
+  );
+}
+
+/**
+ * Which of a multi-language extension's languages it offers sources in. None ticked
+ * is stored as "all"; sources in unticked languages aren't listed anywhere.
+ */
+function LanguagesControl({ extension }: { extension: Extension }) {
+  const invalidate = useInvalidateExtensions();
+  const pkgName = extension.pkgName ?? "";
+  const langs = [...new Set((extension.sources ?? []).map((source) => source.lang ?? ""))].filter(
+    (lang) => lang !== "",
+  );
+  const saved = extension.enabledLangs ?? [];
+  const [selected, setSelected] = useState<string[]>(saved.length ? saved : langs);
+  const save = useMutation({
+    mutationFn: (enabledLangs: string[]) =>
+      unwrap(
+        api.PUT("/v1/admin/extensions/{pkgName}/languages", {
+          params: { path: { pkgName } },
+          body: { enabledLangs },
+        }),
+      ),
+    onSuccess: invalidate,
+  });
+  if (langs.length < 2) return null;
+  // Every language ticked is the same as none: all, also for languages added later.
+  const toSave = selected.length === langs.length ? [] : langs.filter((lang) => selected.includes(lang));
+  const changed = toSave.join(",") !== saved.join(",");
+  const toggle = (lang: string, on: boolean) =>
+    setSelected((current) => (on ? [...current, lang] : current.filter((l) => l !== lang)));
+
+  return (
+    <details className="languages">
+      <summary>Languages: {saved.length ? saved.map(languageLabel).join(", ") : "all"}</summary>
+      <fieldset className="field">
+        <legend className="field-label">Offer sources in</legend>
+        <div className="checks">
+          {langs.map((lang) => (
+            <label key={lang} className="filter-check">
+              <input
+                type="checkbox"
+                checked={selected.includes(lang)}
+                onChange={(e) => toggle(lang, e.target.checked)}
+              />
+              <span>{languageLabel(lang)}</span>
+            </label>
+          ))}
+        </div>
+        <span className="field-hint">
+          Sources in unticked languages aren't listed. &quot;all&quot; and &quot;multi&quot; are languages too: tick
+          them to keep multi-language sources.
+        </span>
+      </fieldset>
+      <ErrorBox error={save.error} title="Languages" />
+      <button
+        type="button"
+        className="small"
+        disabled={!changed || selected.length === 0 || save.isPending}
+        onClick={() => save.mutate(toSave)}
+      >
+        {save.isPending ? "Saving…" : "Save languages"}
+      </button>
+    </details>
   );
 }

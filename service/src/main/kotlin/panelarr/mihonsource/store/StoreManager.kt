@@ -193,6 +193,8 @@ class StoreManager(
             if (installed.record.versionCode > offer.versionCode) {
                 throw ExtensionException("version ${installed.record.versionName} is installed, the store only has ${offer.versionName}")
             }
+            // Installing what's installed (and working) again is a no-op, so retries are safe.
+            if (installed.record.versionCode == offer.versionCode && installed.loaded) return installed
         }
         val url = offer.jarUrl ?: offer.apkUrl ?: throw StoreException("the store lists no file for '$pkgName'")
         val installed =

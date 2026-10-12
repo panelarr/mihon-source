@@ -267,6 +267,36 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/panelarr.mihon.v1.UninstallExtensionResponse'
+    /v1/admin/extensions/{pkgName}/languages:
+        put:
+            tags:
+                - MihonAdminService
+            description: |-
+                SetExtensionLanguages sets which of an extension's languages it offers sources in.
+                 Its sources in other languages aren't listed, and calls to them answer NOT_FOUND.
+                 The setting survives updates. Languages must be among the extension's sources'
+                 languages; none means all of them. "all" and "multi" are languages like any other:
+                 list them to keep multi-language sources.
+            operationId: MihonAdminService_SetExtensionLanguages
+            parameters:
+                - name: pkgName
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/panelarr.mihon.v1.SetExtensionLanguagesRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/panelarr.mihon.v1.SetExtensionLanguagesResponse'
     /v1/admin/extensions/{pkgName}/reload:
         post:
             tags:
@@ -1395,6 +1425,11 @@ components:
                 installedAt:
                     type: string
                     format: date-time
+                enabledLangs:
+                    type: array
+                    items:
+                        type: string
+                    description: Languages the extension offers sources in (SetExtensionLanguages). Empty means all.
         panelarr.mihon.v1.ExtensionOrigin:
             type: object
             properties:
@@ -1416,6 +1451,9 @@ components:
                     type: string
                 lang:
                     type: string
+                available:
+                    type: boolean
+                    description: Its language is enabled, so the source is listed.
         panelarr.mihon.v1.GetExtensionResponse:
             type: object
             properties:
@@ -1850,6 +1888,21 @@ components:
         panelarr.mihon.v1.SetDefaultProfileResponse:
             type: object
             properties: {}
+        panelarr.mihon.v1.SetExtensionLanguagesRequest:
+            type: object
+            properties:
+                pkgName:
+                    type: string
+                enabledLangs:
+                    type: array
+                    items:
+                        type: string
+                    description: Languages to offer sources in; empty means all.
+        panelarr.mihon.v1.SetExtensionLanguagesResponse:
+            type: object
+            properties:
+                extension:
+                    $ref: '#/components/schemas/panelarr.mihon.v1.Extension'
         panelarr.mihon.v1.SetHealthCheckRequest:
             type: object
             properties:

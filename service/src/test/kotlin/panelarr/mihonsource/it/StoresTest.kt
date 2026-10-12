@@ -187,6 +187,69 @@ class StoresTest {
         assertEquals(0, runBlocking { api.listAvailable(listAvailableRequest { updatesOnly = true }) }.extensionsCount)
     }
 
+    private fun installFromStore(storeId: String) =
+        runBlocking {
+            api.installFromStore(
+                installFromStoreRequest {
+                    this.storeId = storeId
+                    pkgName = TestExtensions.LIB16_PKG
+                },
+            )
+        }.extension
+
+    @Test
+    fun `installing the installed version again is a no-op, and updates keep the languages`() {
+        store.publish(key, listOf(lib16()))
+        val storeId = add().id
+        installFromStore(storeId)
+        val jar = "/store/files/${TestExtensions.LIB16_PKG}-1.6.2.jar"
+        assertEquals(1, store.requests[jar])
+        assertEquals("1.6.2", installFromStore(storeId).versionName)
+        assertEquals(1, store.requests[jar], "the same version was downloaded again")
+
+        runBlocking {
+            service.admin.setExtensionLanguages(
+                panelarr.mihon.v1.setExtensionLanguagesRequest {
+                    pkgName = TestExtensions.LIB16_PKG
+                    enabledLangs += "fr"
+                },
+            )
+        }
+        store.publish(key, listOf(lib16("1.6.3", 106003)))
+        runBlocking { api.refreshStore(refreshStoreRequest { this.storeId = storeId }) }
+        val updated = installFromStore(storeId)
+        assertEquals("1.6.3", updated.versionName)
+        assertEquals(listOf("fr"), updated.enabledLangsList)
+    }
+
+    @Test
+    fun `a cancelled install leaves the previous version`() {
+        store.publish(key, listOf(lib16()))
+        val storeId = add().id
+        installFromStore(storeId)
+        store.publish(key, listOf(lib16("1.6.3", 106003)))
+        runBlocking { api.refreshStore(refreshStoreRequest { this.storeId = storeId }) }
+        store.delay = { path -> if (path.endsWith("1.6.3.jar")) 3_000 else 0 }
+        val cancelled =
+            assertFailsWith<StatusException> {
+                runBlocking {
+                    api.withDeadlineAfter(500, java.util.concurrent.TimeUnit.MILLISECONDS).installFromStore(
+                        installFromStoreRequest {
+                            this.storeId = storeId
+                            pkgName = TestExtensions.LIB16_PKG
+                        },
+                    )
+                }
+            }
+        assertEquals(Status.Code.DEADLINE_EXCEEDED, cancelled.status.code)
+        // Give a lingering install time to do damage, then check nothing changed.
+        Thread.sleep(3_500)
+        val ext = service.app.extensions.get(TestExtensions.LIB16_PKG)
+        assertEquals("1.6.2", ext.record.versionName)
+        assertTrue(ext.loaded)
+        assertEquals(2, runBlocking { service.sources.listSources(panelarr.source.v1.listSourcesRequest {}) }.sourcesCount)
+    }
+
     @Test
     fun `scheduled refresh shows updates but never installs them`() {
         service.close()

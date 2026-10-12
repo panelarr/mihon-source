@@ -23,6 +23,8 @@ import panelarr.mihon.v1.ListExtensionsResponse
 import panelarr.mihon.v1.MihonAdminServiceGrpcKt
 import panelarr.mihon.v1.ReloadExtensionRequest
 import panelarr.mihon.v1.ReloadExtensionResponse
+import panelarr.mihon.v1.SetExtensionLanguagesRequest
+import panelarr.mihon.v1.SetExtensionLanguagesResponse
 import panelarr.mihon.v1.SetHealthCheckRequest
 import panelarr.mihon.v1.SetHealthCheckResponse
 import panelarr.mihon.v1.SourceCheck
@@ -36,6 +38,7 @@ import panelarr.mihon.v1.getExtensionResponse
 import panelarr.mihon.v1.installExtensionResponse
 import panelarr.mihon.v1.listExtensionsResponse
 import panelarr.mihon.v1.reloadExtensionResponse
+import panelarr.mihon.v1.setExtensionLanguagesResponse
 import panelarr.mihon.v1.setHealthCheckResponse
 import panelarr.mihon.v1.sourceCheck
 import panelarr.mihon.v1.stepResult
@@ -125,6 +128,9 @@ class ExtensionsApi(
             uninstallExtensionResponse {}
         }
 
+    override suspend fun setExtensionLanguages(request: SetExtensionLanguagesRequest): SetExtensionLanguagesResponse =
+        rpc { setExtensionLanguagesResponse { extension = manager.setLanguages(request.pkgName, request.enabledLangsList).toProto() } }
+
     override suspend fun reloadExtension(request: ReloadExtensionRequest): ReloadExtensionResponse =
         rpc { reloadExtensionResponse { extension = manager.reload(request.pkgName).toProto() } }
 }
@@ -191,8 +197,10 @@ internal fun InstalledExtension.toProto(): Extension {
                     id = source.id.toString()
                     name = source.name
                     lang = source.lang
+                    available = r.offers(source.lang)
                 }
         }
+        enabledLangs += r.enabledLangs
         r.signingFingerprint?.let { signingFingerprint = it }
         sha256 = r.sha256
         origin =

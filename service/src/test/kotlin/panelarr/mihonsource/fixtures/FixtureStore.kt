@@ -34,15 +34,36 @@ class FixtureStore : AutoCloseable {
     private val files = ConcurrentHashMap<String, ByteArray>()
     private val json = Json { encodeDefaults = false }
 
+    /** Requests per path, to see what was downloaded. */
+    val requests = ConcurrentHashMap<String, Int>()
+
+    /** Milliseconds to wait before answering a path, e.g. to make a download slow. */
+    @Volatile
+    var delay: (String) -> Long = { 0 }
+
     init {
         server.dispatcher =
             object : Dispatcher() {
                 override fun dispatch(request: RecordedRequest): MockResponse {
-                    val bytes = files[request.url.encodedPath] ?: return MockResponse.Builder().code(404).build()
+                    val path = request.url.encodedPath
+                    requests.merge(path, 1, Int::plus)
+                    delay(path).takeIf { it > 0 }?.let { Thread.sleep(it) }
+                    val bytes = files[path] ?: return MockResponse.Builder().code(404).build()
                     return MockResponse.Builder().body(Buffer().write(bytes)).build()
                 }
             }
         server.start()
+    }
+
+    /** Writes everything published to [dir], so any web server can serve the store. */
+    fun exportTo(dir: java.nio.file.Path) {
+        files.forEach { (path, bytes) ->
+            val target = dir.resolve(path.removePrefix("/"))
+            java.nio.file.Files
+                .createDirectories(target.parent)
+            java.nio.file.Files
+                .write(target, bytes)
+        }
     }
 
     fun url(path: String): String = server.url(path).toString()
@@ -63,6 +84,8 @@ class FixtureStore : AutoCloseable {
         val file: ByteArray,
         val asJar: Boolean,
         val warning: IndexContentWarning = IndexContentWarning.CONTENT_WARNING_SAFE,
+        /** The sources the index announces, as name and language; one English source by default. */
+        val sources: List<Pair<String, String>> = listOf(name to "en"),
     )
 
     /** Publishes a full store under /store/ signed with [key] (its fingerprint in the index). */
@@ -90,7 +113,10 @@ class FixtureStore : AutoCloseable {
                     versionCode = offer.versionCode,
                     versionName = offer.versionName,
                     contentWarning = offer.warning,
-                    sources = listOf(IndexSource(id = 1, name = offer.name, language = "en", homeUrl = "https://example.com")),
+                    sources =
+                        offer.sources.mapIndexed { i, (sourceName, lang) ->
+                            IndexSource(id = i + 1L, name = sourceName, language = lang, homeUrl = "https://example.com")
+                        },
                 )
             }
         val index = StoreIndex(name = name, badgeLabel = "FX", signingKey = fingerprint, extensionList = ExtensionList(extensions))

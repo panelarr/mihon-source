@@ -82,3 +82,18 @@ val buildInfo =
 sourceSets.main {
     resources.srcDir(buildInfo.map { layout.buildDirectory.dir("generated/build-info").get() })
 }
+
+// Writes the fixture extension store (the lib 1.6 test extension, signed with a test key)
+// to a directory, for end-to-end tests of other repos against this service:
+//   ./gradlew :service:exportFixtureStore -PfixtureStoreDir=/tmp/store
+tasks.register<JavaExec>("exportFixtureStore") {
+    group = "panelarr"
+    description = "Writes the fixture extension store to -PfixtureStoreDir."
+    dependsOn(testExtensions)
+    classpath = sourceSets["test"].runtimeClasspath
+    mainClass = "panelarr.mihonsource.fixtures.ExportFixtureStore"
+    val jars = files(testExtensions)
+    jvmArgumentProviders += CommandLineArgumentProvider { listOf("-Dtest.extensions=" + jars.files.joinToString(File.pathSeparator)) }
+    val out = providers.gradleProperty("fixtureStoreDir").orElse(layout.buildDirectory.dir("fixture-store").map { it.asFile.path })
+    argumentProviders += CommandLineArgumentProvider { listOf(out.get()) }
+}
