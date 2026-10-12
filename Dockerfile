@@ -41,6 +41,10 @@ ENV MIHON_DATA_DIR=/data \
 USER mihon
 VOLUME /data
 EXPOSE 8902
+# Healthy once the service is ready (installed extensions loaded). The image has no
+# curl, so a tiny probe runs on the app's classpath with a small heap of its own.
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+  CMD ["java", "-Xmx24m", "-Xss512k", "-XX:+UseSerialGC", "-XX:TieredStopAtLevel=1", "-XX:-UsePerfData", "-cp", "/opt/mihon-source/lib/*", "panelarr.mihonsource.healthcheck.Healthcheck"]
 ENTRYPOINT ["/opt/mihon-source/bin/mihon-source"]
 
 LABEL org.opencontainers.image.title="mihon-source" \

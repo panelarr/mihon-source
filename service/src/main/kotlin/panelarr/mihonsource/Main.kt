@@ -28,6 +28,8 @@ import panelarr.mihonsource.extension.ExtensionInstaller
 import panelarr.mihonsource.extension.ExtensionListener
 import panelarr.mihonsource.extension.ExtensionManager
 import panelarr.mihonsource.extension.HostedSource
+import panelarr.mihonsource.healthcheck.healthcheck
+import panelarr.mihonsource.healthcheck.healthcheckUrl
 import panelarr.mihonsource.http.ApiServer
 import panelarr.mihonsource.http.CacheControlInterceptor
 import panelarr.mihonsource.http.HttpAuth
@@ -57,6 +59,7 @@ import panelarr.mihonsource.store.StoreManager
 import panelarr.mihonsource.store.StoreReader
 import panelarr.mihonsource.store.StoreRefreshJob
 import java.nio.file.Files
+import kotlin.system.exitProcess
 
 /** Name the service reports about itself. */
 const val SERVICE_NAME = "mihon-source"
@@ -219,7 +222,10 @@ class Application(
     }
 }
 
-fun main() {
+fun main(args: Array<String>) {
+    if (args.firstOrNull() == "healthcheck") {
+        exitProcess(healthcheck(args.getOrNull(1) ?: healthcheckUrl(System.getenv())))
+    }
     val app = Application(AppConfig.fromEnv())
     val port = app.start()
     Runtime.getRuntime().addShutdownHook(Thread { app.stop() })

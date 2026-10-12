@@ -16,6 +16,8 @@ mihon-source runs third-party code: every extension you install executes inside 
 | `mem_limit`, `pids_limit` | Bound what a misbehaving extension can take. About 1 GB is plenty for dozens of extensions. |
 | No Docker socket, no host network | Nothing in mihon-source needs them. |
 
+The image has a health check: it turns healthy once the service is ready (installed extensions loaded, `GET /readyz` answers 200), so compose can wait for it with `depends_on: {mihon-source: {condition: service_healthy}}`. Starting with many extensions can take a while, hence the 60-second start period. The probe also runs by hand as `mihon-source healthcheck [URL]` and follows `MIHON_PORT`; set `MIHON_HEALTHCHECK_URL` if the service listens elsewhere.
+
 Run it as its own container, separate from anything holding other data: an extension can read whatever this container can see.
 
 ## Secrets
