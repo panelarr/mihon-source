@@ -110,11 +110,32 @@ class StoresTest {
         assertEquals(Status.Code.INVALID_ARGUMENT, duplicate.status.code)
     }
 
+    private fun reason(e: StatusException): String? =
+        io.grpc.protobuf.StatusProto
+            .fromThrowable(e)
+            ?.detailsList
+            ?.firstOrNull { it.`is`(com.google.rpc.ErrorInfo::class.java) }
+            ?.unpack(com.google.rpc.ErrorInfo::class.java)
+            ?.reason
+
+    @Test
+    fun `a store that can't be fetched says so, apart from the service being down`() {
+        val missing = assertFailsWith<StatusException> { add(path = "/nowhere/repo.json") }
+        assertEquals(Status.Code.UNAVAILABLE, missing.status.code)
+        assertEquals("STORE_FETCH_FAILED", reason(missing))
+        assertTrue("/nowhere/repo.json" in missing.status.description!!, missing.status.description)
+
+        val unreachable =
+            assertFailsWith<StatusException> { runBlocking { api.addStore(addStoreRequest { url = "http://127.0.0.1:1/repo.json" }) } }
+        assertEquals("STORE_FETCH_FAILED", reason(unreachable))
+    }
+
     @Test
     fun `a store announcing another key than expected is refused`() {
         store.publish(key, listOf(lib16()))
         val error = assertFailsWith<StatusException> { add(expected = "aa".repeat(32)) }
         assertEquals(Status.Code.INVALID_ARGUMENT, error.status.code)
+        assertEquals("STORE_INVALID", reason(error))
         assertEquals(0, runBlocking { api.listStores(listStoresRequest {}) }.storesCount)
     }
 
@@ -226,6 +247,7 @@ class StoresTest {
         store.publish(TestSigningKey("rotated"), listOf(lib16()))
         val error = assertFailsWith<StatusException> { runBlocking { api.refreshStore(refreshStoreRequest { storeId = added.id }) } }
         assertTrue("signing key changed" in error.status.description!!)
+        assertEquals("STORE_INVALID", reason(error))
         val kept = runBlocking { api.listStores(listStoresRequest {}) }.storesList.single()
         assertEquals(added.signingKeyFingerprint, kept.signingKeyFingerprint)
         assertTrue(kept.lastError.isNotEmpty())

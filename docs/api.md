@@ -149,6 +149,8 @@ Failures use gRPC status codes. When the source (not the request) is the problem
 | `LOGIN_REQUIRED` | The site wants a login | `UNAUTHENTICATED` / `PERMISSION_DENIED` | 401 / 403 |
 | `UNSUPPORTED` | The source doesn't support this call | `UNIMPLEMENTED` | 501 |
 
+Store calls (`AddStore`, `RefreshStore`, `InstallFromStore`) say what failed when a store or a file it lists can't be used, with an `ErrorInfo` in domain `mihon.panelarr`: `STORE_FETCH_FAILED` (UNAVAILABLE, 503) when a download failed, `STORE_INVALID` (INVALID_ARGUMENT, 400) when the store's content can't be used or its signing key doesn't match. So an UNAVAILABLE with `STORE_FETCH_FAILED` is the store's problem, and one without a reason is this service's.
+
 Over HTTP, errors are [problem details](https://www.rfc-editor.org/rfc/rfc9457) (`application/problem+json`):
 
 ```json

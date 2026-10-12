@@ -2,6 +2,10 @@
 
 package panelarr.mihonsource.api
 
+import com.google.rpc.ErrorInfo
+import io.grpc.Status
+import io.grpc.StatusException
+import io.grpc.protobuf.StatusProto
 import panelarr.mihon.v1.AddStoreRequest
 import panelarr.mihon.v1.AddStoreResponse
 import panelarr.mihon.v1.ContentWarning
@@ -27,8 +31,10 @@ import panelarr.mihon.v1.listStoresResponse
 import panelarr.mihon.v1.refreshStoreResponse
 import panelarr.mihon.v1.removeStoreResponse
 import panelarr.mihon.v1.store
+import panelarr.mihonsource.net.Downloader
 import panelarr.mihonsource.store.AvailableExtension
 import panelarr.mihonsource.store.IndexContentWarning
+import panelarr.mihonsource.store.StoreException
 import panelarr.mihonsource.store.StoreManager
 import panelarr.mihonsource.store.StoreRecord
 import java.time.Instant
@@ -43,7 +49,12 @@ class StoresApi(
     override suspend fun addStore(request: AddStoreRequest): AddStoreResponse =
         rpc {
             require(request.url.isNotBlank()) { "url is required" }
-            addStoreResponse { store = stores.add(request.url, request.expectedSigningKeyFingerprint.ifBlank { null }).toProto() }
+            storeErrors {
+                addStoreResponse {
+                    store =
+                        stores.add(request.url, request.expectedSigningKeyFingerprint.ifBlank { null }).toProto()
+                }
+            }
         }
 
     override suspend fun removeStore(request: RemoveStoreRequest): RemoveStoreResponse =
@@ -53,7 +64,7 @@ class StoresApi(
         }
 
     override suspend fun refreshStore(request: RefreshStoreRequest): RefreshStoreResponse =
-        rpc { refreshStoreResponse { store = stores.refresh(request.storeId).toProto() } }
+        rpc { storeErrors { refreshStoreResponse { store = stores.refresh(request.storeId).toProto() } } }
 
     override suspend fun listAvailable(request: ListAvailableRequest): ListAvailableResponse =
         rpc {
@@ -68,7 +79,56 @@ class StoresApi(
         }
 
     override suspend fun installFromStore(request: InstallFromStoreRequest): InstallFromStoreResponse =
-        rpc { installFromStoreResponse { extension = stores.install(request.storeId, request.pkgName).toProto() } }
+        rpc { storeErrors { installFromStoreResponse { extension = stores.install(request.storeId, request.pkgName).toProto() } } }
+
+    /**
+     * Says what failed when a store or a file it lists can't be used, with a
+     * google.rpc.ErrorInfo reason next to the usual code: STORE_FETCH_FAILED when a
+     * download failed (UNAVAILABLE), STORE_INVALID when the store's content can't be
+     * used or its key doesn't match (INVALID_ARGUMENT). Callers can then tell a store
+     * problem from this service being unreachable.
+     */
+    @Suppress("SwallowedException") // The message is carried into the status; the stack trace isn't useful to callers.
+    private inline fun <T> storeErrors(block: () -> T): T =
+        try {
+            block()
+        } catch (e: Downloader.DownloadException) {
+            throw storeError(Status.Code.UNAVAILABLE, STORE_FETCH_FAILED, e.message)
+        } catch (e: StoreException) {
+            val fetch = generateSequence<Throwable>(e) { it.cause }.any { it is Downloader.DownloadException }
+            throw if (fetch) {
+                storeError(Status.Code.UNAVAILABLE, STORE_FETCH_FAILED, e.message)
+            } else {
+                storeError(Status.Code.INVALID_ARGUMENT, STORE_INVALID, e.message)
+            }
+        }
+
+    private fun storeError(
+        code: Status.Code,
+        reason: String,
+        message: String?,
+    ): StatusException =
+        StatusProto.toStatusException(
+            com.google.rpc.Status
+                .newBuilder()
+                .setCode(code.value())
+                .setMessage(message ?: reason)
+                .addDetails(
+                    com.google.protobuf.Any.pack(
+                        ErrorInfo
+                            .newBuilder()
+                            .setReason(reason)
+                            .setDomain(DOMAIN)
+                            .build(),
+                    ),
+                ).build(),
+        )
+
+    private companion object {
+        const val DOMAIN = "mihon.panelarr"
+        const val STORE_FETCH_FAILED = "STORE_FETCH_FAILED"
+        const val STORE_INVALID = "STORE_INVALID"
+    }
 
     private fun StoreRecord.toProto(): Store {
         val r = this
