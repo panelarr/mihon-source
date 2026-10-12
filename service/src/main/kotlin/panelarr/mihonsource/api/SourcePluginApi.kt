@@ -22,6 +22,7 @@ import panelarr.mihonsource.mihon.ResultCache
 import panelarr.mihonsource.mihon.SourceErrors
 import panelarr.mihonsource.mihon.SourceSettings
 import panelarr.mihonsource.mihon.UrlMatch
+import panelarr.mihonsource.network.EffectiveProfile
 import panelarr.mihonsource.network.PushedProfiles
 import panelarr.source.v1.CommonService
 import panelarr.source.v1.FetchImageRequest
@@ -30,6 +31,8 @@ import panelarr.source.v1.GetFiltersRequest
 import panelarr.source.v1.GetFiltersResponse
 import panelarr.source.v1.GetInfoRequest
 import panelarr.source.v1.GetInfoResponse
+import panelarr.source.v1.GetNetworkProfileRequest
+import panelarr.source.v1.GetNetworkProfileResponse
 import panelarr.source.v1.GetSeriesRequest
 import panelarr.source.v1.GetSeriesResponse
 import panelarr.source.v1.GetSettingsRequest
@@ -90,6 +93,13 @@ class SourcePluginApi(
     private val cache: ResultCache = ResultCache(emptyMap(), 0),
     /** Number of installed extensions that failed to load, for Health. */
     private val failedExtensions: () -> Int = { 0 },
+    /** Identifies this run of the service, for Health: hosts re-push what they set when it changes. */
+    private val instanceId: String =
+        java.util.UUID
+            .randomUUID()
+            .toString(),
+    /** The profile a source uses: pushed, assigned, default or none. */
+    private val profiles: (Long) -> EffectiveProfile = { EffectiveProfile.DIRECT },
 ) : SourcePluginServiceGrpcKt.SourcePluginServiceCoroutineImplBase() {
     override suspend fun getInfo(request: GetInfoRequest): GetInfoResponse =
         getInfoResponse {
@@ -110,8 +120,12 @@ class SourcePluginApi(
         return healthResponse {
             status = if (failed == 0) HealthStatus.HEALTH_STATUS_SERVING else HealthStatus.HEALTH_STATUS_DEGRADED
             if (failed > 0) message = "$failed extension(s) failed to load"
+            instanceId = this@SourcePluginApi.instanceId
         }
     }
+
+    override suspend fun getNetworkProfile(request: GetNetworkProfileRequest): GetNetworkProfileResponse =
+        rpc { profiles(sources.get(request.sourceId).id).toResponse() }
 
     override suspend fun listSources(request: ListSourcesRequest): ListSourcesResponse =
         rpc {

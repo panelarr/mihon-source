@@ -4,6 +4,7 @@ package panelarr.testext.lib16
 
 import android.app.Application
 import android.content.SharedPreferences
+import android.text.InputType
 import androidx.preference.EditTextPreference
 import androidx.preference.ListPreference
 import androidx.preference.MultiSelectListPreference
@@ -218,6 +219,14 @@ class TestSource(
                 setOnPreferenceChangeListener { _, value -> value != "bad" }
             },
         )
+        screen.addPreference(
+            EditTextPreference(screen.context).apply {
+                key = PREF_TOKEN
+                title = "API token"
+                // A secret, as extensions mark them: a password input.
+                setOnBindEditTextListener { it.inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD }
+            },
+        )
     }
 
     private suspend fun list(url: String): MangasPage {
@@ -307,6 +316,7 @@ class TestSource(
         const val PREF_QUALITY = "quality"
         const val PREF_LANGS = "langs"
         const val PREF_REJECTED = "rejects_bad"
+        const val PREF_TOKEN = "api_token"
         private val STATUSES = listOf("any", "ongoing", "completed")
         private val DATE_FORMAT = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssZZZZZ", java.util.Locale.US)
         private val SORTS = listOf("popular", "latest")

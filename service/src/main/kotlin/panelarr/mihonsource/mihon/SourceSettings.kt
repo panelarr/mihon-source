@@ -3,6 +3,8 @@
 package panelarr.mihonsource.mihon
 
 import android.content.SharedPreferences
+import android.text.InputType
+import android.widget.EditText
 import androidx.preference.DialogPreference
 import androidx.preference.EditTextPreference
 import androidx.preference.ListPreference
@@ -58,9 +60,12 @@ class SourceSettings(
         }
     }
 
+    /** Current values. Secrets (see [isSecret]) come back empty. */
     fun values(): Struct =
         struct {
-            preferences().forEach { pref -> current(pref)?.let { putFields(pref.key, it) } }
+            preferences().forEach { pref ->
+                if (isSecret(pref)) putFields(pref.key, string("")) else current(pref)?.let { putFields(pref.key, it) }
+            }
         }
 
     /** Validates and stores [changes]; keys left out keep their values. Returns all values. */
@@ -69,6 +74,8 @@ class SourceSettings(
         val updates = mutableListOf<Pair<Preference, Any>>()
         changes.fieldsMap.forEach { (key, value) ->
             val pref = byKey[key] ?: throw IllegalArgumentException("unknown setting '$key'")
+            // A secret sent back empty (as values() shows it) keeps its value.
+            if (isSecret(pref) && value.hasStringValue() && value.stringValue.isEmpty()) return@forEach
             require(pref.isEnabled) { "setting '$key' can't be changed" }
             val converted = convert(pref, value)
             // As on Android, the source may veto a change.
@@ -133,6 +140,7 @@ class SourceSettings(
         description(pref)?.let { base.putFields("description", string(it)) }
         defaultValue(pref)?.let { base.putFields("default", it) }
         if (!pref.isEnabled) base.putFields("readOnly", Value.newBuilder().setBoolValue(true).build())
+        if (isSecret(pref)) base.putFields("writeOnly", Value.newBuilder().setBoolValue(true).build())
         return Value.newBuilder().setStructValue(base).build()
     }
 
@@ -217,6 +225,24 @@ class SourceSettings(
         }
     }
 
+    /**
+     * A text setting the source shows as a password (it sets a password input type when
+     * its edit box is bound, as Mihon extensions do for tokens and passwords). Such values
+     * are written but never read back.
+     */
+    private fun isSecret(pref: Preference): Boolean {
+        val listener = (pref as? EditTextPreference)?.onBindEditTextListener ?: return false
+        val box = EditText(AndroidHost.application)
+        runCatching { listener.onBindEditText(box) }.onFailure { return false }
+        val type = box.inputType
+        val variation = type and InputType.TYPE_MASK_VARIATION
+        return when (type and InputType.TYPE_MASK_CLASS) {
+            InputType.TYPE_CLASS_TEXT -> variation in TEXT_PASSWORDS
+            InputType.TYPE_CLASS_NUMBER -> variation == InputType.TYPE_NUMBER_VARIATION_PASSWORD
+            else -> false
+        }
+    }
+
     private fun struct(block: Struct.Builder.() -> Unit): Struct = Struct.newBuilder().apply(block).build()
 
     private fun string(value: String): Value = Value.newBuilder().setStringValue(value).build()
@@ -227,4 +253,13 @@ class SourceSettings(
         key: String,
         value: Struct,
     ): Struct.Builder = putFields(key, Value.newBuilder().setStructValue(value).build())
+
+    private companion object {
+        val TEXT_PASSWORDS =
+            setOf(
+                InputType.TYPE_TEXT_VARIATION_PASSWORD,
+                InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD,
+                InputType.TYPE_TEXT_VARIATION_WEB_PASSWORD,
+            )
+    }
 }

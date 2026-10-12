@@ -77,6 +77,12 @@ class Application(
     val extensions: ExtensionManager
     val networks: SourceNetworks
     val metrics = Metrics()
+
+    /** Identifies this run of the service (Health.instance_id). */
+    val instanceId: String =
+        java.util.UUID
+            .randomUUID()
+            .toString()
     val jobs: JobRunner
     private val server: ApiServer
 
@@ -167,7 +173,14 @@ class Application(
                 port = config.port,
                 services =
                     listOf(
-                        SourcePluginApi(sources, PushedProfiles(integrations, secrets), cache) { extensions.list().count { !it.loaded } },
+                        SourcePluginApi(
+                            sources,
+                            PushedProfiles(integrations, secrets),
+                            cache,
+                            failedExtensions = { extensions.list().count { !it.loaded } },
+                            instanceId = instanceId,
+                            profiles = resolver::resolve,
+                        ),
                         ExtensionsApi(extensions, installer, sources, prober, health),
                         StoresApi(stores),
                         JobsApi(jobs),

@@ -824,6 +824,186 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/panelarr.source.v1.GetInfoResponse'
+    /v1/packages:
+        get:
+            tags:
+                - SourcePluginService
+            description: |-
+                ListPackages lists the packages the plugin can install (with the PACKAGES
+                 capability): for a plugin that hosts many sites, the extensions that provide them.
+                 Plugins without the capability answer UNIMPLEMENTED, and so do the other package
+                 calls.
+            operationId: SourcePluginService_ListPackages
+            parameters:
+                - name: query
+                  in: query
+                  description: Case-insensitive match on the package or source name.
+                  schema:
+                    type: string
+                - name: lang
+                  in: query
+                  description: Only packages with a source in this language.
+                  schema:
+                    type: string
+                - name: installedOnly
+                  in: query
+                  schema:
+                    type: boolean
+                - name: updatesOnly
+                  in: query
+                  schema:
+                    type: boolean
+                - name: originId
+                  in: query
+                  description: Only packages offered by this origin.
+                  schema:
+                    type: string
+                - name: pageSize
+                  in: query
+                  description: At most this many; 0 means all. Plugins may return all regardless.
+                  schema:
+                    type: integer
+                    format: int32
+                - name: pageToken
+                  in: query
+                  description: From the previous response's next_page_token.
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/panelarr.source.v1.ListPackagesResponse'
+    /v1/packages/{packageId}:
+        get:
+            tags:
+                - SourcePluginService
+            operationId: SourcePluginService_GetPackage
+            parameters:
+                - name: packageId
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/panelarr.source.v1.GetPackageResponse'
+    /v1/packages/{packageId}/settings:
+        patch:
+            tags:
+                - SourcePluginService
+            description: |-
+                SetPackageSettings replaces a package's settings, e.g. its enabled languages. It
+                 returns the package as it is after the change.
+            operationId: SourcePluginService_SetPackageSettings
+            parameters:
+                - name: packageId
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/panelarr.source.v1.SetPackageSettingsRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/panelarr.source.v1.SetPackageSettingsResponse'
+    /v1/packages/{packageId}:install:
+        post:
+            tags:
+                - SourcePluginService
+            description: |-
+                InstallPackage installs a package and returns when it's done, which can take a
+                 couple of minutes (a download, maybe a conversion): callers should allow a long
+                 deadline. Installing the version that is already installed answers OK. A call
+                 cancelled midway either finishes or leaves the previous state; never half a package.
+            operationId: SourcePluginService_InstallPackage
+            parameters:
+                - name: packageId
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/panelarr.source.v1.InstallPackageRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/panelarr.source.v1.InstallPackageResponse'
+    /v1/packages/{packageId}:uninstall:
+        post:
+            tags:
+                - SourcePluginService
+            description: |-
+                UninstallPackage removes an installed package and its sources. Uninstalling a
+                 package that isn't installed answers OK.
+            operationId: SourcePluginService_UninstallPackage
+            parameters:
+                - name: packageId
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/panelarr.source.v1.UninstallPackageRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/panelarr.source.v1.UninstallPackageResponse'
+    /v1/packages/{packageId}:update:
+        post:
+            tags:
+                - SourcePluginService
+            description: |-
+                UpdatePackage installs the newest supported version of an installed package. Like
+                 InstallPackage: synchronous, OK when already up to date, never half done.
+            operationId: SourcePluginService_UpdatePackage
+            parameters:
+                - name: packageId
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/panelarr.source.v1.UpdatePackageRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/panelarr.source.v1.UpdatePackageResponse'
     /v1/resolve-url:
         post:
             tags:
@@ -849,7 +1029,9 @@ paths:
         get:
             tags:
                 - SourcePluginService
-            description: ListSources lists the sources the plugin serves.
+            description: |-
+                ListSources lists the sources the plugin serves. A plugin with languages lists only
+                 the sources whose language is enabled; calls to any other source answer NOT_FOUND.
             operationId: SourcePluginService_ListSources
             parameters:
                 - name: lang
@@ -958,6 +1140,27 @@ paths:
                             schema:
                                 $ref: '#/components/schemas/panelarr.source.v1.LatestResponse'
     /v1/sources/{sourceId}/network-profile:
+        get:
+            tags:
+                - SourcePluginService
+            description: |-
+                GetNetworkProfile returns the network profile a source uses now and where it comes
+                 from, so a host can show it. Proxy passwords come back empty. Optional: plugins that
+                 don't implement it answer UNIMPLEMENTED.
+            operationId: SourcePluginService_GetNetworkProfile
+            parameters:
+                - name: sourceId
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/panelarr.source.v1.GetNetworkProfileResponse'
         put:
             tags:
                 - SourcePluginService
@@ -2177,6 +2380,28 @@ components:
             properties:
                 info:
                     $ref: '#/components/schemas/panelarr.source.v1.PluginInfo'
+        panelarr.source.v1.GetNetworkProfileResponse:
+            type: object
+            properties:
+                profile:
+                    allOf:
+                        - $ref: '#/components/schemas/panelarr.source.v1.NetworkProfile'
+                    description: |-
+                        The profile in effect; unset for a direct connection with the plugin's defaults.
+                         Proxy passwords are left empty.
+                origin:
+                    enum:
+                        - NETWORK_PROFILE_ORIGIN_UNSPECIFIED
+                        - NETWORK_PROFILE_ORIGIN_PUSHED
+                        - NETWORK_PROFILE_ORIGIN_PLUGIN
+                        - NETWORK_PROFILE_ORIGIN_NONE
+                    type: string
+                    format: enum
+        panelarr.source.v1.GetPackageResponse:
+            type: object
+            properties:
+                package:
+                    $ref: '#/components/schemas/panelarr.source.v1.Package'
         panelarr.source.v1.GetSeriesResponse:
             type: object
             properties:
@@ -2224,6 +2449,27 @@ components:
                 message:
                     type: string
                     description: Optional detail for humans.
+                instanceId:
+                    type: string
+                    description: |-
+                        Changes whenever the plugin starts (and may have lost what a host pushed to it),
+                         and stays the same while it runs. Hosts that see a new value push configuration and
+                         network profiles again. Empty when the plugin doesn't say.
+        panelarr.source.v1.InstallPackageRequest:
+            type: object
+            properties:
+                packageId:
+                    type: string
+                originId:
+                    type: string
+                    description: |-
+                        Origin to install from (PackageOffer.origin_id). Empty lets the plugin pick the
+                         best supported offer.
+        panelarr.source.v1.InstallPackageResponse:
+            type: object
+            properties:
+                package:
+                    $ref: '#/components/schemas/panelarr.source.v1.Package'
         panelarr.source.v1.LatestResponse:
             type: object
             properties:
@@ -2251,6 +2497,16 @@ components:
                     type: array
                     items:
                         $ref: '#/components/schemas/panelarr.source.v1.Chapter'
+        panelarr.source.v1.ListPackagesResponse:
+            type: object
+            properties:
+                packages:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/panelarr.source.v1.Package'
+                nextPageToken:
+                    type: string
+                    description: Empty on the last page.
         panelarr.source.v1.ListPagesResponse:
             type: object
             properties:
@@ -2305,6 +2561,105 @@ components:
                 timeouts:
                     $ref: '#/components/schemas/panelarr.source.v1.Timeouts'
             description: NetworkProfile is everything a plugin needs to make requests for one source.
+        panelarr.source.v1.Package:
+            type: object
+            properties:
+                id:
+                    type: string
+                    description: |-
+                        Stable identifier, opaque to hosts. Matches `^[A-Za-z0-9][A-Za-z0-9._-]*$`: never a
+                         `:`, which HTTP paths would read as a custom verb (as in `:install`).
+                name:
+                    type: string
+                langs:
+                    type: array
+                    items:
+                        type: string
+                    description: |-
+                        Languages its sources cover: BCP 47 tags, or "all"/"multi" for sources that serve
+                         many languages.
+                version:
+                    type: string
+                    description: Newest version offered.
+                installed:
+                    type: boolean
+                installedVersion:
+                    type: string
+                    description: The installed version, when installed.
+                updateAvailable:
+                    type: boolean
+                    description: A newer supported version is offered than the installed one.
+                contentRating:
+                    enum:
+                        - CONTENT_RATING_UNSPECIFIED
+                        - CONTENT_RATING_SAFE
+                        - CONTENT_RATING_MIXED
+                        - CONTENT_RATING_NSFW
+                    type: string
+                    format: enum
+                supported:
+                    type: boolean
+                    description: The plugin can run the version offered.
+                offers:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/panelarr.source.v1.PackageOffer'
+                    description: Where the package can come from; several origins (e.g. stores) may offer it.
+                sources:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/panelarr.source.v1.PackageSource'
+                    description: The sources it provides.
+                settings:
+                    $ref: '#/components/schemas/panelarr.source.v1.PackageSettings'
+                iconUrl:
+                    type: string
+                    description: |-
+                        Icon URL. It may be a path relative to the plugin's own address, fetched with the
+                         same credentials as the API.
+                error:
+                    type: string
+                    description: Why an installed package isn't working (e.g. it failed to load). Empty when fine.
+            description: Package is something a plugin can install that provides sources, e.g. an extension.
+        panelarr.source.v1.PackageOffer:
+            type: object
+            properties:
+                originId:
+                    type: string
+                    description: Identifier of the origin, e.g. an extension store; for InstallPackage.origin_id.
+                originName:
+                    type: string
+                version:
+                    type: string
+                supported:
+                    type: boolean
+        panelarr.source.v1.PackageSettings:
+            type: object
+            properties:
+                enabledLangs:
+                    type: array
+                    items:
+                        type: string
+                    description: |-
+                        Languages of the package to offer sources in: a subset of Package.langs. Empty
+                         means every language the plugin allows. "all" and "multi" are languages like any
+                         other: they must be listed to keep multi-language sources.
+        panelarr.source.v1.PackageSource:
+            type: object
+            properties:
+                id:
+                    type: string
+                    description: The Source.id it has once installed.
+                name:
+                    type: string
+                lang:
+                    type: string
+                available:
+                    type: boolean
+                    description: |-
+                        Its language is enabled at the plugin's and the package's level, so ListSources
+                         lists it when the package is installed. (Hosts may still turn single sources off
+                         on their side.)
         panelarr.source.v1.Page:
             type: object
             properties:
@@ -2344,6 +2699,7 @@ components:
                             - PLUGIN_CAPABILITY_UNSPECIFIED
                             - PLUGIN_CAPABILITY_NETWORK_PROFILES
                             - PLUGIN_CAPABILITY_DYNAMIC_SOURCES
+                            - PLUGIN_CAPABILITY_PACKAGES
                         type: string
                         format: enum
                     description: Features of the plugin as a whole. Per-source features are on Source.
@@ -2537,6 +2893,18 @@ components:
         panelarr.source.v1.SetNetworkProfileResponse:
             type: object
             properties: {}
+        panelarr.source.v1.SetPackageSettingsRequest:
+            type: object
+            properties:
+                packageId:
+                    type: string
+                settings:
+                    $ref: '#/components/schemas/panelarr.source.v1.PackageSettings'
+        panelarr.source.v1.SetPackageSettingsResponse:
+            type: object
+            properties:
+                package:
+                    $ref: '#/components/schemas/panelarr.source.v1.Package'
         panelarr.source.v1.SetSettingsRequest:
             type: object
             properties:
@@ -2640,6 +3008,11 @@ components:
                     allOf:
                         - $ref: '#/components/schemas/panelarr.source.v1.SourceHealth'
                     description: The result of the plugin's last check of this source, when it checks sources.
+                packageId:
+                    type: string
+                    description: |-
+                        The package that provides the source (see ListPackages), for plugins with the
+                         PACKAGES capability. Empty otherwise.
         panelarr.source.v1.SourceHealth:
             type: object
             properties:
@@ -2698,6 +3071,24 @@ components:
                         - TRI_STATE_EXCLUDE
                     type: string
                     format: enum
+        panelarr.source.v1.UninstallPackageRequest:
+            type: object
+            properties:
+                packageId:
+                    type: string
+        panelarr.source.v1.UninstallPackageResponse:
+            type: object
+            properties: {}
+        panelarr.source.v1.UpdatePackageRequest:
+            type: object
+            properties:
+                packageId:
+                    type: string
+        panelarr.source.v1.UpdatePackageResponse:
+            type: object
+            properties:
+                package:
+                    $ref: '#/components/schemas/panelarr.source.v1.Package'
         panelarr.source.v1.UserAgent:
             type: object
             properties:

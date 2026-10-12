@@ -609,6 +609,126 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/packages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description ListPackages lists the packages the plugin can install (with the PACKAGES
+         *      capability): for a plugin that hosts many sites, the extensions that provide them.
+         *      Plugins without the capability answer UNIMPLEMENTED, and so do the other package
+         *      calls.
+         */
+        get: operations["SourcePluginService_ListPackages"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/packages/{packageId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["SourcePluginService_GetPackage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/packages/{packageId}/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * @description SetPackageSettings replaces a package's settings, e.g. its enabled languages. It
+         *      returns the package as it is after the change.
+         */
+        patch: operations["SourcePluginService_SetPackageSettings"];
+        trace?: never;
+    };
+    "/v1/packages/{packageId}:install": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * @description InstallPackage installs a package and returns when it's done, which can take a
+         *      couple of minutes (a download, maybe a conversion): callers should allow a long
+         *      deadline. Installing the version that is already installed answers OK. A call
+         *      cancelled midway either finishes or leaves the previous state; never half a package.
+         */
+        post: operations["SourcePluginService_InstallPackage"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/packages/{packageId}:uninstall": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * @description UninstallPackage removes an installed package and its sources. Uninstalling a
+         *      package that isn't installed answers OK.
+         */
+        post: operations["SourcePluginService_UninstallPackage"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/packages/{packageId}:update": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * @description UpdatePackage installs the newest supported version of an installed package. Like
+         *      InstallPackage: synchronous, OK when already up to date, never half done.
+         */
+        post: operations["SourcePluginService_UpdatePackage"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/resolve-url": {
         parameters: {
             query?: never;
@@ -636,7 +756,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description ListSources lists the sources the plugin serves. */
+        /**
+         * @description ListSources lists the sources the plugin serves. A plugin with languages lists only
+         *      the sources whose language is enabled; calls to any other source answer NOT_FOUND.
+         */
         get: operations["SourcePluginService_ListSources"];
         put?: never;
         post?: never;
@@ -721,7 +844,12 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /**
+         * @description GetNetworkProfile returns the network profile a source uses now and where it comes
+         *      from, so a host can show it. Proxy passwords come back empty. Optional: plugins that
+         *      don't implement it answer UNIMPLEMENTED.
+         */
+        get: operations["SourcePluginService_GetNetworkProfile"];
         /**
          * @description SetNetworkProfile is how a host pushes the network profile a source must use.
          *      A pushed profile overrides anything the plugin configured locally. Leaving
@@ -1460,6 +1588,21 @@ export interface components {
         "panelarr.source.v1.GetInfoResponse": {
             info?: components["schemas"]["panelarr.source.v1.PluginInfo"];
         };
+        "panelarr.source.v1.GetNetworkProfileResponse": {
+            /**
+             * @description The profile in effect; unset for a direct connection with the plugin's defaults.
+             *      Proxy passwords are left empty.
+             */
+            profile?: components["schemas"]["panelarr.source.v1.NetworkProfile"];
+            /**
+             * Format: enum
+             * @enum {string}
+             */
+            origin?: "NETWORK_PROFILE_ORIGIN_UNSPECIFIED" | "NETWORK_PROFILE_ORIGIN_PUSHED" | "NETWORK_PROFILE_ORIGIN_PLUGIN" | "NETWORK_PROFILE_ORIGIN_NONE";
+        };
+        "panelarr.source.v1.GetPackageResponse": {
+            package?: components["schemas"]["panelarr.source.v1.Package"];
+        };
         "panelarr.source.v1.GetSeriesResponse": {
             series?: components["schemas"]["panelarr.source.v1.Series"];
         };
@@ -1487,6 +1630,23 @@ export interface components {
             status?: "HEALTH_STATUS_UNSPECIFIED" | "HEALTH_STATUS_SERVING" | "HEALTH_STATUS_DEGRADED" | "HEALTH_STATUS_NOT_SERVING";
             /** @description Optional detail for humans. */
             message?: string;
+            /**
+             * @description Changes whenever the plugin starts (and may have lost what a host pushed to it),
+             *      and stays the same while it runs. Hosts that see a new value push configuration and
+             *      network profiles again. Empty when the plugin doesn't say.
+             */
+            instanceId?: string;
+        };
+        "panelarr.source.v1.InstallPackageRequest": {
+            packageId?: string;
+            /**
+             * @description Origin to install from (PackageOffer.origin_id). Empty lets the plugin pick the
+             *      best supported offer.
+             */
+            originId?: string;
+        };
+        "panelarr.source.v1.InstallPackageResponse": {
+            package?: components["schemas"]["panelarr.source.v1.Package"];
         };
         "panelarr.source.v1.LatestResponse": {
             series?: components["schemas"]["panelarr.source.v1.Series"][];
@@ -1503,6 +1663,11 @@ export interface components {
         };
         "panelarr.source.v1.ListChaptersResponse": {
             chapters?: components["schemas"]["panelarr.source.v1.Chapter"][];
+        };
+        "panelarr.source.v1.ListPackagesResponse": {
+            packages?: components["schemas"]["panelarr.source.v1.Package"][];
+            /** @description Empty on the last page. */
+            nextPageToken?: string;
         };
         "panelarr.source.v1.ListPagesResponse": {
             pages?: components["schemas"]["panelarr.source.v1.Page"][];
@@ -1537,6 +1702,73 @@ export interface components {
             sharedCookieJar?: string;
             timeouts?: components["schemas"]["panelarr.source.v1.Timeouts"];
         };
+        /** @description Package is something a plugin can install that provides sources, e.g. an extension. */
+        "panelarr.source.v1.Package": {
+            /**
+             * @description Stable identifier, opaque to hosts. Matches `^[A-Za-z0-9][A-Za-z0-9._-]*$`: never a
+             *      `:`, which HTTP paths would read as a custom verb (as in `:install`).
+             */
+            id?: string;
+            name?: string;
+            /**
+             * @description Languages its sources cover: BCP 47 tags, or "all"/"multi" for sources that serve
+             *      many languages.
+             */
+            langs?: string[];
+            /** @description Newest version offered. */
+            version?: string;
+            installed?: boolean;
+            /** @description The installed version, when installed. */
+            installedVersion?: string;
+            /** @description A newer supported version is offered than the installed one. */
+            updateAvailable?: boolean;
+            /**
+             * Format: enum
+             * @enum {string}
+             */
+            contentRating?: "CONTENT_RATING_UNSPECIFIED" | "CONTENT_RATING_SAFE" | "CONTENT_RATING_MIXED" | "CONTENT_RATING_NSFW";
+            /** @description The plugin can run the version offered. */
+            supported?: boolean;
+            /** @description Where the package can come from; several origins (e.g. stores) may offer it. */
+            offers?: components["schemas"]["panelarr.source.v1.PackageOffer"][];
+            /** @description The sources it provides. */
+            sources?: components["schemas"]["panelarr.source.v1.PackageSource"][];
+            settings?: components["schemas"]["panelarr.source.v1.PackageSettings"];
+            /**
+             * @description Icon URL. It may be a path relative to the plugin's own address, fetched with the
+             *      same credentials as the API.
+             */
+            iconUrl?: string;
+            /** @description Why an installed package isn't working (e.g. it failed to load). Empty when fine. */
+            error?: string;
+        };
+        "panelarr.source.v1.PackageOffer": {
+            /** @description Identifier of the origin, e.g. an extension store; for InstallPackage.origin_id. */
+            originId?: string;
+            originName?: string;
+            version?: string;
+            supported?: boolean;
+        };
+        "panelarr.source.v1.PackageSettings": {
+            /**
+             * @description Languages of the package to offer sources in: a subset of Package.langs. Empty
+             *      means every language the plugin allows. "all" and "multi" are languages like any
+             *      other: they must be listed to keep multi-language sources.
+             */
+            enabledLangs?: string[];
+        };
+        "panelarr.source.v1.PackageSource": {
+            /** @description The Source.id it has once installed. */
+            id?: string;
+            name?: string;
+            lang?: string;
+            /**
+             * @description Its language is enabled at the plugin's and the package's level, so ListSources
+             *      lists it when the package is installed. (Hosts may still turn single sources off
+             *      on their side.)
+             */
+            available?: boolean;
+        };
         "panelarr.source.v1.Page": {
             /**
              * Format: uint32
@@ -1561,7 +1793,7 @@ export interface components {
             /** @description Contracts the plugin implements, e.g. "panelarr.source.v1". */
             contracts?: string[];
             /** @description Features of the plugin as a whole. Per-source features are on Source. */
-            capabilities?: ("PLUGIN_CAPABILITY_UNSPECIFIED" | "PLUGIN_CAPABILITY_NETWORK_PROFILES" | "PLUGIN_CAPABILITY_DYNAMIC_SOURCES")[];
+            capabilities?: ("PLUGIN_CAPABILITY_UNSPECIFIED" | "PLUGIN_CAPABILITY_NETWORK_PROFILES" | "PLUGIN_CAPABILITY_DYNAMIC_SOURCES" | "PLUGIN_CAPABILITY_PACKAGES")[];
             /** @description Limits the plugin asks hosts to respect. Hosts should enforce them too. */
             limits?: components["schemas"]["panelarr.source.v1.Limits"];
             /**
@@ -1676,6 +1908,13 @@ export interface components {
             profile?: components["schemas"]["panelarr.source.v1.NetworkProfile"];
         };
         "panelarr.source.v1.SetNetworkProfileResponse": Record<string, never>;
+        "panelarr.source.v1.SetPackageSettingsRequest": {
+            packageId?: string;
+            settings?: components["schemas"]["panelarr.source.v1.PackageSettings"];
+        };
+        "panelarr.source.v1.SetPackageSettingsResponse": {
+            package?: components["schemas"]["panelarr.source.v1.Package"];
+        };
         "panelarr.source.v1.SetSettingsRequest": {
             sourceId?: string;
             /** @description Settings to change. Keys not listed keep their value. */
@@ -1734,6 +1973,11 @@ export interface components {
             homeUrl?: string;
             /** @description The result of the plugin's last check of this source, when it checks sources. */
             health?: components["schemas"]["panelarr.source.v1.SourceHealth"];
+            /**
+             * @description The package that provides the source (see ListPackages), for plugins with the
+             *      PACKAGES capability. Empty otherwise.
+             */
+            packageId?: string;
         };
         /** @description SourceHealth is what a plugin last saw when it checked a source itself. */
         "panelarr.source.v1.SourceHealth": {
@@ -1771,6 +2015,16 @@ export interface components {
              * @enum {string}
              */
             value?: "TRI_STATE_UNSPECIFIED" | "TRI_STATE_IGNORE" | "TRI_STATE_INCLUDE" | "TRI_STATE_EXCLUDE";
+        };
+        "panelarr.source.v1.UninstallPackageRequest": {
+            packageId?: string;
+        };
+        "panelarr.source.v1.UninstallPackageResponse": Record<string, never>;
+        "panelarr.source.v1.UpdatePackageRequest": {
+            packageId?: string;
+        };
+        "panelarr.source.v1.UpdatePackageResponse": {
+            package?: components["schemas"]["panelarr.source.v1.Package"];
         };
         "panelarr.source.v1.UserAgent": {
             /** @description Always this value. */
@@ -2683,6 +2937,165 @@ export interface operations {
             };
         };
     };
+    SourcePluginService_ListPackages: {
+        parameters: {
+            query?: {
+                /** @description Case-insensitive match on the package or source name. */
+                query?: string;
+                /** @description Only packages with a source in this language. */
+                lang?: string;
+                installedOnly?: boolean;
+                updatesOnly?: boolean;
+                /** @description Only packages offered by this origin. */
+                originId?: string;
+                /** @description At most this many; 0 means all. Plugins may return all regardless. */
+                pageSize?: number;
+                /** @description From the previous response's next_page_token. */
+                pageToken?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["panelarr.source.v1.ListPackagesResponse"];
+                };
+            };
+        };
+    };
+    SourcePluginService_GetPackage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                packageId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["panelarr.source.v1.GetPackageResponse"];
+                };
+            };
+        };
+    };
+    SourcePluginService_SetPackageSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                packageId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["panelarr.source.v1.SetPackageSettingsRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["panelarr.source.v1.SetPackageSettingsResponse"];
+                };
+            };
+        };
+    };
+    SourcePluginService_InstallPackage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                packageId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["panelarr.source.v1.InstallPackageRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["panelarr.source.v1.InstallPackageResponse"];
+                };
+            };
+        };
+    };
+    SourcePluginService_UninstallPackage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                packageId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["panelarr.source.v1.UninstallPackageRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["panelarr.source.v1.UninstallPackageResponse"];
+                };
+            };
+        };
+    };
+    SourcePluginService_UpdatePackage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                packageId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["panelarr.source.v1.UpdatePackageRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["panelarr.source.v1.UpdatePackageResponse"];
+                };
+            };
+        };
+    };
     SourcePluginService_ResolveUrl: {
         parameters: {
             query?: never;
@@ -2824,6 +3237,28 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["panelarr.source.v1.LatestResponse"];
+                };
+            };
+        };
+    };
+    SourcePluginService_GetNetworkProfile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sourceId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["panelarr.source.v1.GetNetworkProfileResponse"];
                 };
             };
         };
