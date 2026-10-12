@@ -359,6 +359,22 @@ class SourceApiTest {
             schema.fieldsMap
                 .getValue("properties")
                 .structValue.fieldsMap
+        // The display order: the object-level list, and each property's own position.
+        val order =
+            schema.fieldsMap
+                .getValue("x-order")
+                .listValue.valuesList
+                .map { it.stringValue }
+        assertEquals(
+            order.indices.map { it + 1.0 },
+            order.map {
+                properties
+                    .getValue(it)
+                    .structValue.fieldsMap
+                    .getValue("x-order")
+                    .numberValue
+            },
+        )
         assertEquals(
             "string",
             properties

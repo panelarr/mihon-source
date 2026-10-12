@@ -38,7 +38,15 @@ class SourceSettings(
     fun schema(): Struct {
         val preferences = preferences().filter { it.isVisible }
         val properties = Struct.newBuilder()
-        preferences.forEach { pref -> propertySchema(pref)?.let { properties.putFields(pref.key, it) } }
+        preferences.forEach { pref ->
+            propertySchema(pref)?.let { schema ->
+                // Each property also carries its position, the convention every
+                // Panelarr form reads; the object-level list below stays for older readers.
+                val position = Value.newBuilder().setNumberValue((properties.fieldsCount + 1).toDouble()).build()
+                val ordered = schema.toBuilder().apply { structValueBuilder.putFields("x-order", position) }.build()
+                properties.putFields(pref.key, ordered)
+            }
+        }
         return struct {
             putFields("\$schema", string("https://json-schema.org/draft/2020-12/schema"))
             putFields("type", string("object"))
