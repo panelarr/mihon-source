@@ -9,12 +9,20 @@ mihon-source runs third-party code: every extension you install executes inside 
 | Setting | Why |
 |---|---|
 | `read_only: true` | Nothing outside `/data` can be changed, by the service or by an extension. Tested: the service runs and installs extensions with a read-only root. |
-| `tmpfs: /tmp` (e.g. 64 MB) | The JVM and the JavaScript engine need a scratch directory. |
+| `tmpfs: /tmp:rw,exec` (e.g. 128 MB) | The JVM and the JavaScript engine need a scratch directory, and it must allow running code (see below). |
 | Volume on `/data` only | All state lives there ([configuration](configuration.md)). Nothing else needs to persist. |
 | `cap_drop: [ALL]` and `no-new-privileges` | The service needs no Linux capabilities. |
 | Non-root user | The image runs as uid 10001. Don't override it with root. |
 | `mem_limit`, `pids_limit` | Bound what a misbehaving extension can take. About 1 GB is plenty for dozens of extensions. |
 | No Docker socket, no host network | Nothing in mihon-source needs them. |
+
+### Why `/tmp` needs `exec`
+
+Extensions' HTTP clients decode zstd-compressed answers with a native library. It is unpacked into the JVM's temporary directory (`java.io.tmpdir`) and loaded from there, which a `noexec` mount forbids. Without it, every request to a site that answers with zstd fails (`UnsatisfiedLinkError … failed to map segment from shared object`, reported to hosts as a failed source), while other sites keep working.
+
+So mount `/tmp` with `exec`, as in the example. The image also protects itself: its entrypoint checks whether code can run from `/tmp` and, if not, uses `/data/tmp` instead (emptied at every start), and says so on standard error. Set `MIHON_TMP_DIR` to choose the directory yourself. The service also logs a warning at startup when its temporary directory can't run code. A read-only root with a `noexec` `/tmp` therefore still works, as long as `/data` allows running code (Docker volumes do).
+
+Outside the image, start the JVM with `-Djava.io.tmpdir=<a directory that allows running code>` (in `JAVA_OPTS`) if your `/tmp` is `noexec`.
 
 The image has a health check: it turns healthy once the service is ready (installed extensions loaded, `GET /readyz` answers 200), so compose can wait for it with `depends_on: {mihon-source: {condition: service_healthy}}`. Starting with many extensions can take a while, hence the 60-second start period. The probe also runs by hand as `mihon-source healthcheck [URL]` and follows `MIHON_PORT`; set `MIHON_HEALTHCHECK_URL` if the service listens elsewhere.
 

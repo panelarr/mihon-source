@@ -240,6 +240,7 @@ fun main(args: Array<String>) {
     if (args.firstOrNull() == "healthcheck") {
         exitProcess(healthcheck(args.getOrNull(1) ?: healthcheckUrl(System.getenv())))
     }
+    checkTempDir()
     val app = Application(AppConfig.fromEnv())
     val port = app.start()
     Runtime.getRuntime().addShutdownHook(Thread { app.stop() })

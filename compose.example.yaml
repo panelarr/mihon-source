@@ -19,9 +19,11 @@ services:
     volumes:
       - mihon-data:/data
     # Hardening: nothing but /data and a small /tmp is writable, no extra privileges.
+    # /tmp must allow running code: extensions' HTTP clients load a native zstd decoder
+    # from it (without exec, the image falls back to /data/tmp).
     read_only: true
     tmpfs:
-      - /tmp:rw,size=64m
+      - /tmp:rw,exec,size=128m
     cap_drop: [ALL]
     security_opt:
       - no-new-privileges:true

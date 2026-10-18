@@ -5,6 +5,7 @@ mihon-source reads a few environment variables at start. Each one can also be gi
 | Variable | Default | Meaning |
 |---|---|---|
 | `MIHON_DATA_DIR` | `/data` | Where all state is kept. `make run` uses `./data` in the repository. |
+| `MIHON_TMP_DIR` | *(image: `/tmp`, or `$MIHON_DATA_DIR/tmp` when `/tmp` is noexec)* | The container image's temporary directory (`java.io.tmpdir`). It must allow running code: extensions load a native zstd decoder from it. See [deployment](deployment.md#why-tmp-needs-exec). Outside the image, set `-Djava.io.tmpdir` in `JAVA_OPTS` instead. |
 | `MIHON_HOST` | `0.0.0.0` | Address to listen on. |
 | `MIHON_PORT` | `8902` | Port for everything: gRPC, HTTP/JSON, OpenAPI and the admin UI. |
 | `MIHON_ADMIN_TOKEN` | *(generated)* | The admin token. When unset, a token is generated on first start, printed once to standard output and stored only as a hash. Setting it overrides the stored one. |

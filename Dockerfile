@@ -33,6 +33,8 @@ RUN apt-get update \
     && mkdir -p /data && chown mihon:mihon /data
 
 COPY --from=build /src/service/build/install/mihon-source /opt/mihon-source
+# Picks a temporary directory code can run from (see the script), then starts the service.
+COPY --chmod=0755 docker/entrypoint.sh /opt/mihon-source/bin/entrypoint
 
 ENV MIHON_DATA_DIR=/data \
     MIHON_PORT=8902 \
@@ -45,7 +47,7 @@ EXPOSE 8902
 # curl, so a tiny probe runs on the app's classpath with a small heap of its own.
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
   CMD ["java", "-Xmx24m", "-Xss512k", "-XX:+UseSerialGC", "-XX:TieredStopAtLevel=1", "-XX:-UsePerfData", "-cp", "/opt/mihon-source/lib/*", "panelarr.mihonsource.healthcheck.Healthcheck"]
-ENTRYPOINT ["/opt/mihon-source/bin/mihon-source"]
+ENTRYPOINT ["/opt/mihon-source/bin/entrypoint"]
 
 LABEL org.opencontainers.image.title="mihon-source" \
       org.opencontainers.image.description="Runs Mihon extensions and serves their sources over gRPC and HTTP/JSON" \
