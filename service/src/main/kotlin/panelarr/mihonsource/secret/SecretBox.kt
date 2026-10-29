@@ -2,9 +2,9 @@
 
 package panelarr.mihonsource.secret
 
+import panelarr.mihonsource.storage.DurableFiles
 import java.nio.file.Files
 import java.nio.file.Path
-import java.nio.file.attribute.PosixFilePermissions
 import java.security.SecureRandom
 import java.util.Base64
 import javax.crypto.Cipher
@@ -62,9 +62,7 @@ class SecretBox private constructor(
 
         private fun generate(keyFile: Path): ByteArray {
             val bytes = ByteArray(KEY_BYTES).also(SecureRandom()::nextBytes)
-            Files.createDirectories(keyFile.parent)
-            Files.writeString(keyFile, Base64.getEncoder().encodeToString(bytes))
-            runCatching { Files.setPosixFilePermissions(keyFile, PosixFilePermissions.fromString("rw-------")) }
+            DurableFiles.write(keyFile, Base64.getEncoder().encode(bytes), private = true)
             return bytes
         }
     }

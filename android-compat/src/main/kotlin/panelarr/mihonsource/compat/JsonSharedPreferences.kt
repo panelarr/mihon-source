@@ -17,9 +17,15 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.long
+import java.nio.ByteBuffer
+import java.nio.channels.FileChannel
+import java.nio.charset.CharacterCodingException
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
+import java.nio.file.StandardOpenOption
+import java.time.Instant
+import java.time.temporal.ChronoUnit
 import java.util.concurrent.CopyOnWriteArrayList
 
 /**
@@ -27,10 +33,15 @@ import java.util.concurrent.CopyOnWriteArrayList
  * code relies on getting back exactly the type it stored.
  *
  * File format: `{"key": {"type": "string|int|long|float|boolean|stringSet", "value": ...}}`.
+ *
+ * Saves are flushed to disk before the new file replaces the old one, so a crash or power
+ * cut can't leave a file of zeros behind. A file that can't be read anyway is set aside
+ * next to the original, the preferences start empty, and [onDamaged] is told.
  */
 @Suppress("TooManyFunctions") // one override per SharedPreferences member
 class JsonSharedPreferences(
     private val file: Path,
+    private val onDamaged: (file: Path, keptAs: Path) -> Unit = { _, _ -> },
 ) : SharedPreferences {
     private val values: MutableMap<String, Any> = load()
     private val listeners = CopyOnWriteArrayList<SharedPreferences.OnSharedPreferenceChangeListener>()
@@ -179,14 +190,47 @@ class JsonSharedPreferences(
             }
         Files.createDirectories(file.parent)
         val tmp = file.resolveSibling(".${file.fileName}.tmp")
-        Files.writeString(tmp, JSON.encodeToString(JsonObject.serializer(), json))
+        FileChannel
+            .open(tmp, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.WRITE)
+            .use { channel ->
+                val buffer = ByteBuffer.wrap(JSON.encodeToString(JsonObject.serializer(), json).toByteArray())
+                while (buffer.hasRemaining()) channel.write(buffer)
+                channel.force(true)
+            }
         Files.move(tmp, file, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
+        syncDirectory(file.parent)
     }
 
     private fun load(): MutableMap<String, Any> {
         if (!Files.exists(file)) return linkedMapOf()
-        val root = JSON.parseToJsonElement(Files.readString(file)).jsonObject
+        val root =
+            try {
+                JSON.parseToJsonElement(Files.readString(file)).jsonObject
+            } catch (_: IllegalArgumentException) {
+                // Not JSON, or not an object (kotlinx's parse errors are IllegalArgumentExceptions).
+                return setAside()
+            } catch (_: CharacterCodingException) {
+                return setAside()
+            }
         return root.mapNotNullTo(mutableListOf()) { (key, element) -> decode(element)?.let { key to it } }.toMap(linkedMapOf())
+    }
+
+    private fun setAside(): MutableMap<String, Any> {
+        val stamp =
+            Instant
+                .now()
+                .truncatedTo(ChronoUnit.SECONDS)
+                .toString()
+                .replace(":", "")
+        val aside = file.resolveSibling("${file.fileName}.corrupt-$stamp")
+        Files.move(file, aside, StandardCopyOption.REPLACE_EXISTING)
+        onDamaged(file, aside)
+        return linkedMapOf()
+    }
+
+    /** Makes the rename survive a crash too. Not every platform can open a directory for this. */
+    private fun syncDirectory(dir: Path) {
+        runCatching { FileChannel.open(dir, StandardOpenOption.READ).use { it.force(true) } }
     }
 
     companion object {

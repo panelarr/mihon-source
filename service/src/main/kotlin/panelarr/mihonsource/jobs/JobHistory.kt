@@ -4,11 +4,8 @@ package panelarr.mihonsource.jobs
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
-import org.slf4j.LoggerFactory
 import panelarr.mihonsource.storage.JsonFile
-import java.nio.file.Files
 import java.nio.file.Path
-import java.nio.file.StandardCopyOption
 import java.time.Instant
 
 @Serializable
@@ -52,19 +49,12 @@ class JobHistory(
     private val keep: Int,
     now: () -> Instant = Instant::now,
 ) {
-    private val log = LoggerFactory.getLogger(JobHistory::class.java)
     private val file = JsonFile(path, ListSerializer(RunRecord.serializer()))
     private val runs: MutableList<RunRecord> = load(now).toMutableList()
 
     private fun load(now: () -> Instant): List<RunRecord> {
-        val stored =
-            runCatching { file.read() }
-                .onFailure { e ->
-                    // Keep the unreadable file for inspection and start a new history.
-                    log.warn("Unreadable job history {} ({}); starting a new one", file.path, e.message)
-                    Files.move(file.path, file.path.resolveSibling("${file.path.fileName}.bad"), StandardCopyOption.REPLACE_EXISTING)
-                }.getOrNull()
-                .orEmpty()
+        // An unreadable history is set aside by JsonFile, and a new one starts.
+        val stored = file.read().orEmpty()
         val at = now().toString()
         val fixed =
             stored.map {

@@ -4,7 +4,10 @@ package panelarr.mihonsource.compat
 
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
+import java.nio.file.Files
 import java.nio.file.Path
+import kotlin.io.path.listDirectoryEntries
+import kotlin.io.path.name
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
@@ -13,6 +16,23 @@ import kotlin.test.assertNull
 class JsonSharedPreferencesTest {
     @TempDir
     lateinit var dir: Path
+
+    @Test
+    fun `a damaged file is set aside, reported, and the preferences start empty`() {
+        val file = dir.resolve("p.json")
+        Files.write(file, ByteArray(64))
+        val reported = mutableListOf<Path>()
+
+        val prefs = JsonSharedPreferences(file) { damaged, keptAs -> reported += listOf(damaged, keptAs) }
+
+        assertEquals(0, prefs.all.size)
+        assertEquals(file, reported.first())
+        assertEquals(64, Files.size(reported.last()))
+        prefs.edit().putString("s", "again").commit()
+        assertEquals("again", JsonSharedPreferences(file).getString("s", null))
+        assertEquals(2, dir.listDirectoryEntries().size)
+        assertEquals(1, dir.listDirectoryEntries().count { it.name.startsWith("p.json.corrupt-") })
+    }
 
     @Test
     fun `every type round-trips and survives a reload`() {

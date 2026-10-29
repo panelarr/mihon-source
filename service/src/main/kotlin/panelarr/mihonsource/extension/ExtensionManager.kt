@@ -5,6 +5,7 @@ package panelarr.mihonsource.extension
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import org.slf4j.LoggerFactory
+import panelarr.mihonsource.storage.DurableFiles
 import panelarr.mihonsource.storage.JsonFile
 import java.nio.file.Files
 import java.nio.file.Path
@@ -149,7 +150,9 @@ class ExtensionManager(
                     )
                 unload(record.pkgName)
                 val extDir = Files.createDirectories(dir.resolve(record.pkgName))
+                DurableFiles.sync(prepared.jar)
                 Files.move(prepared.jar, jarPath(extDir), StandardCopyOption.REPLACE_EXISTING)
+                DurableFiles.syncDirectory(extDir)
                 recordFile(extDir).write(record)
                 prepared.icon?.let { icons.save(record.pkgName, it) }
                 log.info("Installed {} {} ({})", record.pkgName, record.versionName, record.format)

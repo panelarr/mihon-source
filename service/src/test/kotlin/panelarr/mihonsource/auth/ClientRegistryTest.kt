@@ -40,6 +40,16 @@ class ClientRegistryTest {
     }
 
     @Test
+    fun `a damaged clients file doesn't stop the registry from starting`() {
+        Files.write(dir.resolve("clients.json"), ByteArray(527))
+
+        val registry = ClientRegistry(dir)
+        assertTrue(registry.list().isEmpty())
+        val key = registry.create("reader", setOf(Scopes.SOURCES_READ)).apiKey
+        assertNotNull(ClientRegistry(dir).authenticate(key))
+    }
+
+    @Test
     fun `clients survive a restart`() {
         val key = ClientRegistry(dir).create("reader", setOf(Scopes.SOURCES_READ)).apiKey
         assertNotNull(ClientRegistry(dir).authenticate(key))

@@ -41,6 +41,10 @@ object AndroidHost {
     @Volatile
     var cookieListener: CookieListener? = null
 
+    /** Told when a preferences file couldn't be read and was set aside as `keptAs`, so the host can log it. */
+    @Volatile
+    var damagedPreferencesListener: ((file: Path, keptAs: Path) -> Unit)? = null
+
     /** Sets the data directory. Calling it again switches directories and drops cached preferences. */
     fun configure(dataDir: Path) {
         synchronized(this) {
@@ -58,7 +62,9 @@ object AndroidHost {
     /** The preferences called [name], created on first use and cached. */
     fun sharedPreferences(name: String): SharedPreferences {
         val file = preferencesFile(name)
-        return preferences.computeIfAbsent(file) { JsonSharedPreferences(it) }
+        return preferences.computeIfAbsent(file) {
+            JsonSharedPreferences(it) { damaged, keptAs -> damagedPreferencesListener?.invoke(damaged, keptAs) }
+        }
     }
 
     /** Deletes the preferences file of a source and forgets the cached instance. */

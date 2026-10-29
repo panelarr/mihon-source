@@ -62,6 +62,8 @@ A request counts as an anti-bot challenge when the site answers 403 or 503 with 
 
 Files that hold hashes, keys, cookies or encrypted secrets are created readable by their owner only.
 
+Every file is saved by writing a temporary file, flushing it to disk, and renaming it over the old one, so a crash or a power cut leaves either the old version or the new one. A file that can't be read anyway (damaged by something outside the service) doesn't stop the service: it's renamed to `<name>.corrupt-<time>`, an error is logged, and the service carries on as if the file were missing. What that means depends on the file: a damaged `auth/clients.json` loses the API clients (create new keys with the admin token), a damaged `auth/admin-token.json` prints a new admin token, and a damaged store or settings file starts empty. The renamed file is kept for inspection; delete it once you no longer need it.
+
 ## Lost the admin token?
 
 Stop the service, delete `auth/admin-token.json` and start it again: a new token is printed. Or set `MIHON_ADMIN_TOKEN`.

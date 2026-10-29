@@ -2,9 +2,9 @@
 
 package panelarr.mihonsource.extension
 
+import panelarr.mihonsource.storage.DurableFiles
 import java.nio.file.Files
 import java.nio.file.Path
-import java.nio.file.StandardCopyOption
 import java.util.zip.ZipFile
 
 /**
@@ -30,11 +30,7 @@ class ExtensionIcons(
         bytes: ByteArray,
     ): Boolean {
         if (bytes.size > MAX_BYTES || contentType(bytes) == null) return false
-        val target = file(pkgName)
-        Files.createDirectories(target.parent)
-        val tmp = target.resolveSibling(".icon.tmp")
-        Files.write(tmp, bytes)
-        Files.move(tmp, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
+        DurableFiles.write(file(pkgName), bytes)
         return true
     }
 

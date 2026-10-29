@@ -11,6 +11,7 @@ import eu.kanade.tachiyomi.source.online.HttpSource
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.protobuf.ProtoBuf
+import org.slf4j.LoggerFactory
 import panelarr.mihonsource.compat.AndroidHost
 import panelarr.mihonsource.extensionapi.ExtensionHost
 import panelarr.mihonsource.network.SourceNetworks
@@ -29,12 +30,17 @@ object MihonHost {
     /** Sources whose construction finished; only their ids are safe to read. */
     private val constructed: MutableSet<Source> = Collections.synchronizedSet(Collections.newSetFromMap(WeakHashMap()))
 
+    private val log = LoggerFactory.getLogger(MihonHost::class.java)
+
     @OptIn(ExperimentalSerializationApi::class)
     fun install(
         dataDir: Path,
         networks: SourceNetworks,
     ) {
         AndroidHost.configure(dataDir)
+        AndroidHost.damagedPreferencesListener = { file, keptAs ->
+            log.error("Unreadable source settings {}; kept it as {} and continuing without them", file, keptAs.fileName)
+        }
         ExtensionHost.install { source -> NetworkHelper(networks.create { idOf(source) }) }
 
         val application = AndroidHost.application
