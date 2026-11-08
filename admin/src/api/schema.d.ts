@@ -217,6 +217,32 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/admin/health-checks/schedule": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description GetHealthCheckSchedule returns when the `source-health` job checks sources on its
+         *      own, and which.
+         */
+        get: operations["MihonAdminService_GetHealthCheckSchedule"];
+        /**
+         * @description SetHealthCheckSchedule replaces the health-check schedule, overriding the
+         *      MIHON_HEALTH_CHECK_* environment variables until it is reset; the job's next run
+         *      follows the new interval at once. Leaving `schedule` unset goes back to the
+         *      environment's schedule.
+         */
+        put: operations["MihonAdminService_SetHealthCheckSchedule"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/admin/job-runs/{runId}": {
         parameters: {
             query?: never;
@@ -1153,11 +1179,31 @@ export interface components {
         "panelarr.mihon.v1.GetExtensionResponse": {
             extension?: components["schemas"]["panelarr.mihon.v1.Extension"];
         };
+        "panelarr.mihon.v1.GetHealthCheckScheduleResponse": {
+            schedule?: components["schemas"]["panelarr.mihon.v1.HealthCheckSchedule"];
+        };
         "panelarr.mihon.v1.GetJobResponse": {
             job?: components["schemas"]["panelarr.mihon.v1.Job"];
         };
         "panelarr.mihon.v1.GetJobRunResponse": {
             run?: components["schemas"]["panelarr.mihon.v1.JobRun"];
+        };
+        /** @description When the `source-health` job checks sources on its own, and which. */
+        "panelarr.mihon.v1.HealthCheckSchedule": {
+            /** @description How often. Unset means no scheduled checks; at least a minute otherwise. */
+            interval?: string;
+            /** @description Source languages the checks cover. Empty means all. */
+            langs?: string[];
+            /**
+             * Format: uint32
+             * @description Sources per round, the least recently checked first. 0 means all.
+             */
+            sample?: number;
+            /**
+             * @description Where the schedule comes from: "SetHealthCheckSchedule" once set over the API, or
+             *      the environment variables. Ignored in SetHealthCheckSchedule.
+             */
+            source?: string;
         };
         "panelarr.mihon.v1.InstallExtensionRequest": {
             /** @description http(s) URL of a .jar or .apk. */
@@ -1427,6 +1473,13 @@ export interface components {
             enabled?: boolean;
         };
         "panelarr.mihon.v1.SetHealthCheckResponse": Record<string, never>;
+        "panelarr.mihon.v1.SetHealthCheckScheduleRequest": {
+            /** @description The new schedule; unset goes back to the environment's. */
+            schedule?: components["schemas"]["panelarr.mihon.v1.HealthCheckSchedule"];
+        };
+        "panelarr.mihon.v1.SetHealthCheckScheduleResponse": {
+            schedule?: components["schemas"]["panelarr.mihon.v1.HealthCheckSchedule"];
+        };
         "panelarr.mihon.v1.Solver": {
             /** @description Identifier chosen by the admin: lowercase letters, digits and dashes. */
             id?: string;
@@ -2394,6 +2447,50 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["panelarr.mihon.v1.ReloadExtensionResponse"];
+                };
+            };
+        };
+    };
+    MihonAdminService_GetHealthCheckSchedule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["panelarr.mihon.v1.GetHealthCheckScheduleResponse"];
+                };
+            };
+        };
+    };
+    MihonAdminService_SetHealthCheckSchedule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["panelarr.mihon.v1.SetHealthCheckScheduleRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["panelarr.mihon.v1.SetHealthCheckScheduleResponse"];
                 };
             };
         };

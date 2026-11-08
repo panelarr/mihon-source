@@ -322,6 +322,43 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/panelarr.mihon.v1.ReloadExtensionResponse'
+    /v1/admin/health-checks/schedule:
+        get:
+            tags:
+                - MihonAdminService
+            description: |-
+                GetHealthCheckSchedule returns when the `source-health` job checks sources on its
+                 own, and which.
+            operationId: MihonAdminService_GetHealthCheckSchedule
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/panelarr.mihon.v1.GetHealthCheckScheduleResponse'
+        put:
+            tags:
+                - MihonAdminService
+            description: |-
+                SetHealthCheckSchedule replaces the health-check schedule, overriding the
+                 MIHON_HEALTH_CHECK_* environment variables until it is reset; the job's next run
+                 follows the new interval at once. Leaving `schedule` unset goes back to the
+                 environment's schedule.
+            operationId: MihonAdminService_SetHealthCheckSchedule
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/panelarr.mihon.v1.SetHealthCheckScheduleRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/panelarr.mihon.v1.SetHealthCheckScheduleResponse'
     /v1/admin/job-runs/{runId}:
         get:
             tags:
@@ -1662,6 +1699,11 @@ components:
             properties:
                 extension:
                     $ref: '#/components/schemas/panelarr.mihon.v1.Extension'
+        panelarr.mihon.v1.GetHealthCheckScheduleResponse:
+            type: object
+            properties:
+                schedule:
+                    $ref: '#/components/schemas/panelarr.mihon.v1.HealthCheckSchedule'
         panelarr.mihon.v1.GetJobResponse:
             type: object
             properties:
@@ -1672,6 +1714,28 @@ components:
             properties:
                 run:
                     $ref: '#/components/schemas/panelarr.mihon.v1.JobRun'
+        panelarr.mihon.v1.HealthCheckSchedule:
+            type: object
+            properties:
+                interval:
+                    pattern: ^-?(?:0|[1-9][0-9]{0,11})(?:\.[0-9]{1,9})?s$
+                    type: string
+                    description: How often. Unset means no scheduled checks; at least a minute otherwise.
+                langs:
+                    type: array
+                    items:
+                        type: string
+                    description: Source languages the checks cover. Empty means all.
+                sample:
+                    type: integer
+                    description: Sources per round, the least recently checked first. 0 means all.
+                    format: uint32
+                source:
+                    type: string
+                    description: |-
+                        Where the schedule comes from: "SetHealthCheckSchedule" once set over the API, or
+                         the environment variables. Ignored in SetHealthCheckSchedule.
+            description: When the `source-health` job checks sources on its own, and which.
         panelarr.mihon.v1.InstallExtensionRequest:
             type: object
             properties:
@@ -2116,6 +2180,18 @@ components:
         panelarr.mihon.v1.SetHealthCheckResponse:
             type: object
             properties: {}
+        panelarr.mihon.v1.SetHealthCheckScheduleRequest:
+            type: object
+            properties:
+                schedule:
+                    allOf:
+                        - $ref: '#/components/schemas/panelarr.mihon.v1.HealthCheckSchedule'
+                    description: The new schedule; unset goes back to the environment's.
+        panelarr.mihon.v1.SetHealthCheckScheduleResponse:
+            type: object
+            properties:
+                schedule:
+                    $ref: '#/components/schemas/panelarr.mihon.v1.HealthCheckSchedule'
         panelarr.mihon.v1.Solver:
             type: object
             properties:
