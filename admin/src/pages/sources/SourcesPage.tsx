@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { getRouteApi, Link } from "@tanstack/react-router";
 import { useMemo } from "react";
 import { AuthIcon } from "../../components/AuthIcon";
-import { Empty, ErrorBox, Field, Loading, Mono, PageHeader } from "../../components/ui";
+import { Empty, ErrorBox, Field, Loading, Mono, PageHeader, SearchInput } from "../../components/ui";
 import { languageLabel } from "../../lib/format";
 import { sourcesQuery } from "./queries";
 import { CapabilityBadges, ContentRatingBadge, HealthBadge } from "./SourceBadges";
@@ -38,14 +38,12 @@ export function SourcesPage() {
     <>
       <PageHeader title="Sources" />
       <div className="toolbar">
-        <Field label="Name or ID">
-          <input
-            type="search"
-            value={search.q ?? ""}
-            onChange={(event) => setSearch({ q: event.target.value || undefined })}
-            placeholder="Filter sources"
-          />
-        </Field>
+        <SearchInput
+          label="Name or ID"
+          value={search.q ?? ""}
+          placeholder="Filter sources"
+          onChange={(q) => setSearch({ q: q || undefined })}
+        />
         <Field label="Language">
           <select value={search.lang ?? ""} onChange={(event) => setSearch({ lang: event.target.value || undefined })}>
             <option value="">All languages</option>

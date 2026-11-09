@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { type FormEvent, useMemo, useState } from "react";
 import { api, unwrap } from "../../api/client";
 import type { FilterValue } from "../../api/types";
-import { ErrorBox, Loading } from "../../components/ui";
+import { ErrorBox, Loading, SearchInput } from "../../components/ui";
 import { type FieldValue, type FilterState, toFilterValues } from "../../lib/filters";
 import { FiltersForm } from "./FiltersForm";
 import { filtersQuery } from "./queries";
@@ -31,10 +31,7 @@ export function SearchPanel({ sourceId }: { sourceId: string }) {
   return (
     <div className="search-layout">
       <form className="search-form card" onSubmit={submit}>
-        <label className="field">
-          <span className="field-label">Query</span>
-          <input type="search" value={query} onChange={(event) => setQuery(event.target.value)} />
-        </label>
+        <SearchInput label="Query" value={query} onChange={setQuery} />
         {filters.isPending ? <Loading label="Loading filters…" /> : null}
         <ErrorBox error={filters.error} title="Filters" onRetry={() => filters.refetch()} />
         {filters.data && filters.data.length > 0 ? (

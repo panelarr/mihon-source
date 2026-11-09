@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-import type { ReactNode } from "react";
+import { type ReactNode, useId, useRef } from "react";
 import { errorMessage } from "../api/errors";
 
 export function Loading({ label = "Loading…" }: { label?: string }) {
@@ -70,5 +70,56 @@ export function Mono({ children, title }: { children: ReactNode; title?: string 
     <code className="mono" title={title}>
       {children}
     </code>
+  );
+}
+
+/**
+ * A labelled search field with a clear (×) button, shown only while it has a value. Escape clears it too.
+ * The label sits beside the field rather than around it, so the button's name stays out of the field's name.
+ */
+export function SearchInput({
+  label,
+  value,
+  onChange,
+  placeholder,
+}: {
+  label: ReactNode;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+}) {
+  const id = useId();
+  const input = useRef<HTMLInputElement>(null);
+  const clear = () => {
+    onChange("");
+    input.current?.focus();
+  };
+  return (
+    <div className="field">
+      <label className="field-label" htmlFor={id}>
+        {label}
+      </label>
+      <div className="search-input">
+        <input
+          ref={input}
+          id={id}
+          type="search"
+          value={value}
+          placeholder={placeholder}
+          onChange={(event) => onChange(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Escape" && value) {
+              event.preventDefault();
+              clear();
+            }
+          }}
+        />
+        {value ? (
+          <button type="button" className="search-clear" aria-label="Clear search" title="Clear search" onClick={clear}>
+            <span aria-hidden="true">×</span>
+          </button>
+        ) : null}
+      </div>
+    </div>
   );
 }

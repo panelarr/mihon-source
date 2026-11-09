@@ -9,7 +9,7 @@ import type { AvailableExtension, Store } from "../api/types";
 import { AuthIcon } from "../components/AuthIcon";
 import { ConfirmDialog } from "../components/Dialog";
 import { TabList, tabProps } from "../components/Tabs";
-import { Badge, Empty, ErrorBox, Field, Loading, Mono, PageHeader } from "../components/ui";
+import { Badge, Empty, ErrorBox, Field, Loading, Mono, PageHeader, SearchInput } from "../components/ui";
 import { enumLabel, formatDate, languageLabel, shortHash } from "../lib/format";
 import { ContentWarningBadge } from "./ExtensionsPage";
 
@@ -253,23 +253,17 @@ function AvailableView() {
   const setSearch = (patch: { q?: string; lang?: string; store?: string; updates?: boolean }) =>
     navigate({ search: (prev) => ({ ...prev, ...patch }), replace: true });
 
-  const sorted = [...(available.data ?? [])].sort(
-    (a, b) =>
-      Number(b.updateAvailable ?? false) - Number(a.updateAvailable ?? false) ||
-      (a.name ?? "").localeCompare(b.name ?? ""),
-  );
+  const sorted = sortAvailable(available.data ?? []);
 
   return (
     <>
       <div className="toolbar">
-        <Field label="Search">
-          <input
-            type="search"
-            value={search.q ?? ""}
-            placeholder="Extension or source name"
-            onChange={(event) => setSearch({ q: event.target.value || undefined })}
-          />
-        </Field>
+        <SearchInput
+          label="Search"
+          value={search.q ?? ""}
+          placeholder="Extension or source name"
+          onChange={(q) => setSearch({ q: q || undefined })}
+        />
         <Field label="Language">
           <select value={search.lang ?? ""} onChange={(event) => setSearch({ lang: event.target.value || undefined })}>
             <option value="">All languages</option>
@@ -330,6 +324,19 @@ function AvailableView() {
         </table>
       ) : null}
     </>
+  );
+}
+
+/**
+ * Orders extensions with updates first, then installed ones, then by name. Array sort is stable, so equal
+ * entries keep the server's order. The filters only narrow the list, so every filter shows the same order.
+ */
+export function sortAvailable(extensions: readonly AvailableExtension[]): AvailableExtension[] {
+  return [...extensions].sort(
+    (a, b) =>
+      Number(b.updateAvailable ?? false) - Number(a.updateAvailable ?? false) ||
+      Number(b.installed ?? false) - Number(a.installed ?? false) ||
+      (a.name ?? "").localeCompare(b.name ?? ""),
   );
 }
 
