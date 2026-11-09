@@ -9,11 +9,14 @@ armeria = "1.42.0"
 grpc = "1.84.0"
 grpcKotlin = "1.4.3"
 protobuf = "3.25.9"
+# Not used directly: protobuf-java-util and gRPC bring it in, at a version with known
+# vulnerabilities, so api/ raises it with a constraint.
+guava = "33.7.2-jre"
 protobufPlugin = "0.10.0"
 buf = "1.73.0"
 coroutines = "1.11.0"
 serialization = "1.11.0"
-logback = "1.5.20"
+logback = "1.5.38"
 swaggerUi = "5.33.1"
 micrometer = "1.17.1"
 icu4j = "78.3"
@@ -55,6 +58,7 @@ grpc-services = { module = "io.grpc:grpc-services", version.ref = "grpc" }
 grpc-kotlin-stub = { module = "io.grpc:grpc-kotlin-stub", version.ref = "grpcKotlin" }
 protobuf-kotlin = { module = "com.google.protobuf:protobuf-kotlin", version.ref = "protobuf" }
 protobuf-java-util = { module = "com.google.protobuf:protobuf-java-util", version.ref = "protobuf" }
+guava = { module = "com.google.guava:guava", version.ref = "guava" }
 coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }
 serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "serialization" }
 logback = { module = "ch.qos.logback:logback-classic", version.ref = "logback" }

@@ -39,3 +39,14 @@ detekt {
 configure<org.jlleitschuh.gradle.ktlint.KtlintExtension> {
     version.set(libs.versions.ktlint.get())
 }
+
+// ktlint brings in an older Logback with known vulnerabilities. It only runs at build
+// time, but keep it on the same Logback as the service.
+configurations.matching { it.name.startsWith("ktlint") }.configureEach {
+    resolutionStrategy.eachDependency {
+        if (requested.group == "ch.qos.logback" && requested.name in setOf("logback-classic", "logback-core")) {
+            useVersion(libs.versions.logback.get())
+            because("Logback before ${libs.versions.logback.get()} has known vulnerabilities")
+        }
+    }
+}
