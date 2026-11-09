@@ -14,6 +14,14 @@ dependencies {
     api(libs.grpc.stub)
     api(libs.grpc.kotlin.stub)
     api(libs.coroutines.core)
+
+    constraints {
+        // protobuf-java-util and gRPC bring in an older Guava with known vulnerabilities.
+        // As an api constraint it reaches every module that uses this one.
+        api(libs.guava) {
+            because("Guava before 33.7.2 has known vulnerabilities")
+        }
+    }
 }
 
 sourceSets {
