@@ -5,6 +5,14 @@
 // The static build lands in admin/dist, which the service serves at `/`.
 import com.github.gradle.node.npm.task.NpmTask
 
+// The node-gradle plugin depends on an old Jackson with known vulnerabilities. The BOM
+// raises every Jackson module on this script's classpath to a patched release.
+buildscript {
+    dependencies {
+        classpath(platform(libs.jackson.bom))
+    }
+}
+
 plugins {
     base
     alias(libs.plugins.node)
