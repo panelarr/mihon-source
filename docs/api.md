@@ -96,7 +96,12 @@ curl -H "Authorization: Bearer $KEY" "localhost:8902/v1/sources/$SOURCE/pages?ch
 ```
 
 - **Languages:** an extension's enabled languages (`SetExtensionLanguages`) decide which of its sources are listed; the others answer NOT_FOUND. `Extension.enabled_langs` and `ExtensionSource.available` show the setting. See [extensions](extensions.md#languages).
-- **Pasted URLs:** `ResolveUrl` (`POST /v1/resolve-url`) turns a web URL into a series. Sources with their own resolver handle it; for the others on the URL's site, mihon-source searches the source for the URL (many accept that) and takes the result whose web URL matches, or the only result. Those answers set `bestEffort`.
+- **Pasted URLs:** `ResolveUrl` (`POST /v1/resolve-url`) turns a web URL into a series. mihon-source tries each candidate source (the one asked for, or every source with its own resolver or on the URL's site) in this order:
+  1. the source's own resolver, if it has one; a resolver that fails doesn't stop the others;
+  2. the URL's path (and query) relative to the source's base URL as the series key, as most Mihon sources key series by path: it counts when the source turns that key back into the same web URL and the series' details load with a title;
+  3. a search for the URL (many sources accept that), taking the result whose web URL matches.
+
+  These answers are verified. Only when no source gives one does mihon-source fall back to a search that returned a single result whose web URL is different: that answer may be an unrelated series, so it sets `bestEffort`.
 - **Keys** (series keys, chapter keys, page refs) are opaque: store them and pass them back unchanged.
 - **Filters** have no stable names, so a `FilterValue` addresses a filter by its position in `GetFilters`: `[index]`, or `[group index, child index]` inside a group. Filters you don't send keep their defaults.
 - **Network profile in use:** `GetNetworkProfile` (`GET /v1/sources/{sourceId}/network-profile`) says which profile a source uses: one a host pushed (`PUSHED`), one assigned in this service or its default (`PLUGIN`), or none (`NONE`). Proxy passwords never come back. A pushed profile wins and is kept across restarts; pushing an empty profile removes it.
