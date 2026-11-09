@@ -8,6 +8,7 @@ import type { JsonObject, SearchRequest } from "../api/types";
 import { createDb, createHandlers } from "../mocks/handlers";
 import { renderApp } from "../test/render";
 import { server } from "../test/setup";
+import { sortAvailable } from "./StoresPage";
 
 describe("sources", () => {
   it("lists sources and filters them by language and name", async () => {
@@ -22,6 +23,28 @@ describe("sources", () => {
     await userEvent.selectOptions(screen.getByLabelText("Language"), "");
     await userEvent.type(screen.getByLabelText("Name or ID"), "nothing like this");
     expect(await screen.findByText("No source matches the filter.")).toBeInTheDocument();
+    app.dispose();
+  });
+
+  it("clears the search with the × button and with Escape", async () => {
+    const app = renderApp("/sources");
+    await screen.findByRole("link", { name: "Sample Comics" });
+    const field = screen.getByLabelText("Name or ID");
+    expect(screen.queryByRole("button", { name: "Clear search" })).not.toBeInTheDocument();
+
+    await userEvent.type(field, "nothing like this");
+    expect(await screen.findByText("No source matches the filter.")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Clear search" }));
+    await waitFor(() => expect(field).toHaveValue(""));
+    expect(field).toHaveFocus();
+    expect(await screen.findByRole("link", { name: "Sample Comics" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Clear search" })).not.toBeInTheDocument();
+
+    await userEvent.type(field, "sample");
+    await waitFor(() => expect(screen.queryByRole("link", { name: "Example Source" })).not.toBeInTheDocument());
+    await userEvent.keyboard("{Escape}");
+    await waitFor(() => expect(field).toHaveValue(""));
+    expect(await screen.findAllByRole("link", { name: "Example Source" })).toHaveLength(2);
     app.dispose();
   });
 
@@ -215,6 +238,68 @@ describe("stores", () => {
     await waitFor(() => expect(screen.queryByText("Demo Reader")).not.toBeInTheDocument());
     expect(screen.getByText("Example Source")).toBeInTheDocument();
     app.dispose();
+  });
+});
+
+describe("available extension order", () => {
+  const names = () =>
+    screen
+      .getAllByRole("row")
+      .slice(1)
+      .map((row) => within(row).getAllByRole("cell")[0]?.textContent ?? "");
+
+  it("puts updates first, then installed, then sorts by name, under every filter", async () => {
+    const db = createDb();
+    const base = db.available.find((ext) => ext.name === "Demo Reader");
+    if (!base) throw new Error("mock data changed");
+    const ext = (name: string, extra: Partial<typeof base>) => ({
+      ...base,
+      pkgName: `eu.example.extension.${name.toLowerCase().replace(" ", "")}`,
+      name,
+      sources: [{ id: name, name, lang: "en" }],
+      ...extra,
+    });
+    db.available = [
+      ext("Zeta Installed", { installed: true }),
+      ext("Alpha New", {}),
+      ext("Yankee Update", { installed: true, updateAvailable: true }),
+      ext("Bravo Installed", { installed: true }),
+      ext("Xray Update", { installed: true, updateAvailable: true }),
+    ];
+    server.resetHandlers(...createHandlers(db));
+    const app = renderApp("/stores?view=available");
+    await screen.findByText("Alpha New");
+    const order = names();
+    expect(order).toHaveLength(5);
+    for (const [i, name] of [
+      "Xray Update",
+      "Yankee Update",
+      "Bravo Installed",
+      "Zeta Installed",
+      "Alpha New",
+    ].entries()) {
+      expect(order[i]).toContain(name);
+    }
+
+    // A search keeps the same order among what is left.
+    await userEvent.type(screen.getByLabelText("Search"), "n");
+    await waitFor(() => expect(screen.queryByText("Xray Update")).not.toBeInTheDocument());
+    const filtered = names();
+    expect(filtered).toHaveLength(4);
+    for (const [i, name] of ["Yankee Update", "Bravo Installed", "Zeta Installed", "Alpha New"].entries()) {
+      expect(filtered[i]).toContain(name);
+    }
+    app.dispose();
+  });
+});
+
+describe("sortAvailable", () => {
+  it("keeps the given order for entries that compare equal", () => {
+    const sorted = sortAvailable([
+      { pkgName: "first", name: "Same", installed: true },
+      { pkgName: "second", name: "Same", installed: true },
+    ]);
+    expect(sorted.map((ext) => ext.pkgName)).toEqual(["first", "second"]);
   });
 });
 

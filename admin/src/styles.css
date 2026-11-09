@@ -899,6 +899,47 @@ p.success {
   }
 }
 
+/* Search field with its own clear button; the browser's built-in one is hidden. */
+.search-input {
+  position: relative;
+}
+
+.search-input input[type="search"] {
+  padding-right: 2rem;
+}
+
+.search-input input[type="search"]::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+  appearance: none;
+  display: none;
+}
+
+.search-clear {
+  position: absolute;
+  top: 50%;
+  right: 0.3rem;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--muted);
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.search-clear:hover,
+.search-clear:focus-visible {
+  color: inherit;
+  background: var(--border);
+}
+
 .field-wrap {
   display: flex;
   flex-direction: column;
