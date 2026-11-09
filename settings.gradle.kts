@@ -2,9 +2,12 @@
 
 pluginManagement {
     includeBuild("build-logic")
+    // Maven Central first: it holds the plugins' own artifacts (Kotlin and others). The plugin
+    // portal is then only asked for plugin markers and plugins published nowhere else, and isn't
+    // in the way of the large downloads, which it serves by redirecting elsewhere.
     repositories {
-        gradlePluginPortal()
         mavenCentral()
+        gradlePluginPortal()
     }
 }
 

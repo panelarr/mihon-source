@@ -16,11 +16,28 @@ RUN npm run build
 # ---- Service -----------------------------------------------------------------------
 FROM --platform=$BUILDPLATFORM eclipse-temurin:21-jdk AS build
 WORKDIR /src
+# Download the Gradle distribution in a layer of its own. It only changes with the wrapper,
+# so the layer cache (also exported to CI's build cache) keeps it between builds, and a
+# build rarely needs the distribution server. Downloads retry, because that server
+# sometimes times out or answers 5xx for a while.
+COPY gradlew ./
+COPY gradle/wrapper gradle/wrapper
+RUN for attempt in 1 2 3; do \
+        ./gradlew --no-daemon --version && exit 0; \
+        echo "Gradle download failed (attempt $attempt), retrying" >&2; sleep $((attempt * 20)); \
+    done; exit 1
 COPY . .
 COPY --from=admin /src/admin/dist admin/dist
 # The admin UI is already built above, so skip Gradle's Node build of it.
-RUN --mount=type=cache,target=/root/.gradle \
-    ./gradlew --no-daemon --no-configuration-cache :service:installDist -x :admin:buildSpa -x :admin:npmInstall
+# The cache mount keeps dependencies between local builds. It covers only caches/, so the
+# distribution from the layer above stays visible. CI's build cache doesn't store cache
+# mounts, so CI downloads dependencies on every build: a failed attempt is retried,
+# reusing what the earlier attempts already downloaded.
+RUN --mount=type=cache,target=/root/.gradle/caches \
+    for attempt in 1 2 3; do \
+        ./gradlew --no-daemon --no-configuration-cache :service:installDist -x :admin:buildSpa -x :admin:npmInstall && exit 0; \
+        echo "Gradle build failed (attempt $attempt), retrying" >&2; sleep $((attempt * 20)); \
+    done; exit 1
 
 # ---- Runtime -----------------------------------------------------------------------
 FROM eclipse-temurin:21-jre
