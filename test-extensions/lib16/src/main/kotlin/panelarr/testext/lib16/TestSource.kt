@@ -13,8 +13,10 @@ import androidx.preference.SwitchPreferenceCompat
 import eu.kanade.tachiyomi.network.GET
 import eu.kanade.tachiyomi.network.awaitSuccess
 import eu.kanade.tachiyomi.source.ConfigurableSource
+import eu.kanade.tachiyomi.source.ResolvableSource
 import eu.kanade.tachiyomi.source.Source
 import eu.kanade.tachiyomi.source.SourceFactory
+import eu.kanade.tachiyomi.source.UriType
 import eu.kanade.tachiyomi.source.model.Filter
 import eu.kanade.tachiyomi.source.model.FilterList
 import eu.kanade.tachiyomi.source.model.MangasPage
@@ -40,12 +42,14 @@ class TestFactory : SourceFactory {
 
 /**
  * A lib 1.6-style source over a small JSON API, used by mihon-source's tests. It uses the
- * suspend API, every filter type, preferences, Injekt and per-source headers.
+ * suspend API, every filter type, preferences, Injekt, per-source headers and a URL
+ * resolver.
  */
 class TestSource(
     override val lang: String,
 ) : HttpSource(),
-    ConfigurableSource {
+    ConfigurableSource,
+    ResolvableSource {
     override val name = "Lib16 Test"
     override val supportsLatest = true
 
@@ -174,6 +178,36 @@ class TestSource(
     override fun getMangaUrl(manga: SManga): String = "$baseUrl/series/${manga.url}"
 
     override fun getChapterUrl(chapter: SChapter): String = "$baseUrl/read/${chapter.url}"
+
+    /** Claims every URL on its site, like many resolvers do. */
+    override fun getUriType(uri: String): UriType = if (uri.startsWith(baseUrl)) UriType.Manga else UriType.Unknown
+
+    /**
+     * Resolves short links (`<base>/r/<id>`). Series pages (`<base>/series/<id>`) make it
+     * fail, standing in for a resolver broken by a site change; anything else is unknown.
+     */
+    override suspend fun getManga(uri: String): SManga? {
+        val path = uri.removePrefix(baseUrl)
+        return when {
+            path.startsWith("/r/") -> {
+                val id = path.removePrefix("/r/").trimEnd('/')
+                SManga.create().apply {
+                    url = id
+                    title = get<SeriesDto>("$baseUrl/api/series/$id").title
+                }
+            }
+
+            path.startsWith("/series/") -> {
+                throw IllegalStateException("the test resolver fails on series pages")
+            }
+
+            else -> {
+                null
+            }
+        }
+    }
+
+    override suspend fun getChapter(uri: String): SChapter? = null
 
     override fun setupPreferenceScreen(screen: PreferenceScreen) {
         screen.addPreference(

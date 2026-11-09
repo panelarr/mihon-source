@@ -6,11 +6,14 @@ import com.google.protobuf.ByteString
 import eu.kanade.tachiyomi.source.ResolvableSource
 import eu.kanade.tachiyomi.source.UriType
 import eu.kanade.tachiyomi.source.model.MangasPage
+import eu.kanade.tachiyomi.source.model.SManga
 import eu.kanade.tachiyomi.source.online.HttpSource
+import io.grpc.StatusException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
+import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import panelarr.mihonsource.BuildInfo
 import panelarr.mihonsource.SERVICE_NAME
@@ -194,29 +197,39 @@ class SourcePluginApi(
         rpc {
             val url = request.url.trim()
             val parsed = url.toHttpUrlOrNull() ?: throw IllegalArgumentException("url must be an absolute http(s) URL")
+            val explicit = request.sourceId.isNotEmpty()
             val candidates =
-                if (request.sourceId.isNotEmpty()) {
+                if (explicit) {
                     listOf(sources.get(request.sourceId))
                 } else {
                     sources.all().filter { it.resolvable || UrlMatch.sameSite(it.homeUrl, parsed) }
                 }
+            // A verified answer from any source beats a guess from an earlier one, so the
+            // guesses wait until every source has had its turn.
+            var guess: ResolveUrlResponse? = null
             for (source in candidates) {
-                val resolved =
-                    if (source.resolvable) native(source, url) else bySearch(source, url)
-                if (resolved != null) return@rpc resolved
+                if (source.resolvable) native(source, url)?.let { return@rpc it }
+                // The other ways read the site itself: only for a source on the URL's site
+                // (or the one asked for).
+                if (!explicit && !UrlMatch.sameSite(source.homeUrl, parsed)) continue
+                byPath(source, parsed)?.let { return@rpc it }
+                val found = bySearch(source, url)
+                found.match?.let { return@rpc it }
+                if (guess == null) guess = found.guess
             }
-            throw SourceErrors.notFound("no source recognizes this URL")
+            guess ?: throw SourceErrors.notFound("no source recognizes this URL")
         }
 
-    /** The source's own resolver. */
+    /** The source's own resolver. A resolver that fails leaves the URL to the other ways. */
     private suspend fun native(
         source: MihonSource,
         url: String,
     ): ResolveUrlResponse? {
         val resolvable = source.source as ResolvableSource
         val manga =
-            sources.call(source, "resolve_url") { if (resolvable.getUriType(url) == UriType.Manga) resolvable.getManga(url) else null }
-                ?: return null
+            attempt {
+                sources.call(source, "resolve_url") { if (resolvable.getUriType(url) == UriType.Manga) resolvable.getManga(url) else null }
+            } ?: return null
         return resolveUrlResponse {
             sourceId = source.id.toString()
             series = Mapping.withUrl(Mapping.series(manga), webUrl(source) { http -> http.getMangaUrl(manga) })
@@ -224,27 +237,90 @@ class SourcePluginApi(
     }
 
     /**
-     * Best effort for sources without a resolver: many extensions accept a pasted URL as a
-     * search query. A result counts when its web URL is the given one, or when it's the
-     * only result.
+     * Mihon sources usually key a series by its path on the site, and their web URL is the
+     * base URL plus that key. So the URL's path (and query) relative to the base URL is
+     * tried as the key: it counts when the source turns that key back into the same URL
+     * and its details load with a title.
+     */
+    private suspend fun byPath(
+        source: MihonSource,
+        url: HttpUrl,
+    ): ResolveUrlResponse? {
+        val http = source.source as? HttpSource ?: return null
+        val key = pathKey(http, url) ?: return null
+        val web = webUrl(source) { it.getMangaUrl(Mapping.mangaFor(key)) } ?: return null
+        if (!UrlMatch.same(web, url.toString())) return null
+        val manga =
+            attempt {
+                sources.call(source, "resolve_url") {
+                    it.source.getMangaUpdate(Mapping.mangaFor(key), emptyList(), true, false).manga
+                }
+            } ?: return null
+        val details = Mapping.series(manga, key = key, detailsLoaded = true)
+        if (details.title.isBlank()) return null
+        return resolveUrlResponse {
+            sourceId = source.id.toString()
+            series = Mapping.withUrl(details, web)
+        }
+    }
+
+    /** [url]'s path and query relative to the source's base URL, or null when it isn't under it. */
+    private fun pathKey(
+        http: HttpSource,
+        url: HttpUrl,
+    ): String? {
+        val base = runCatching { http.baseUrl.toHttpUrlOrNull() }.getOrNull() ?: return null
+        val prefix = base.encodedPath.trimEnd('/')
+        val path = url.encodedPath
+        if (prefix.isNotEmpty() && path != prefix && !path.startsWith("$prefix/")) return null
+        val relative = path.removePrefix(prefix)
+        if (relative.trim('/').isEmpty()) return null
+        return relative + (url.encodedQuery?.let { "?$it" } ?: "")
+    }
+
+    /** What a search for the URL found: a result whose web URL is the URL, or only a guess. */
+    private class SearchFound(
+        val match: ResolveUrlResponse? = null,
+        val guess: ResolveUrlResponse? = null,
+    )
+
+    /**
+     * Many extensions accept a pasted URL as a search query. A result whose web URL is the
+     * given one is a match; when there is no match, a single result is only a guess, marked
+     * best effort, since the site may have answered with an unrelated series.
      */
     private suspend fun bySearch(
         source: MihonSource,
         url: String,
-    ): ResolveUrlResponse? {
+    ): SearchFound {
         val page =
-            runCatching { sources.call(source, "resolve_url") { it.source.getSearchManga(1, url, it.source.getFilterList()) } }
-                .getOrNull() ?: return null
-        val match =
-            page.mangas.firstOrNull { manga -> webUrl(source) { http -> http.getMangaUrl(manga) }?.let { UrlMatch.same(it, url) } == true }
-                ?: page.mangas.singleOrNull()
-                ?: return null
-        return resolveUrlResponse {
+            attempt { sources.call(source, "resolve_url") { it.source.getSearchManga(1, url, it.source.getFilterList()) } }
+                ?: return SearchFound()
+
+        fun response(
+            manga: SManga,
+            web: String?,
+            guessed: Boolean,
+        ) = resolveUrlResponse {
             sourceId = source.id.toString()
-            series = Mapping.withUrl(Mapping.series(match), webUrl(source) { http -> http.getMangaUrl(match) })
-            bestEffort = true
+            series = Mapping.withUrl(Mapping.series(manga), web)
+            bestEffort = guessed
         }
+        for (manga in page.mangas) {
+            val web = webUrl(source) { http -> http.getMangaUrl(manga) }
+            if (web != null && UrlMatch.same(web, url)) return SearchFound(match = response(manga, web, guessed = false))
+        }
+        val single = page.mangas.singleOrNull() ?: return SearchFound()
+        return SearchFound(guess = response(single, webUrl(source) { http -> http.getMangaUrl(single) }, guessed = true))
     }
+
+    /** [block]'s result, or null when the source failed (a cancelled call still cancels). */
+    private suspend fun <T> attempt(block: suspend () -> T?): T? =
+        try {
+            block()
+        } catch (_: StatusException) {
+            null
+        }
 
     override suspend fun getSeries(request: GetSeriesRequest): GetSeriesResponse =
         rpc {

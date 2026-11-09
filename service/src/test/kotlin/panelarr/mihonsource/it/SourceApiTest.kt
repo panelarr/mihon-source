@@ -44,6 +44,7 @@ import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /** The source API against the in-repo test extensions and a fake site. */
@@ -278,17 +279,72 @@ class SourceApiTest {
     }
 
     @Test
-    fun `pasted URLs resolve through search, as best effort`() {
-        // The test sources have no resolver; their search accepts a URL, and their series
-        // URLs look like <base>/series/<key>.
-        val resolved =
-            runBlocking { api.resolveUrl(resolveUrlRequest { url = site.baseUrl + "/series/search-en-1-1/" }) }
+    fun `pasted URLs resolve through the native resolver first`() {
+        val resolved = runBlocking { api.resolveUrl(resolveUrlRequest { url = site.baseUrl + "/r/abc" }) }
+        assertEquals(en, resolved.sourceId)
+        assertEquals("abc", resolved.series.key)
+        assertEquals("Series abc", resolved.series.title)
+        assertFalse(resolved.bestEffort)
+    }
+
+    @Test
+    fun `pasted URLs resolve with their path as the series key`() {
+        // The lib 1.4 source keys series by their path, and its web URL is base URL + key.
+        val resolved = runBlocking { api.resolveUrl(resolveUrlRequest { url = site.baseUrl + "/html/series/one" }) }
+        assertEquals(lib14, resolved.sourceId)
+        assertEquals("/html/series/one", resolved.series.key)
+        assertEquals("Html one", resolved.series.title)
+        assertEquals(site.baseUrl + "/html/series/one", resolved.series.url)
+        assertFalse(resolved.bestEffort)
+    }
+
+    @Test
+    fun `a failing native resolver leaves the URL to search, and a URL match is not best effort`() {
+        // The lib 1.6 resolver throws on series pages; its search accepts a URL, and its
+        // series URLs look like <base>/series/<key>. The path isn't its key, so search finds it.
+        val url = site.baseUrl + "/series/search-en-1-1/"
+        val resolved = runBlocking { api.resolveUrl(resolveUrlRequest { this.url = url }) }
         assertEquals(en, resolved.sourceId)
         assertEquals("search-en-1-1", resolved.series.key)
-        assertTrue(resolved.bestEffort)
+        assertFalse(resolved.bestEffort)
+
+        val asked =
+            runBlocking {
+                api.resolveUrl(
+                    resolveUrlRequest {
+                        this.url = url
+                        sourceId = en
+                    },
+                )
+            }
+        assertEquals("search-en-1-1", asked.series.key)
+        assertFalse(asked.bestEffort)
 
         val http = service.send("POST", "/v1/resolve-url", "{\"url\": \"https://unrelated.example.org/series/x\"}")
         assertEquals(404, http.statusCode())
+    }
+
+    @Test
+    fun `a single unrelated search result is only best effort`() {
+        site.override = { request ->
+            if (request.url.encodedPath == "/api/search" && request.url.queryParameter("q")?.contains("/lonely/") == true) {
+                MockResponse
+                    .Builder()
+                    .addHeader("Content-Type", "application/json")
+                    .body("""{"items":[{"id":"other-1","title":"Other"}],"hasNext":false}""")
+                    .build()
+            } else {
+                null
+            }
+        }
+        try {
+            val resolved = runBlocking { api.resolveUrl(resolveUrlRequest { url = site.baseUrl + "/lonely/x" }) }
+            assertEquals(en, resolved.sourceId)
+            assertEquals("other-1", resolved.series.key)
+            assertTrue(resolved.bestEffort)
+        } finally {
+            site.override = { null }
+        }
     }
 
     @Test
