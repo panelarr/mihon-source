@@ -31,6 +31,9 @@ bouncycastle = "1.86"
 # The admin SPA (admin/): the Gradle plugin downloads this Node.js LTS itself.
 nodeGradle = "7.1.0"
 nodejs = "24.21.0"
+# The node-gradle plugin brings an old Jackson onto the admin build classpath; this BOM
+# raises it to a patched release (admin/build.gradle.kts).
+jacksonBuild = "2.22.4"
 graalvm = "25.0.4"
 twelvemonkeys = "3.15.3"
 
@@ -86,6 +89,9 @@ gradle-kotlin = { module = "org.jetbrains.kotlin:kotlin-gradle-plugin", version.
 gradle-detekt = { module = "dev.detekt:detekt-gradle-plugin", version.ref = "detekt" }
 gradle-ktlint = { module = "org.jlleitschuh.gradle:ktlint-gradle", version.ref = "ktlintPlugin" }
 gradle-serialization = { module = "org.jetbrains.kotlin:kotlin-serialization", version.ref = "kotlin" }
+
+# Build classpath constraints (admin/build.gradle.kts).
+jackson-bom = { module = "com.fasterxml.jackson:jackson-bom", version.ref = "jacksonBuild" }
 
 [plugins]
 protobuf = { id = "com.google.protobuf", version.ref = "protobufPlugin" }
