@@ -7,6 +7,7 @@ import ch.qos.logback.classic.Logger
 import ch.qos.logback.classic.LoggerContext
 import ch.qos.logback.classic.joran.JoranConfigurator
 import ch.qos.logback.classic.spi.LoggingEvent
+import ch.qos.logback.classic.util.LogbackMDCAdapter
 import ch.qos.logback.core.ConsoleAppender
 import ch.qos.logback.core.encoder.LayoutWrappingEncoder
 import ch.qos.logback.core.status.Status
@@ -23,7 +24,8 @@ import kotlin.test.assertTrue
 /** The service's logback.xml, loaded the way the service loads it, survives Logback upgrades. */
 class LogbackConfigTest {
     private fun configure(format: String?): LoggerContext {
-        val context = LoggerContext()
+        // A bare context has no MDC adapter; in the service, SLF4J's Logback provider sets one.
+        val context = LoggerContext().apply { setMDCAdapter(LogbackMDCAdapter()) }
         format?.let { context.putProperty("MIHON_LOG_FORMAT", it) }
         val config = assertNotNull(javaClass.getResource("/logback.xml"))
         JoranConfigurator().apply { this.context = context }.doConfigure(config)
