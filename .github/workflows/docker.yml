@@ -2,6 +2,9 @@ name: Docker
 
 # Pull requests build the image (both architectures) without pushing. Pushes to main
 # publish panelarr/mihon-source:edge; version tags publish the version tags and latest.
+# Publishing needs the DOCKERHUB_USERNAME and DOCKERHUB_TOKEN secrets: without them
+# (forks, or before the registry is set up) the image is still built as a check, and
+# login and push are skipped.
 
 on:
   pull_request:
@@ -21,6 +24,10 @@ jobs:
     name: Build image
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    env:
+      # Secrets can't be used in `if:` conditions, so expose whether they exist.
+      HAS_REGISTRY: ${{ secrets.DOCKERHUB_USERNAME != '' && secrets.DOCKERHUB_TOKEN != '' }}
+      PUBLISH: ${{ github.event_name != 'pull_request' && secrets.DOCKERHUB_USERNAME != '' && secrets.DOCKERHUB_TOKEN != '' }}
     steps:
       - uses: actions/checkout@v5
 
@@ -39,8 +46,12 @@ jobs:
             type=semver,pattern={{major}}.{{minor}}
             type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
 
+      - name: Note skipped publish
+        if: github.event_name != 'pull_request' && env.HAS_REGISTRY != 'true'
+        run: echo "::notice::Docker Hub credentials are not set; building the image without pushing it."
+
       - name: Log in to Docker Hub
-        if: github.event_name != 'pull_request'
+        if: env.PUBLISH == 'true'
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
@@ -50,7 +61,7 @@ jobs:
         with:
           context: .
           platforms: linux/amd64,linux/arm64
-          push: ${{ github.event_name != 'pull_request' }}
+          push: ${{ env.PUBLISH == 'true' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           sbom: true
