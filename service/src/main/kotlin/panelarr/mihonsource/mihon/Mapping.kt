@@ -36,6 +36,13 @@ import panelarr.source.v1.Page as ProtoPage
 
 /** Converts between Mihon's model and `panelarr.source.v1`. */
 object Mapping {
+    /**
+     * The IDs a source is known by in other apps (`Source.compat_ids`). A Mihon source ID is
+     * the same number in Mihon and its forks, and their backups name sources by it, so hosts
+     * can match imported data with `mihon:<id>`.
+     */
+    fun compatIds(sourceId: Long): List<String> = listOf("$MIHON_SCHEME:$sourceId")
+
     fun series(
         manga: SManga,
         key: String? = null,
@@ -146,6 +153,7 @@ object Mapping {
             ?: throw IllegalArgumentException("invalid page ref")
     }
 
+    private const val MIHON_SCHEME = "mihon"
     private const val REF_PREFIX = "p1."
     private const val MILLIS = 1000L
     private const val NANOS_PER_MILLI = 1_000_000L

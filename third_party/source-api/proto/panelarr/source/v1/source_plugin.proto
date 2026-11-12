@@ -8,6 +8,7 @@ import "google/api/annotations.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/timestamp.proto";
+import "panelarr/jobs/v1/jobs.proto";
 
 option java_multiple_files = true;
 option java_package = "panelarr.source.v1";
@@ -188,6 +189,43 @@ service SourcePluginService {
     };
   }
 
+  // ListOrigins lists where packages come from, e.g. extension stores (with the
+  // PACKAGES capability). PackageOffer.origin_id names one of them.
+  rpc ListOrigins(ListOriginsRequest) returns (ListOriginsResponse) {
+    option (google.api.http) = {get: "/v1/origins"};
+  }
+
+  // RefreshOrigin fetches an origin's list of packages again and returns the origin.
+  // When that fails, the call fails (STORE_FETCH_FAILED or STORE_INVALID) and the
+  // origin's `error` says why until a refresh works.
+  rpc RefreshOrigin(RefreshOriginRequest) returns (RefreshOriginResponse) {
+    option (google.api.http) = {
+      post: "/v1/origins/{origin_id}:refresh"
+      body: "*"
+    };
+  }
+
+  // ReloadPackage loads an installed package again from what is installed, without
+  // downloading anything: to retry a package that failed to load, or to apply settings
+  // the package only reads when it starts. UpdatePackage doesn't do that when the
+  // package is up to date. Returns the package as it is after loading.
+  rpc ReloadPackage(ReloadPackageRequest) returns (ReloadPackageResponse) {
+    option (google.api.http) = {
+      post: "/v1/packages/{package_id}:reload"
+      body: "*"
+    };
+  }
+
+  // SetSourceHealthCheck turns the plugin's scheduled health checks of one source on
+  // or off (with the HEALTH_CHECKS capability). SourceHealth.checks_disabled shows the
+  // setting. Returns the source. Plugins without the capability answer UNIMPLEMENTED.
+  rpc SetSourceHealthCheck(SetSourceHealthCheckRequest) returns (SetSourceHealthCheckResponse) {
+    option (google.api.http) = {
+      put: "/v1/sources/{source_id}/health-check"
+      body: "*"
+    };
+  }
+
   // GetNetworkProfile returns the network profile a source uses now and where it comes
   // from, so a host can show it. Proxy passwords come back empty. Optional: plugins that
   // don't implement it answer UNIMPLEMENTED.
@@ -201,6 +239,47 @@ service SourcePluginService {
   rpc SetNetworkProfile(SetNetworkProfileRequest) returns (SetNetworkProfileResponse) {
     option (google.api.http) = {
       put: "/v1/sources/{source_id}/network-profile"
+      body: "*"
+    };
+  }
+
+  // ListJobs lists the plugin's background jobs (with the JOBS capability), such as
+  // refreshing what it can install or checking its sources. Jobs use the shared
+  // panelarr.jobs.v1 model and its rules. Plugins without the capability answer
+  // UNIMPLEMENTED, and so do the other job calls.
+  rpc ListJobs(ListJobsRequest) returns (ListJobsResponse) {
+    option (google.api.http) = {get: "/v1/jobs"};
+  }
+
+  rpc GetJob(GetJobRequest) returns (GetJobResponse) {
+    option (google.api.http) = {get: "/v1/jobs/{job_id}"};
+  }
+
+  // ListJobRuns lists a job's runs, newest first.
+  rpc ListJobRuns(ListJobRunsRequest) returns (ListJobRunsResponse) {
+    option (google.api.http) = {get: "/v1/jobs/{job_id}/runs"};
+  }
+
+  // GetJobRun returns a run with its params, notes and, while it runs, progress.
+  rpc GetJobRun(GetJobRunRequest) returns (GetJobRunResponse) {
+    option (google.api.http) = {get: "/v1/job-runs/{run_id}"};
+  }
+
+  // RunJob starts a run now and returns at once. If the job is already running, it
+  // fails with ALREADY_EXISTS, an ErrorInfo with reason `ALREADY_RUNNING` and a
+  // panelarr.jobs.v1.JobAlreadyRunning detail naming the running run.
+  rpc RunJob(RunJobRequest) returns (RunJobResponse) {
+    option (google.api.http) = {
+      post: "/v1/jobs/{job_id}:run"
+      body: "*"
+    };
+  }
+
+  // CancelJobRun stops a running run. Fails with FAILED_PRECONDITION when the run isn't
+  // running or its job can't be cancelled.
+  rpc CancelJobRun(CancelJobRunRequest) returns (CancelJobRunResponse) {
+    option (google.api.http) = {
+      post: "/v1/job-runs/{run_id}:cancel"
       body: "*"
     };
   }
@@ -245,6 +324,12 @@ enum PluginCapability {
   // The plugin lists, installs, updates and removes packages (ListPackages and the
   // other package calls), e.g. extensions that each provide some sources.
   PLUGIN_CAPABILITY_PACKAGES = 3;
+  // The plugin has background jobs that hosts can list, run and cancel (ListJobs and
+  // the other job calls).
+  PLUGIN_CAPABILITY_JOBS = 4;
+  // The plugin checks its sources on a schedule, reports the results in Source.health,
+  // and lets hosts turn the checks off per source (SetSourceHealthCheck).
+  PLUGIN_CAPABILITY_HEALTH_CHECKS = 5;
 }
 
 // CommonService is a service a host can offer to plugins.
@@ -257,10 +342,19 @@ enum CommonService {
 }
 
 message Limits {
-  // Maximum parallel requests the plugin wants per source. 0 means no limit declared.
+  // Maximum parallel calls the plugin wants per source, FetchImage excepted. 0 means no
+  // limit declared.
   uint32 max_concurrency_per_source = 1;
-  // Default request rate per source. Unset means no limit declared.
+  // Call rate per source, FetchImage excepted (lists, search, details, chapters, pages).
+  // Unset means no limit declared.
   RateLimit default_rate_limit = 2;
+  // How fast a host may call FetchImage per source. Images often come from CDNs, and
+  // many plugins pace image downloads themselves; unset means the plugin does, and hosts
+  // should add no pacing of their own. A rate limit in a network profile the host pushes
+  // (SetNetworkProfile) still applies to all of the source's requests, images included.
+  RateLimit image_rate_limit = 3;
+  // Maximum parallel FetchImage calls per source. 0 means no limit declared.
+  uint32 max_image_concurrency_per_source = 4;
 }
 
 message RateLimit {
@@ -339,6 +433,12 @@ enum ErrorReason {
   // signing key that doesn't match. Sent with FAILED_PRECONDITION. (A bad signature or
   // checksum of the package file itself is INVALID_ARGUMENT.)
   ERROR_REASON_STORE_INVALID = 8;
+  // The job is already running. Sent with ALREADY_EXISTS; the ErrorInfo's metadata
+  // `current_run_id` and a panelarr.jobs.v1.JobAlreadyRunning detail name the running run.
+  ERROR_REASON_ALREADY_RUNNING = 9;
+  // The job can't run now; Job.disabled_reason says why. Sent with FAILED_PRECONDITION;
+  // the ErrorInfo's metadata `job_id` names the job.
+  ERROR_REASON_JOB_DISABLED = 10;
 }
 
 // ---------------------------------------------------------------------------
@@ -364,6 +464,13 @@ message Source {
   // The package that provides the source (see ListPackages), for plugins with the
   // PACKAGES capability. Empty otherwise.
   string package_id = 9;
+  // Optional. IDs this source is known by in other apps' ecosystems, as
+  // "<scheme>:<id>" (the scheme matches ^[a-z0-9-]+$ and the id isn't empty),
+  // e.g. "mihon:1234567890". Hosts use them to recognise the source in data
+  // imported from those apps (backups, reading history). A plugin sets only the
+  // schemes it knows to be right; the core never interprets them, and two
+  // plugins may claim the same ID.
+  repeated string compat_ids = 10;
 }
 
 // SourceHealth is what a plugin last saw when it checked a source itself.
@@ -721,6 +828,41 @@ message Package {
   string icon_url = 13;
   // Why an installed package isn't working (e.g. it failed to load). Empty when fine.
   string error = 14;
+  // More about the installed package, when the plugin knows it. Unset when not
+  // installed.
+  PackageDetails details = 15;
+}
+
+// PackageDetails describes an installed package, for an admin to check.
+message PackageDetails {
+  // SHA-256 (hex, lowercase) of the key the package is signed with. Empty when unsigned.
+  string signing_fingerprint = 1;
+  // The version of the plugin's API the package was built against, e.g. an
+  // extension's library version.
+  string api_version = 2;
+  google.protobuf.Timestamp installed_at = 3;
+  // SHA-256 (hex, lowercase) of the installed file.
+  string sha256 = 4;
+  // The origin it was installed from. Empty when installed another way, e.g. from a
+  // file.
+  string origin_id = 5;
+}
+
+// Origin is where packages come from, e.g. an extension store.
+message Origin {
+  // Matches `^[A-Za-z0-9][A-Za-z0-9._-]*$`, like package IDs.
+  string id = 1;
+  string name = 2;
+  string url = 3;
+  // When its list of packages was last fetched successfully.
+  google.protobuf.Timestamp refreshed_at = 4;
+  // Why the last refresh failed. Empty when it worked.
+  string error = 5;
+  // How many packages it offers.
+  uint32 package_count = 6;
+  // SHA-256 (hex, lowercase) of the signing key pinned for the origin. Empty when it
+  // has none.
+  string signing_key_fingerprint = 7;
 }
 
 message PackageOffer {
@@ -740,6 +882,9 @@ message PackageSource {
   // lists it when the package is installed. (Hosts may still turn single sources off
   // on their side.)
   bool available = 4;
+  // Optional. The Source.compat_ids it has once installed, so hosts can tell
+  // which package would provide a source they're looking for.
+  repeated string compat_ids = 5;
 }
 
 message PackageSettings {
@@ -806,6 +951,37 @@ message UninstallPackageResponse {}
 message SetPackageSettingsRequest {
   string package_id = 1;
   PackageSettings settings = 2;
+}
+
+message ListOriginsRequest {}
+
+message ListOriginsResponse {
+  repeated Origin origins = 1;
+}
+
+message RefreshOriginRequest {
+  string origin_id = 1;
+}
+
+message RefreshOriginResponse {
+  Origin origin = 1;
+}
+
+message ReloadPackageRequest {
+  string package_id = 1;
+}
+
+message ReloadPackageResponse {
+  Package package = 1;
+}
+
+message SetSourceHealthCheckRequest {
+  string source_id = 1;
+  bool enabled = 2;
+}
+
+message SetSourceHealthCheckResponse {
+  Source source = 1;
 }
 
 message SetPackageSettingsResponse {
@@ -941,4 +1117,68 @@ message Timeouts {
   google.protobuf.Duration read = 2;
   // Whole call, including redirects and retries.
   google.protobuf.Duration call = 3;
+}
+
+// ---------------------------------------------------------------------------
+// Jobs
+// ---------------------------------------------------------------------------
+
+message ListJobsRequest {}
+
+message ListJobsResponse {
+  repeated panelarr.jobs.v1.Job jobs = 1;
+}
+
+message GetJobRequest {
+  string job_id = 1;
+}
+
+message GetJobResponse {
+  panelarr.jobs.v1.Job job = 1;
+}
+
+message ListJobRunsRequest {
+  string job_id = 1;
+  // At most 100; 20 when unset.
+  int32 page_size = 2;
+  // From the previous response's `next_page_token`.
+  string page_token = 3;
+  // Only runs with this status, when set.
+  panelarr.jobs.v1.JobRunStatus status = 4;
+}
+
+message ListJobRunsResponse {
+  repeated panelarr.jobs.v1.JobRunSummary runs = 1;
+  // Empty on the last page.
+  string next_page_token = 2;
+}
+
+message GetJobRunRequest {
+  string run_id = 1;
+}
+
+message GetJobRunResponse {
+  panelarr.jobs.v1.JobRun run = 1;
+}
+
+message RunJobRequest {
+  string job_id = 1;
+  // Values for the job's params; lists are comma-separated. Params left out get their
+  // defaults.
+  map<string, string> params = 2;
+  // Who asked the host for the run, e.g. its user. The plugin records it in the run's
+  // `triggered_by`.
+  string on_behalf_of = 3;
+}
+
+message RunJobResponse {
+  panelarr.jobs.v1.JobRunSummary run = 1;
+}
+
+message CancelJobRunRequest {
+  string run_id = 1;
+}
+
+message CancelJobRunResponse {
+  panelarr.jobs.v1.JobRunSummary run = 1;
 }

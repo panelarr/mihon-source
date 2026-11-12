@@ -53,6 +53,8 @@ class ExtensionLoadingTest {
         assertEquals(ContentWarning.CONTENT_WARNING_MIXED, extension.contentWarning)
         assertEquals(ExtensionStatus.EXTENSION_STATUS_LOADED, extension.status, extension.loadError)
         assertEquals(listOf("en", "fr"), extension.sourcesList.map { it.lang }.sorted())
+        // The package listing names each source by its Mihon id, like ListSources does.
+        assertTrue(extension.sourcesList.all { it.compatIdsList == listOf("mihon:${it.id}") })
         assertEquals("", extension.signingFingerprint)
 
         val sources = runBlocking { service.sources.listSources(listSourcesRequest {}) }.sourcesList

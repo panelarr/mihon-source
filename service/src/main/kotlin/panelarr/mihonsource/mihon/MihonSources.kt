@@ -80,6 +80,7 @@ class MihonSources(
             source.homeUrl?.let { homeUrl = it }
             if (extensions.icons.has(source.extension.pkgName)) iconUrl = "/v1/sources/${source.id}/icon"
             capabilities += capabilities(source)
+            compatIds += Mapping.compatIds(source.id)
             val enabled = checksEnabled(source.id)
             if (!enabled) health = sourceHealth { checksDisabled = true }
             healthOf(source.id)?.let { last ->

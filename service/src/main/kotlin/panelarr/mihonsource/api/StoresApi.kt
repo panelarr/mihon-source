@@ -31,6 +31,7 @@ import panelarr.mihon.v1.listStoresResponse
 import panelarr.mihon.v1.refreshStoreResponse
 import panelarr.mihon.v1.removeStoreResponse
 import panelarr.mihon.v1.store
+import panelarr.mihonsource.mihon.Mapping
 import panelarr.mihonsource.net.Downloader
 import panelarr.mihonsource.store.AvailableExtension
 import panelarr.mihonsource.store.IndexContentWarning
@@ -170,6 +171,7 @@ class StoresApi(
                         name = s.name
                         lang = s.language
                         homeUrl = s.homeUrl
+                        compatIds += Mapping.compatIds(s.id)
                     }
                 }
             supported = this@toProto.supported

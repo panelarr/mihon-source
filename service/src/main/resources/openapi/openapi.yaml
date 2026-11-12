@@ -861,6 +861,201 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/panelarr.source.v1.GetInfoResponse'
+    /v1/job-runs/{runId}:
+        get:
+            tags:
+                - SourcePluginService
+            description: GetJobRun returns a run with its params, notes and, while it runs, progress.
+            operationId: SourcePluginService_GetJobRun
+            parameters:
+                - name: runId
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/panelarr.source.v1.GetJobRunResponse'
+    /v1/job-runs/{runId}:cancel:
+        post:
+            tags:
+                - SourcePluginService
+            description: |-
+                CancelJobRun stops a running run. Fails with FAILED_PRECONDITION when the run isn't
+                 running or its job can't be cancelled.
+            operationId: SourcePluginService_CancelJobRun
+            parameters:
+                - name: runId
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/panelarr.source.v1.CancelJobRunRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/panelarr.source.v1.CancelJobRunResponse'
+    /v1/jobs:
+        get:
+            tags:
+                - SourcePluginService
+            description: |-
+                ListJobs lists the plugin's background jobs (with the JOBS capability), such as
+                 refreshing what it can install or checking its sources. Jobs use the shared
+                 panelarr.jobs.v1 model and its rules. Plugins without the capability answer
+                 UNIMPLEMENTED, and so do the other job calls.
+            operationId: SourcePluginService_ListJobs
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/panelarr.source.v1.ListJobsResponse'
+    /v1/jobs/{jobId}:
+        get:
+            tags:
+                - SourcePluginService
+            operationId: SourcePluginService_GetJob
+            parameters:
+                - name: jobId
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/panelarr.source.v1.GetJobResponse'
+    /v1/jobs/{jobId}/runs:
+        get:
+            tags:
+                - SourcePluginService
+            description: ListJobRuns lists a job's runs, newest first.
+            operationId: SourcePluginService_ListJobRuns
+            parameters:
+                - name: jobId
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+                - name: pageSize
+                  in: query
+                  description: At most 100; 20 when unset.
+                  schema:
+                    type: integer
+                    format: int32
+                - name: pageToken
+                  in: query
+                  description: From the previous response's `next_page_token`.
+                  schema:
+                    type: string
+                - name: status
+                  in: query
+                  description: Only runs with this status, when set.
+                  schema:
+                    enum:
+                        - JOB_RUN_STATUS_UNSPECIFIED
+                        - JOB_RUN_STATUS_RUNNING
+                        - JOB_RUN_STATUS_SUCCEEDED
+                        - JOB_RUN_STATUS_FAILED
+                        - JOB_RUN_STATUS_CANCELLED
+                        - JOB_RUN_STATUS_SKIPPED
+                    type: string
+                    format: enum
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/panelarr.source.v1.ListJobRunsResponse'
+    /v1/jobs/{jobId}:run:
+        post:
+            tags:
+                - SourcePluginService
+            description: |-
+                RunJob starts a run now and returns at once. If the job is already running, it
+                 fails with ALREADY_EXISTS, an ErrorInfo with reason `ALREADY_RUNNING` and a
+                 panelarr.jobs.v1.JobAlreadyRunning detail naming the running run.
+            operationId: SourcePluginService_RunJob
+            parameters:
+                - name: jobId
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/panelarr.source.v1.RunJobRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/panelarr.source.v1.RunJobResponse'
+    /v1/origins:
+        get:
+            tags:
+                - SourcePluginService
+            description: |-
+                ListOrigins lists where packages come from, e.g. extension stores (with the
+                 PACKAGES capability). PackageOffer.origin_id names one of them.
+            operationId: SourcePluginService_ListOrigins
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/panelarr.source.v1.ListOriginsResponse'
+    /v1/origins/{originId}:refresh:
+        post:
+            tags:
+                - SourcePluginService
+            description: |-
+                RefreshOrigin fetches an origin's list of packages again and returns the origin.
+                 When that fails, the call fails (STORE_FETCH_FAILED or STORE_INVALID) and the
+                 origin's `error` says why until a refresh works.
+            operationId: SourcePluginService_RefreshOrigin
+            parameters:
+                - name: originId
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/panelarr.source.v1.RefreshOriginRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/panelarr.source.v1.RefreshOriginResponse'
     /v1/packages:
         get:
             tags:
@@ -987,6 +1182,35 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/panelarr.source.v1.InstallPackageResponse'
+    /v1/packages/{packageId}:reload:
+        post:
+            tags:
+                - SourcePluginService
+            description: |-
+                ReloadPackage loads an installed package again from what is installed, without
+                 downloading anything: to retry a package that failed to load, or to apply settings
+                 the package only reads when it starts. UpdatePackage doesn't do that when the
+                 package is up to date. Returns the package as it is after loading.
+            operationId: SourcePluginService_ReloadPackage
+            parameters:
+                - name: packageId
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/panelarr.source.v1.ReloadPackageRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/panelarr.source.v1.ReloadPackageResponse'
     /v1/packages/{packageId}:uninstall:
         post:
             tags:
@@ -1151,6 +1375,34 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/panelarr.source.v1.GetFiltersResponse'
+    /v1/sources/{sourceId}/health-check:
+        put:
+            tags:
+                - SourcePluginService
+            description: |-
+                SetSourceHealthCheck turns the plugin's scheduled health checks of one source on
+                 or off (with the HEALTH_CHECKS capability). SourceHealth.checks_disabled shows the
+                 setting. Returns the source. Plugins without the capability answer UNIMPLEMENTED.
+            operationId: SourcePluginService_SetSourceHealthCheck
+            parameters:
+                - name: sourceId
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/panelarr.source.v1.SetSourceHealthCheckRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/panelarr.source.v1.SetSourceHealthCheckResponse'
     /v1/sources/{sourceId}/latest:
         get:
             tags:
@@ -1407,6 +1659,173 @@ paths:
                                 $ref: '#/components/schemas/panelarr.mihon.v1.WhoAmIResponse'
 components:
     schemas:
+        panelarr.jobs.v1.Job:
+            type: object
+            properties:
+                id:
+                    type: string
+                    description: |-
+                        Stable ID, such as `store-refresh`. Matches `^[a-z0-9][a-z0-9._-]*$`: never a `:`,
+                         which HTTP paths would read as a custom verb (as in `:run`).
+                name:
+                    type: string
+                description:
+                    type: string
+                schedule:
+                    $ref: '#/components/schemas/panelarr.jobs.v1.Schedule'
+                running:
+                    type: boolean
+                currentRunId:
+                    type: string
+                    description: The running run, when `running`.
+                lastRun:
+                    $ref: '#/components/schemas/panelarr.jobs.v1.JobRunSummary'
+                nextRunAt:
+                    type: string
+                    description: When the next scheduled run starts. Unset when the job only runs on request.
+                    format: date-time
+                cancellable:
+                    type: boolean
+                params:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/panelarr.jobs.v1.JobParam'
+                    description: What a run accepts as params.
+                group:
+                    type: string
+                    description: A label to group jobs by, such as "Stores".
+                disabledReason:
+                    type: string
+                    description: |-
+                        Why the job can't run now, e.g. a feature it needs is turned off. Empty means it
+                         can. While set, starting it fails with FAILED_PRECONDITION and reason
+                         `JOB_DISABLED` (metadata `job_id`), and its schedule doesn't fire (`next_run_at`
+                         unset; `schedule.enabled` stays as configured). Output only, worked out by the
+                         service as things change.
+        panelarr.jobs.v1.JobParam:
+            type: object
+            properties:
+                name:
+                    type: string
+                type:
+                    type: string
+                    description: '`bool`, `int`, `string` or `string_list` (comma-separated in a run''s params).'
+                description:
+                    type: string
+                required:
+                    type: boolean
+                default:
+                    type: string
+                    description: The value used when the param isn't given, if any.
+                choices:
+                    type: array
+                    items:
+                        type: string
+                    description: The allowed values, when there is a fixed set. For a `string_list`, any subset.
+        panelarr.jobs.v1.JobProgress:
+            type: object
+            properties:
+                phase:
+                    type: string
+                done:
+                    type: string
+                total:
+                    type: string
+                unit:
+                    type: string
+                    description: What is counted, such as "sources".
+        panelarr.jobs.v1.JobRun:
+            type: object
+            properties:
+                summary:
+                    $ref: '#/components/schemas/panelarr.jobs.v1.JobRunSummary'
+                params:
+                    type: object
+                    additionalProperties:
+                        type: string
+                    description: The parameters it ran with.
+                notes:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/panelarr.jobs.v1.JobRunNote'
+                    description: Warnings, errors and notable events, oldest first (at most 200).
+                progress:
+                    allOf:
+                        - $ref: '#/components/schemas/panelarr.jobs.v1.JobProgress'
+                    description: While running.
+        panelarr.jobs.v1.JobRunNote:
+            type: object
+            properties:
+                at:
+                    type: string
+                    format: date-time
+                level:
+                    type: string
+                    description: '`info`, `warn` or `error`.'
+                message:
+                    type: string
+                ref:
+                    type: string
+                    description: What the note is about, such as a store or source ID.
+        panelarr.jobs.v1.JobRunSummary:
+            type: object
+            properties:
+                id:
+                    type: string
+                jobId:
+                    type: string
+                status:
+                    enum:
+                        - JOB_RUN_STATUS_UNSPECIFIED
+                        - JOB_RUN_STATUS_RUNNING
+                        - JOB_RUN_STATUS_SUCCEEDED
+                        - JOB_RUN_STATUS_FAILED
+                        - JOB_RUN_STATUS_CANCELLED
+                        - JOB_RUN_STATUS_SKIPPED
+                    type: string
+                    format: enum
+                trigger:
+                    enum:
+                        - JOB_TRIGGER_UNSPECIFIED
+                        - JOB_TRIGGER_SCHEDULE
+                        - JOB_TRIGGER_MANUAL
+                        - JOB_TRIGGER_STARTUP
+                        - JOB_TRIGGER_SYSTEM
+                    type: string
+                    format: enum
+                startedAt:
+                    type: string
+                    format: date-time
+                finishedAt:
+                    type: string
+                    format: date-time
+                message:
+                    type: string
+                    description: 'One line: the outcome, or the error.'
+                counts:
+                    type: object
+                    additionalProperties:
+                        type: string
+                    description: 'What the run did, such as {"stores": 2, "updates": 5}.'
+                triggeredBy:
+                    type: string
+                    description: Who started a manual run.
+        panelarr.jobs.v1.Schedule:
+            type: object
+            properties:
+                cron:
+                    type: string
+                interval:
+                    pattern: ^-?(?:0|[1-9][0-9]{0,11})(?:\.[0-9]{1,9})?s$
+                    type: string
+                enabled:
+                    type: boolean
+                source:
+                    type: string
+                    description: Where the schedule is configured, such as an environment variable.
+            description: |-
+                When a job runs on its own. With neither `cron` nor `interval`, it only runs on
+                 request.
         panelarr.mihon.v1.AddStoreRequest:
             type: object
             properties:
@@ -1512,6 +1931,13 @@ components:
                     type: string
                 homeUrl:
                     type: string
+                compatIds:
+                    type: array
+                    items:
+                        type: string
+                    description: |-
+                        IDs the source will be known by in other apps, as "<scheme>:<id>": "mihon:<id>".
+                         The same as Source.compat_ids in panelarr.source.v1 once installed.
         panelarr.mihon.v1.CancelJobRunRequest:
             type: object
             properties:
@@ -1694,6 +2120,13 @@ components:
                 available:
                     type: boolean
                     description: Its language is enabled, so the source is listed.
+                compatIds:
+                    type: array
+                    items:
+                        type: string
+                    description: |-
+                        IDs the source is known by in other apps, as "<scheme>:<id>": "mihon:<id>".
+                         The same as Source.compat_ids in panelarr.source.v1.
         panelarr.mihon.v1.GetExtensionResponse:
             type: object
             properties:
@@ -2353,6 +2786,16 @@ components:
                     type: array
                     items:
                         type: string
+        panelarr.source.v1.CancelJobRunRequest:
+            type: object
+            properties:
+                runId:
+                    type: string
+        panelarr.source.v1.CancelJobRunResponse:
+            type: object
+            properties:
+                run:
+                    $ref: '#/components/schemas/panelarr.jobs.v1.JobRunSummary'
         panelarr.source.v1.Chapter:
             type: object
             properties:
@@ -2456,6 +2899,16 @@ components:
             properties:
                 info:
                     $ref: '#/components/schemas/panelarr.source.v1.PluginInfo'
+        panelarr.source.v1.GetJobResponse:
+            type: object
+            properties:
+                job:
+                    $ref: '#/components/schemas/panelarr.jobs.v1.Job'
+        panelarr.source.v1.GetJobRunResponse:
+            type: object
+            properties:
+                run:
+                    $ref: '#/components/schemas/panelarr.jobs.v1.JobRun'
         panelarr.source.v1.GetNetworkProfileResponse:
             type: object
             properties:
@@ -2560,12 +3013,28 @@ components:
             properties:
                 maxConcurrencyPerSource:
                     type: integer
-                    description: Maximum parallel requests the plugin wants per source. 0 means no limit declared.
+                    description: |-
+                        Maximum parallel calls the plugin wants per source, FetchImage excepted. 0 means no
+                         limit declared.
                     format: uint32
                 defaultRateLimit:
                     allOf:
                         - $ref: '#/components/schemas/panelarr.source.v1.RateLimit'
-                    description: Default request rate per source. Unset means no limit declared.
+                    description: |-
+                        Call rate per source, FetchImage excepted (lists, search, details, chapters, pages).
+                         Unset means no limit declared.
+                imageRateLimit:
+                    allOf:
+                        - $ref: '#/components/schemas/panelarr.source.v1.RateLimit'
+                    description: |-
+                        How fast a host may call FetchImage per source. Images often come from CDNs, and
+                         many plugins pace image downloads themselves; unset means the plugin does, and hosts
+                         should add no pacing of their own. A rate limit in a network profile the host pushes
+                         (SetNetworkProfile) still applies to all of the source's requests, images included.
+                maxImageConcurrencyPerSource:
+                    type: integer
+                    description: Maximum parallel FetchImage calls per source. 0 means no limit declared.
+                    format: uint32
         panelarr.source.v1.ListChaptersResponse:
             type: object
             properties:
@@ -2573,6 +3042,30 @@ components:
                     type: array
                     items:
                         $ref: '#/components/schemas/panelarr.source.v1.Chapter'
+        panelarr.source.v1.ListJobRunsResponse:
+            type: object
+            properties:
+                runs:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/panelarr.jobs.v1.JobRunSummary'
+                nextPageToken:
+                    type: string
+                    description: Empty on the last page.
+        panelarr.source.v1.ListJobsResponse:
+            type: object
+            properties:
+                jobs:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/panelarr.jobs.v1.Job'
+        panelarr.source.v1.ListOriginsResponse:
+            type: object
+            properties:
+                origins:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/panelarr.source.v1.Origin'
         panelarr.source.v1.ListPackagesResponse:
             type: object
             properties:
@@ -2637,6 +3130,33 @@ components:
                 timeouts:
                     $ref: '#/components/schemas/panelarr.source.v1.Timeouts'
             description: NetworkProfile is everything a plugin needs to make requests for one source.
+        panelarr.source.v1.Origin:
+            type: object
+            properties:
+                id:
+                    type: string
+                    description: Matches `^[A-Za-z0-9][A-Za-z0-9._-]*$`, like package IDs.
+                name:
+                    type: string
+                url:
+                    type: string
+                refreshedAt:
+                    type: string
+                    description: When its list of packages was last fetched successfully.
+                    format: date-time
+                error:
+                    type: string
+                    description: Why the last refresh failed. Empty when it worked.
+                packageCount:
+                    type: integer
+                    description: How many packages it offers.
+                    format: uint32
+                signingKeyFingerprint:
+                    type: string
+                    description: |-
+                        SHA-256 (hex, lowercase) of the signing key pinned for the origin. Empty when it
+                         has none.
+            description: Origin is where packages come from, e.g. an extension store.
         panelarr.source.v1.Package:
             type: object
             properties:
@@ -2696,7 +3216,36 @@ components:
                 error:
                     type: string
                     description: Why an installed package isn't working (e.g. it failed to load). Empty when fine.
+                details:
+                    allOf:
+                        - $ref: '#/components/schemas/panelarr.source.v1.PackageDetails'
+                    description: |-
+                        More about the installed package, when the plugin knows it. Unset when not
+                         installed.
             description: Package is something a plugin can install that provides sources, e.g. an extension.
+        panelarr.source.v1.PackageDetails:
+            type: object
+            properties:
+                signingFingerprint:
+                    type: string
+                    description: SHA-256 (hex, lowercase) of the key the package is signed with. Empty when unsigned.
+                apiVersion:
+                    type: string
+                    description: |-
+                        The version of the plugin's API the package was built against, e.g. an
+                         extension's library version.
+                installedAt:
+                    type: string
+                    format: date-time
+                sha256:
+                    type: string
+                    description: SHA-256 (hex, lowercase) of the installed file.
+                originId:
+                    type: string
+                    description: |-
+                        The origin it was installed from. Empty when installed another way, e.g. from a
+                         file.
+            description: PackageDetails describes an installed package, for an admin to check.
         panelarr.source.v1.PackageOffer:
             type: object
             properties:
@@ -2736,6 +3285,13 @@ components:
                         Its language is enabled at the plugin's and the package's level, so ListSources
                          lists it when the package is installed. (Hosts may still turn single sources off
                          on their side.)
+                compatIds:
+                    type: array
+                    items:
+                        type: string
+                    description: |-
+                        Optional. The Source.compat_ids it has once installed, so hosts can tell
+                         which package would provide a source they're looking for.
         panelarr.source.v1.Page:
             type: object
             properties:
@@ -2776,6 +3332,8 @@ components:
                             - PLUGIN_CAPABILITY_NETWORK_PROFILES
                             - PLUGIN_CAPABILITY_DYNAMIC_SOURCES
                             - PLUGIN_CAPABILITY_PACKAGES
+                            - PLUGIN_CAPABILITY_JOBS
+                            - PLUGIN_CAPABILITY_HEALTH_CHECKS
                         type: string
                         format: enum
                     description: Features of the plugin as a whole. Per-source features are on Source.
@@ -2840,6 +3398,26 @@ components:
                     type: string
                     description: What the limit counts.
                     format: enum
+        panelarr.source.v1.RefreshOriginRequest:
+            type: object
+            properties:
+                originId:
+                    type: string
+        panelarr.source.v1.RefreshOriginResponse:
+            type: object
+            properties:
+                origin:
+                    $ref: '#/components/schemas/panelarr.source.v1.Origin'
+        panelarr.source.v1.ReloadPackageRequest:
+            type: object
+            properties:
+                packageId:
+                    type: string
+        panelarr.source.v1.ReloadPackageResponse:
+            type: object
+            properties:
+                package:
+                    $ref: '#/components/schemas/panelarr.source.v1.Package'
         panelarr.source.v1.ResolveUrlRequest:
             type: object
             properties:
@@ -2860,6 +3438,28 @@ components:
                     description: |-
                         The source has no URL resolver of its own and the plugin found the series another
                          way (e.g. by searching for the URL). The match may be wrong.
+        panelarr.source.v1.RunJobRequest:
+            type: object
+            properties:
+                jobId:
+                    type: string
+                params:
+                    type: object
+                    additionalProperties:
+                        type: string
+                    description: |-
+                        Values for the job's params; lists are comma-separated. Params left out get their
+                         defaults.
+                onBehalfOf:
+                    type: string
+                    description: |-
+                        Who asked the host for the run, e.g. its user. The plugin records it in the run's
+                         `triggered_by`.
+        panelarr.source.v1.RunJobResponse:
+            type: object
+            properties:
+                run:
+                    $ref: '#/components/schemas/panelarr.jobs.v1.JobRunSummary'
         panelarr.source.v1.SearchRequest:
             type: object
             properties:
@@ -2994,6 +3594,18 @@ components:
             properties:
                 values:
                     type: object
+        panelarr.source.v1.SetSourceHealthCheckRequest:
+            type: object
+            properties:
+                sourceId:
+                    type: string
+                enabled:
+                    type: boolean
+        panelarr.source.v1.SetSourceHealthCheckResponse:
+            type: object
+            properties:
+                source:
+                    $ref: '#/components/schemas/panelarr.source.v1.Source'
         panelarr.source.v1.Solver:
             type: object
             properties:
@@ -3089,6 +3701,17 @@ components:
                     description: |-
                         The package that provides the source (see ListPackages), for plugins with the
                          PACKAGES capability. Empty otherwise.
+                compatIds:
+                    type: array
+                    items:
+                        type: string
+                    description: |-
+                        Optional. IDs this source is known by in other apps' ecosystems, as
+                         "<scheme>:<id>" (the scheme matches ^[a-z0-9-]+$ and the id isn't empty),
+                         e.g. "mihon:1234567890". Hosts use them to recognise the source in data
+                         imported from those apps (backups, reading history). A plugin sets only the
+                         schemes it knows to be right; the core never interprets them, and two
+                         plugins may claim the same ID.
         panelarr.source.v1.SourceHealth:
             type: object
             properties:

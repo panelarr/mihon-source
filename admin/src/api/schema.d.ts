@@ -635,6 +635,160 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/job-runs/{runId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description GetJobRun returns a run with its params, notes and, while it runs, progress. */
+        get: operations["SourcePluginService_GetJobRun"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/job-runs/{runId}:cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * @description CancelJobRun stops a running run. Fails with FAILED_PRECONDITION when the run isn't
+         *      running or its job can't be cancelled.
+         */
+        post: operations["SourcePluginService_CancelJobRun"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/jobs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description ListJobs lists the plugin's background jobs (with the JOBS capability), such as
+         *      refreshing what it can install or checking its sources. Jobs use the shared
+         *      panelarr.jobs.v1 model and its rules. Plugins without the capability answer
+         *      UNIMPLEMENTED, and so do the other job calls.
+         */
+        get: operations["SourcePluginService_ListJobs"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/jobs/{jobId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["SourcePluginService_GetJob"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/jobs/{jobId}/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description ListJobRuns lists a job's runs, newest first. */
+        get: operations["SourcePluginService_ListJobRuns"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/jobs/{jobId}:run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * @description RunJob starts a run now and returns at once. If the job is already running, it
+         *      fails with ALREADY_EXISTS, an ErrorInfo with reason `ALREADY_RUNNING` and a
+         *      panelarr.jobs.v1.JobAlreadyRunning detail naming the running run.
+         */
+        post: operations["SourcePluginService_RunJob"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/origins": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description ListOrigins lists where packages come from, e.g. extension stores (with the
+         *      PACKAGES capability). PackageOffer.origin_id names one of them.
+         */
+        get: operations["SourcePluginService_ListOrigins"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/origins/{originId}:refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * @description RefreshOrigin fetches an origin's list of packages again and returns the origin.
+         *      When that fails, the call fails (STORE_FETCH_FAILED or STORE_INVALID) and the
+         *      origin's `error` says why until a refresh works.
+         */
+        post: operations["SourcePluginService_RefreshOrigin"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/packages": {
         parameters: {
             query?: never;
@@ -709,6 +863,28 @@ export interface paths {
          *      cancelled midway either finishes or leaves the previous state; never half a package.
          */
         post: operations["SourcePluginService_InstallPackage"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/packages/{packageId}:reload": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * @description ReloadPackage loads an installed package again from what is installed, without
+         *      downloading anything: to retry a package that failed to load, or to apply settings
+         *      the package only reads when it starts. UpdatePackage doesn't do that when the
+         *      package is up to date. Returns the package as it is after loading.
+         */
+        post: operations["SourcePluginService_ReloadPackage"];
         delete?: never;
         options?: never;
         head?: never;
@@ -839,6 +1015,27 @@ export interface paths {
         /** @description GetFilters returns the search filters of a source with their default values. */
         get: operations["SourcePluginService_GetFilters"];
         put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/sources/{sourceId}/health-check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * @description SetSourceHealthCheck turns the plugin's scheduled health checks of one source on
+         *      or off (with the HEALTH_CHECKS capability). SourceHealth.checks_disabled shows the
+         *      setting. Returns the source. Plugins without the capability answer UNIMPLEMENTED.
+         */
+        put: operations["SourcePluginService_SetSourceHealthCheck"];
         post?: never;
         delete?: never;
         options?: never;
@@ -1016,6 +1213,113 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        "panelarr.jobs.v1.Job": {
+            /**
+             * @description Stable ID, such as `store-refresh`. Matches `^[a-z0-9][a-z0-9._-]*$`: never a `:`,
+             *      which HTTP paths would read as a custom verb (as in `:run`).
+             */
+            id?: string;
+            name?: string;
+            description?: string;
+            schedule?: components["schemas"]["panelarr.jobs.v1.Schedule"];
+            running?: boolean;
+            /** @description The running run, when `running`. */
+            currentRunId?: string;
+            lastRun?: components["schemas"]["panelarr.jobs.v1.JobRunSummary"];
+            /**
+             * Format: date-time
+             * @description When the next scheduled run starts. Unset when the job only runs on request.
+             */
+            nextRunAt?: string;
+            cancellable?: boolean;
+            /** @description What a run accepts as params. */
+            params?: components["schemas"]["panelarr.jobs.v1.JobParam"][];
+            /** @description A label to group jobs by, such as "Stores". */
+            group?: string;
+            /**
+             * @description Why the job can't run now, e.g. a feature it needs is turned off. Empty means it
+             *      can. While set, starting it fails with FAILED_PRECONDITION and reason
+             *      `JOB_DISABLED` (metadata `job_id`), and its schedule doesn't fire (`next_run_at`
+             *      unset; `schedule.enabled` stays as configured). Output only, worked out by the
+             *      service as things change.
+             */
+            disabledReason?: string;
+        };
+        "panelarr.jobs.v1.JobParam": {
+            name?: string;
+            /** @description `bool`, `int`, `string` or `string_list` (comma-separated in a run's params). */
+            type?: string;
+            description?: string;
+            required?: boolean;
+            /** @description The value used when the param isn't given, if any. */
+            default?: string;
+            /** @description The allowed values, when there is a fixed set. For a `string_list`, any subset. */
+            choices?: string[];
+        };
+        "panelarr.jobs.v1.JobProgress": {
+            phase?: string;
+            done?: string;
+            total?: string;
+            /** @description What is counted, such as "sources". */
+            unit?: string;
+        };
+        "panelarr.jobs.v1.JobRun": {
+            summary?: components["schemas"]["panelarr.jobs.v1.JobRunSummary"];
+            /** @description The parameters it ran with. */
+            params?: {
+                [key: string]: string;
+            };
+            /** @description Warnings, errors and notable events, oldest first (at most 200). */
+            notes?: components["schemas"]["panelarr.jobs.v1.JobRunNote"][];
+            /** @description While running. */
+            progress?: components["schemas"]["panelarr.jobs.v1.JobProgress"];
+        };
+        "panelarr.jobs.v1.JobRunNote": {
+            /** Format: date-time */
+            at?: string;
+            /** @description `info`, `warn` or `error`. */
+            level?: string;
+            message?: string;
+            /** @description What the note is about, such as a store or source ID. */
+            ref?: string;
+        };
+        "panelarr.jobs.v1.JobRunSummary": {
+            id?: string;
+            jobId?: string;
+            /**
+             * Format: enum
+             * @enum {string}
+             */
+            status?: "JOB_RUN_STATUS_UNSPECIFIED" | "JOB_RUN_STATUS_RUNNING" | "JOB_RUN_STATUS_SUCCEEDED" | "JOB_RUN_STATUS_FAILED" | "JOB_RUN_STATUS_CANCELLED" | "JOB_RUN_STATUS_SKIPPED";
+            /**
+             * Format: enum
+             * @enum {string}
+             */
+            trigger?: "JOB_TRIGGER_UNSPECIFIED" | "JOB_TRIGGER_SCHEDULE" | "JOB_TRIGGER_MANUAL" | "JOB_TRIGGER_STARTUP" | "JOB_TRIGGER_SYSTEM";
+            /** Format: date-time */
+            startedAt?: string;
+            /** Format: date-time */
+            finishedAt?: string;
+            /** @description One line: the outcome, or the error. */
+            message?: string;
+            /** @description What the run did, such as {"stores": 2, "updates": 5}. */
+            counts?: {
+                [key: string]: string;
+            };
+            /** @description Who started a manual run. */
+            triggeredBy?: string;
+        };
+        /**
+         * @description When a job runs on its own. With neither `cron` nor `interval`, it only runs on
+         *      request.
+         */
+        "panelarr.jobs.v1.Schedule": {
+            cron?: string;
+            interval?: string;
+            enabled?: boolean;
+            /** @description Where the schedule is configured, such as an environment variable. */
+            source?: string;
+        };
         "panelarr.mihon.v1.AddStoreRequest": {
             /** @description URL of the store's repo.json, or of a legacy index.min.json. */
             url?: string;
@@ -1076,6 +1380,11 @@ export interface components {
             name?: string;
             lang?: string;
             homeUrl?: string;
+            /**
+             * @description IDs the source will be known by in other apps, as "<scheme>:<id>": "mihon:<id>".
+             *      The same as Source.compat_ids in panelarr.source.v1 once installed.
+             */
+            compatIds?: string[];
         };
         "panelarr.mihon.v1.CancelJobRunRequest": {
             runId?: string;
@@ -1175,6 +1484,11 @@ export interface components {
             lang?: string;
             /** @description Its language is enabled, so the source is listed. */
             available?: boolean;
+            /**
+             * @description IDs the source is known by in other apps, as "<scheme>:<id>": "mihon:<id>".
+             *      The same as Source.compat_ids in panelarr.source.v1.
+             */
+            compatIds?: string[];
         };
         "panelarr.mihon.v1.GetExtensionResponse": {
             extension?: components["schemas"]["panelarr.mihon.v1.Extension"];
@@ -1575,6 +1889,12 @@ export interface components {
             name?: string;
             scopes?: string[];
         };
+        "panelarr.source.v1.CancelJobRunRequest": {
+            runId?: string;
+        };
+        "panelarr.source.v1.CancelJobRunResponse": {
+            run?: components["schemas"]["panelarr.jobs.v1.JobRunSummary"];
+        };
         "panelarr.source.v1.Chapter": {
             /** @description Opaque key of the chapter within its source. */
             key?: string;
@@ -1640,6 +1960,12 @@ export interface components {
         };
         "panelarr.source.v1.GetInfoResponse": {
             info?: components["schemas"]["panelarr.source.v1.PluginInfo"];
+        };
+        "panelarr.source.v1.GetJobResponse": {
+            job?: components["schemas"]["panelarr.jobs.v1.Job"];
+        };
+        "panelarr.source.v1.GetJobRunResponse": {
+            run?: components["schemas"]["panelarr.jobs.v1.JobRun"];
         };
         "panelarr.source.v1.GetNetworkProfileResponse": {
             /**
@@ -1708,14 +2034,41 @@ export interface components {
         "panelarr.source.v1.Limits": {
             /**
              * Format: uint32
-             * @description Maximum parallel requests the plugin wants per source. 0 means no limit declared.
+             * @description Maximum parallel calls the plugin wants per source, FetchImage excepted. 0 means no
+             *      limit declared.
              */
             maxConcurrencyPerSource?: number;
-            /** @description Default request rate per source. Unset means no limit declared. */
+            /**
+             * @description Call rate per source, FetchImage excepted (lists, search, details, chapters, pages).
+             *      Unset means no limit declared.
+             */
             defaultRateLimit?: components["schemas"]["panelarr.source.v1.RateLimit"];
+            /**
+             * @description How fast a host may call FetchImage per source. Images often come from CDNs, and
+             *      many plugins pace image downloads themselves; unset means the plugin does, and hosts
+             *      should add no pacing of their own. A rate limit in a network profile the host pushes
+             *      (SetNetworkProfile) still applies to all of the source's requests, images included.
+             */
+            imageRateLimit?: components["schemas"]["panelarr.source.v1.RateLimit"];
+            /**
+             * Format: uint32
+             * @description Maximum parallel FetchImage calls per source. 0 means no limit declared.
+             */
+            maxImageConcurrencyPerSource?: number;
         };
         "panelarr.source.v1.ListChaptersResponse": {
             chapters?: components["schemas"]["panelarr.source.v1.Chapter"][];
+        };
+        "panelarr.source.v1.ListJobRunsResponse": {
+            runs?: components["schemas"]["panelarr.jobs.v1.JobRunSummary"][];
+            /** @description Empty on the last page. */
+            nextPageToken?: string;
+        };
+        "panelarr.source.v1.ListJobsResponse": {
+            jobs?: components["schemas"]["panelarr.jobs.v1.Job"][];
+        };
+        "panelarr.source.v1.ListOriginsResponse": {
+            origins?: components["schemas"]["panelarr.source.v1.Origin"][];
         };
         "panelarr.source.v1.ListPackagesResponse": {
             packages?: components["schemas"]["panelarr.source.v1.Package"][];
@@ -1754,6 +2107,30 @@ export interface components {
             /** @description Name of a cookie jar shared with other sources. Empty means a jar of its own. */
             sharedCookieJar?: string;
             timeouts?: components["schemas"]["panelarr.source.v1.Timeouts"];
+        };
+        /** @description Origin is where packages come from, e.g. an extension store. */
+        "panelarr.source.v1.Origin": {
+            /** @description Matches `^[A-Za-z0-9][A-Za-z0-9._-]*$`, like package IDs. */
+            id?: string;
+            name?: string;
+            url?: string;
+            /**
+             * Format: date-time
+             * @description When its list of packages was last fetched successfully.
+             */
+            refreshedAt?: string;
+            /** @description Why the last refresh failed. Empty when it worked. */
+            error?: string;
+            /**
+             * Format: uint32
+             * @description How many packages it offers.
+             */
+            packageCount?: number;
+            /**
+             * @description SHA-256 (hex, lowercase) of the signing key pinned for the origin. Empty when it
+             *      has none.
+             */
+            signingKeyFingerprint?: string;
         };
         /** @description Package is something a plugin can install that provides sources, e.g. an extension. */
         "panelarr.source.v1.Package": {
@@ -1794,6 +2171,30 @@ export interface components {
             iconUrl?: string;
             /** @description Why an installed package isn't working (e.g. it failed to load). Empty when fine. */
             error?: string;
+            /**
+             * @description More about the installed package, when the plugin knows it. Unset when not
+             *      installed.
+             */
+            details?: components["schemas"]["panelarr.source.v1.PackageDetails"];
+        };
+        /** @description PackageDetails describes an installed package, for an admin to check. */
+        "panelarr.source.v1.PackageDetails": {
+            /** @description SHA-256 (hex, lowercase) of the key the package is signed with. Empty when unsigned. */
+            signingFingerprint?: string;
+            /**
+             * @description The version of the plugin's API the package was built against, e.g. an
+             *      extension's library version.
+             */
+            apiVersion?: string;
+            /** Format: date-time */
+            installedAt?: string;
+            /** @description SHA-256 (hex, lowercase) of the installed file. */
+            sha256?: string;
+            /**
+             * @description The origin it was installed from. Empty when installed another way, e.g. from a
+             *      file.
+             */
+            originId?: string;
         };
         "panelarr.source.v1.PackageOffer": {
             /** @description Identifier of the origin, e.g. an extension store; for InstallPackage.origin_id. */
@@ -1821,6 +2222,11 @@ export interface components {
              *      on their side.)
              */
             available?: boolean;
+            /**
+             * @description Optional. The Source.compat_ids it has once installed, so hosts can tell
+             *      which package would provide a source they're looking for.
+             */
+            compatIds?: string[];
         };
         "panelarr.source.v1.Page": {
             /**
@@ -1846,7 +2252,7 @@ export interface components {
             /** @description Contracts the plugin implements, e.g. "panelarr.source.v1". */
             contracts?: string[];
             /** @description Features of the plugin as a whole. Per-source features are on Source. */
-            capabilities?: ("PLUGIN_CAPABILITY_UNSPECIFIED" | "PLUGIN_CAPABILITY_NETWORK_PROFILES" | "PLUGIN_CAPABILITY_DYNAMIC_SOURCES" | "PLUGIN_CAPABILITY_PACKAGES")[];
+            capabilities?: ("PLUGIN_CAPABILITY_UNSPECIFIED" | "PLUGIN_CAPABILITY_NETWORK_PROFILES" | "PLUGIN_CAPABILITY_DYNAMIC_SOURCES" | "PLUGIN_CAPABILITY_PACKAGES" | "PLUGIN_CAPABILITY_JOBS" | "PLUGIN_CAPABILITY_HEALTH_CHECKS")[];
             /** @description Limits the plugin asks hosts to respect. Hosts should enforce them too. */
             limits?: components["schemas"]["panelarr.source.v1.Limits"];
             /**
@@ -1887,6 +2293,18 @@ export interface components {
              */
             scope?: "RATE_LIMIT_SCOPE_UNSPECIFIED" | "RATE_LIMIT_SCOPE_SOURCE" | "RATE_LIMIT_SCOPE_HOST";
         };
+        "panelarr.source.v1.RefreshOriginRequest": {
+            originId?: string;
+        };
+        "panelarr.source.v1.RefreshOriginResponse": {
+            origin?: components["schemas"]["panelarr.source.v1.Origin"];
+        };
+        "panelarr.source.v1.ReloadPackageRequest": {
+            packageId?: string;
+        };
+        "panelarr.source.v1.ReloadPackageResponse": {
+            package?: components["schemas"]["panelarr.source.v1.Package"];
+        };
         "panelarr.source.v1.ResolveUrlRequest": {
             url?: string;
             /** @description Source to ask. Empty means every source that may know the URL. */
@@ -1900,6 +2318,24 @@ export interface components {
              *      way (e.g. by searching for the URL). The match may be wrong.
              */
             bestEffort?: boolean;
+        };
+        "panelarr.source.v1.RunJobRequest": {
+            jobId?: string;
+            /**
+             * @description Values for the job's params; lists are comma-separated. Params left out get their
+             *      defaults.
+             */
+            params?: {
+                [key: string]: string;
+            };
+            /**
+             * @description Who asked the host for the run, e.g. its user. The plugin records it in the run's
+             *      `triggered_by`.
+             */
+            onBehalfOf?: string;
+        };
+        "panelarr.source.v1.RunJobResponse": {
+            run?: components["schemas"]["panelarr.jobs.v1.JobRunSummary"];
         };
         "panelarr.source.v1.SearchRequest": {
             sourceId?: string;
@@ -1976,6 +2412,13 @@ export interface components {
         "panelarr.source.v1.SetSettingsResponse": {
             values?: Record<string, never>;
         };
+        "panelarr.source.v1.SetSourceHealthCheckRequest": {
+            sourceId?: string;
+            enabled?: boolean;
+        };
+        "panelarr.source.v1.SetSourceHealthCheckResponse": {
+            source?: components["schemas"]["panelarr.source.v1.Source"];
+        };
         "panelarr.source.v1.Solver": {
             /**
              * Format: enum
@@ -2031,6 +2474,15 @@ export interface components {
              *      PACKAGES capability. Empty otherwise.
              */
             packageId?: string;
+            /**
+             * @description Optional. IDs this source is known by in other apps' ecosystems, as
+             *      "<scheme>:<id>" (the scheme matches ^[a-z0-9-]+$ and the id isn't empty),
+             *      e.g. "mihon:1234567890". Hosts use them to recognise the source in data
+             *      imported from those apps (backups, reading history). A plugin sets only the
+             *      schemes it knows to be right; the core never interprets them, and two
+             *      plugins may claim the same ID.
+             */
+            compatIds?: string[];
         };
         /** @description SourceHealth is what a plugin last saw when it checked a source itself. */
         "panelarr.source.v1.SourceHealth": {
@@ -3034,6 +3486,197 @@ export interface operations {
             };
         };
     };
+    SourcePluginService_GetJobRun: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                runId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["panelarr.source.v1.GetJobRunResponse"];
+                };
+            };
+        };
+    };
+    SourcePluginService_CancelJobRun: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                runId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["panelarr.source.v1.CancelJobRunRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["panelarr.source.v1.CancelJobRunResponse"];
+                };
+            };
+        };
+    };
+    SourcePluginService_ListJobs: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["panelarr.source.v1.ListJobsResponse"];
+                };
+            };
+        };
+    };
+    SourcePluginService_GetJob: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                jobId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["panelarr.source.v1.GetJobResponse"];
+                };
+            };
+        };
+    };
+    SourcePluginService_ListJobRuns: {
+        parameters: {
+            query?: {
+                /** @description At most 100; 20 when unset. */
+                pageSize?: number;
+                /** @description From the previous response's `next_page_token`. */
+                pageToken?: string;
+                /** @description Only runs with this status, when set. */
+                status?: "JOB_RUN_STATUS_UNSPECIFIED" | "JOB_RUN_STATUS_RUNNING" | "JOB_RUN_STATUS_SUCCEEDED" | "JOB_RUN_STATUS_FAILED" | "JOB_RUN_STATUS_CANCELLED" | "JOB_RUN_STATUS_SKIPPED";
+            };
+            header?: never;
+            path: {
+                jobId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["panelarr.source.v1.ListJobRunsResponse"];
+                };
+            };
+        };
+    };
+    SourcePluginService_RunJob: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                jobId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["panelarr.source.v1.RunJobRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["panelarr.source.v1.RunJobResponse"];
+                };
+            };
+        };
+    };
+    SourcePluginService_ListOrigins: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["panelarr.source.v1.ListOriginsResponse"];
+                };
+            };
+        };
+    };
+    SourcePluginService_RefreshOrigin: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                originId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["panelarr.source.v1.RefreshOriginRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["panelarr.source.v1.RefreshOriginResponse"];
+                };
+            };
+        };
+    };
     SourcePluginService_ListPackages: {
         parameters: {
             query?: {
@@ -3137,6 +3780,32 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["panelarr.source.v1.InstallPackageResponse"];
+                };
+            };
+        };
+    };
+    SourcePluginService_ReloadPackage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                packageId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["panelarr.source.v1.ReloadPackageRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["panelarr.source.v1.ReloadPackageResponse"];
                 };
             };
         };
@@ -3309,6 +3978,32 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["panelarr.source.v1.GetFiltersResponse"];
+                };
+            };
+        };
+    };
+    SourcePluginService_SetSourceHealthCheck: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sourceId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["panelarr.source.v1.SetSourceHealthCheckRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["panelarr.source.v1.SetSourceHealthCheckResponse"];
                 };
             };
         };

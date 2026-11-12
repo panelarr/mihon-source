@@ -1,5 +1,6 @@
 # The source API protos (panelarr.source.v1) come from source-api. Don't edit them here:
 # change them in source-api, then run `make sync-source-api` (see CONTRIBUTING.md).
 repository=https://github.com/panelarr/source-api
-commit=348bc2d21fab4cff2cca5ecb0f9403a40e9ab925
-sha256=ad03755447197f61c92c66a2ec115a5a74a2591cf80096e167f5a9aeda131e1c
+commit=333bb17d70d513ccb8034137a9241320072e0e43
+sha256 proto/panelarr/jobs/v1/jobs.proto=ef711949b83cdd827e1989745203cf4ca684031e10cc584bd965958ce7488571
+sha256 proto/panelarr/source/v1/source_plugin.proto=a7e20b8dab8783aa8aaea8c7372afb87fde1cfc00b1a74678dc9e5dab4336925

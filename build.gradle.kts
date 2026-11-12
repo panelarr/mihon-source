@@ -15,25 +15,38 @@ tasks.register("setup") {
 }
 
 // panelarr.source.v1 is pinned from source-api: third_party/source-api/PIN names the
-// commit and the SHA-256 of the proto, so a local edit fails the build.
-val sourceApiProto = "proto/panelarr/source/v1/source_plugin.proto"
+// commit and the SHA-256 of each proto file, so a local edit fails the build.
+val sourceApiProtos =
+    listOf(
+        "proto/panelarr/jobs/v1/jobs.proto",
+        "proto/panelarr/source/v1/source_plugin.proto",
+    )
 
 val sourceApiCheck =
     tasks.register("sourceApiCheck") {
         group = "verification"
-        description = "Fails when the vendored source API proto differs from its pin."
+        description = "Fails when the vendored source API protos differ from their pin."
         val pin = file("third_party/source-api/PIN")
-        val proto = file("third_party/source-api/$sourceApiProto")
-        inputs.files(pin, proto)
+        val protos = sourceApiProtos.associateWith { file("third_party/source-api/$it") }
+        inputs.files(pin, protos.values)
         doLast {
-            val want = pin.readLines().first { it.startsWith("sha256=") }.substringAfter("=")
-            val got =
+            fun sha256Hex(bytes: ByteArray): String =
                 java.security.MessageDigest
                     .getInstance("SHA-256")
-                    .digest(proto.readBytes())
+                    .digest(bytes)
                     .joinToString("") { "%02x".format(it) }
-            check(got == want) {
-                "third_party/source-api/proto was edited. Change the protos in source-api, then run make sync-source-api."
+            val pinned =
+                pin
+                    .readLines()
+                    .filter { it.startsWith("sha256 ") }
+                    .associate { line -> line.removePrefix("sha256 ").substringBefore("=") to line.substringAfter("=") }
+            check(pinned.keys == protos.keys) {
+                "third_party/source-api/PIN doesn't list the vendored protos. Run make sync-source-api."
+            }
+            protos.forEach { (path, proto) ->
+                check(proto.isFile && sha256Hex(proto.readBytes()) == pinned[path]) {
+                    "third_party/source-api/$path was edited. Change the protos in source-api, then run make sync-source-api."
+                }
             }
         }
     }
@@ -41,12 +54,12 @@ val sourceApiCheck =
 // make sync-source-api [REF=v0.2.0] [SOURCE_API_DIR=../source-api]
 tasks.register("syncSourceApi") {
     group = "panelarr"
-    description = "Copies the source API proto from a source-api checkout at a ref and pins it."
+    description = "Copies the source API protos from a source-api checkout at a ref and pins them."
     val dir = providers.gradleProperty("sourceApiDir").orElse("../source-api")
     val ref = providers.gradleProperty("sourceApiRef").orElse("main")
     val pin = file("third_party/source-api/PIN")
-    val protoPath = sourceApiProto
-    val target = file("third_party/source-api/$protoPath")
+    val protoPaths = sourceApiProtos
+    val targetDir = file("third_party/source-api")
     doLast {
         fun git(vararg args: String): ByteArray {
             val process =
@@ -57,16 +70,20 @@ tasks.register("syncSourceApi") {
             check(process.waitFor() == 0) { "git ${args.joinToString(" ")} failed in ${dir.get()}" }
             return out
         }
-        val commit = String(git("rev-parse", "${ref.get()}^{commit}")).trim()
-        val proto = git("show", "$commit:$protoPath")
-        val sha256 =
+        fun sha256Hex(bytes: ByteArray): String =
             java.security.MessageDigest
                 .getInstance("SHA-256")
-                .digest(proto)
+                .digest(bytes)
                 .joinToString("") { "%02x".format(it) }
-        target.writeBytes(proto)
+        val commit = String(git("rev-parse", "${ref.get()}^{commit}")).trim()
+        val hashes =
+            protoPaths.map { path ->
+                val proto = git("show", "$commit:$path")
+                targetDir.resolve(path).apply { parentFile.mkdirs() }.writeBytes(proto)
+                "sha256 $path=${sha256Hex(proto)}"
+            }
         val kept = pin.readLines().filter { it.startsWith("#") || it.startsWith("repository=") }
-        pin.writeText((kept + listOf("commit=$commit", "sha256=$sha256")).joinToString("\n", postfix = "\n"))
+        pin.writeText((kept + "commit=$commit" + hashes).joinToString("\n", postfix = "\n"))
         logger.lifecycle("Pinned source-api $commit. Run make gen and make check.")
     }
 }
