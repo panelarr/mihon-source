@@ -105,6 +105,8 @@ class StoresTest {
         assertTrue(offered.hasJar)
         assertEquals(false, offered.installed)
         assertEquals(ContentWarning.CONTENT_WARNING_MIXED, offered.contentWarning)
+        // The fixture index numbers its sources from 1.
+        assertEquals(listOf(listOf("mihon:1")), offered.sourcesList.map { it.compatIdsList })
 
         val duplicate = assertFailsWith<StatusException> { add() }
         assertEquals(Status.Code.INVALID_ARGUMENT, duplicate.status.code)

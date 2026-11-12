@@ -30,6 +30,7 @@ import panelarr.source.v1.getFiltersRequest
 import panelarr.source.v1.getSeriesRequest
 import panelarr.source.v1.getSettingsRequest
 import panelarr.source.v1.getSettingsSchemaRequest
+import panelarr.source.v1.getSourceRequest
 import panelarr.source.v1.latestRequest
 import panelarr.source.v1.listChaptersRequest
 import panelarr.source.v1.listPagesRequest
@@ -89,6 +90,16 @@ class SourceApiTest {
         val old = sources.single { it.id == lib14 }
         assertTrue(SourceCapability.SOURCE_CAPABILITY_NSFW in old.capabilitiesList)
         assertTrue(SourceCapability.SOURCE_CAPABILITY_LATEST !in old.capabilitiesList)
+    }
+
+    @Test
+    fun `sources carry their Mihon id as a compat id`() {
+        val sources = runBlocking { api.listSources(listSourcesRequest {}) }.sourcesList
+        assertEquals(listOf("mihon:$en"), sources.single { it.id == en }.compatIdsList)
+        assertEquals(listOf("mihon:$lib14"), sources.single { it.id == lib14 }.compatIdsList)
+        assertTrue(sources.all { it.compatIdsList == listOf("mihon:${it.id}") })
+        val one = runBlocking { api.getSource(getSourceRequest { sourceId = en }) }.source
+        assertEquals(listOf("mihon:$en"), one.compatIdsList)
     }
 
     @Test

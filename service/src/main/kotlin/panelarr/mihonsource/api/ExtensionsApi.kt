@@ -58,6 +58,7 @@ import panelarr.mihonsource.extension.InstalledExtension
 import panelarr.mihonsource.mihon.CheckStepKind
 import panelarr.mihonsource.mihon.HealthCheckSchedule
 import panelarr.mihonsource.mihon.HealthCheckSchedules
+import panelarr.mihonsource.mihon.Mapping
 import panelarr.mihonsource.mihon.MihonSources
 import panelarr.mihonsource.mihon.SourceCheckResult
 import panelarr.mihonsource.mihon.SourceHealthService
@@ -234,6 +235,7 @@ internal fun InstalledExtension.toProto(): Extension {
                     name = source.name
                     lang = source.lang
                     available = r.offers(source.lang)
+                    compatIds += Mapping.compatIds(source.id)
                 }
         }
         enabledLangs += r.enabledLangs
