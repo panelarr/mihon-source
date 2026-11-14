@@ -63,4 +63,15 @@ fun summary(report: Report): String =
                 .eachCount()
                 .forEach { (failure, count) -> appendLine("  $failure: $count") }
         }
+        if (needsBrowser(report)) appendLine(WEBVIEW_HINT)
     }.trimEnd()
+
+/** Shown when sources failed only because no browser is configured. */
+const val WEBVIEW_HINT =
+    "WebView sources need the optional browser service: run a headless Chromium and set MIHON_WEBVIEW_URL " +
+        "(see docs/configuration.md). With it configured, they run like any other source."
+
+private fun needsBrowser(report: Report): Boolean =
+    report.extensions.any { extension ->
+        extension.problem == "needs webview" || extension.sources.any { source -> source.steps.any { it.reason == "NEEDS_WEBVIEW" } }
+    }

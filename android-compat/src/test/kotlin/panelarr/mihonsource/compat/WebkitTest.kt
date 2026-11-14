@@ -2,27 +2,216 @@
 
 package panelarr.mihonsource.compat
 
+import android.net.Uri
 import android.webkit.CookieManager
+import android.webkit.ValueCallback
+import android.webkit.WebResourceError
+import android.webkit.WebResourceRequest
+import android.webkit.WebResourceResponse
 import android.webkit.WebView
+import android.webkit.WebViewClient
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class WebkitTest {
     @AfterEach
     fun tearDown() {
+        AndroidHost.webViewProvider = null
         AndroidHost.cookieListener = null
         CookieManager.getInstance().removeAllCookies(null)
     }
 
     @Test
-    fun `constructing a WebView fails clearly`() {
+    fun `without a browser, constructing a WebView fails with a hint`() {
         val error = assertFailsWith<UnsupportedOperationException> { WebView(AndroidHost.application) }
-        assertEquals("WebView is not available in mihon-source", error.message)
+        assertEquals(WebView.MESSAGE_UNSUPPORTED, error.message)
+        assertTrue("MIHON_WEBVIEW_URL" in error.message!!)
+    }
+
+    /** Records what the WebView passes on. */
+    private class RecordingEngine : WebViewEngine {
+        val calls = mutableListOf<String>()
+
+        override fun loadUrl(
+            url: String,
+            headers: Map<String, String>,
+        ) {
+            calls += "load $url $headers"
+        }
+
+        override fun loadDataWithBaseURL(
+            baseUrl: String?,
+            data: String,
+            mimeType: String?,
+            encoding: String?,
+            historyUrl: String?,
+        ) {
+            calls += "data $baseUrl $data $mimeType"
+        }
+
+        override fun evaluateJavascript(
+            script: String,
+            callback: ValueCallback<String>?,
+        ) {
+            calls += "eval $script"
+            callback?.onReceiveValue("42")
+        }
+
+        override fun addJavascriptInterface(
+            target: Any,
+            name: String,
+        ) {
+            calls += "add $name"
+        }
+
+        override fun removeJavascriptInterface(name: String) {
+            calls += "remove $name"
+        }
+
+        override fun stopLoading() {
+            calls += "stop"
+        }
+
+        override fun reload() {
+            calls += "reload"
+        }
+
+        override fun destroy() {
+            calls += "destroy"
+        }
+
+        override val url: String = "https://example.org/now"
+        override val originalUrl: String = "https://example.org/"
+        override val title: String = "Now"
+        override val progress: Int = 100
+    }
+
+    @Test
+    fun `with a browser, a WebView passes its calls to the engine`() {
+        val engine = RecordingEngine()
+        var created: WebView? = null
+        AndroidHost.webViewProvider =
+            WebViewProvider { view ->
+                created = view
+                engine
+            }
+        val view = WebView(AndroidHost.application)
+        assertSame(view, created)
+        assertFalse(view.settings.javaScriptEnabled, "JavaScript is off by default, as on Android")
+        assertTrue(view.settings.userAgentString.contains("Android"))
+        assertEquals(WebViewClient::class.java, view.webViewClient.javaClass)
+
+        view.loadUrl("https://example.org/a")
+        view.loadUrl("https://example.org/b", mapOf("X-A" to "1"))
+        view.loadData("<p>hi</p>", "text/html", null)
+        view.loadData("PHA+aGk8L3A+", null, "base64")
+        view.loadDataWithBaseURL("https://example.org/", "<p>x</p>", "text/html", "utf-8", null)
+        var result: String? = null
+        view.evaluateJavascript("6 * 7") { result = it }
+        view.addJavascriptInterface(Any(), "bridge")
+        view.removeJavascriptInterface("bridge")
+        view.stopLoading()
+        view.reload()
+        view.destroy()
+        assertEquals("42", result)
+        assertEquals(
+            listOf(
+                "load https://example.org/a {}",
+                "load https://example.org/b {X-A=1}",
+                "load data:text/html,<p>hi</p> {}",
+                "load data:text/html;base64,PHA+aGk8L3A+ {}",
+                "data https://example.org/ <p>x</p> text/html",
+                "eval 6 * 7",
+                "add bridge",
+                "remove bridge",
+                "stop",
+                "reload",
+                "destroy",
+            ),
+            engine.calls,
+        )
+        assertEquals("https://example.org/now", view.url)
+        assertEquals("Now", view.title)
+        assertEquals(100, view.progress)
+    }
+
+    @Test
+    fun `newer client overloads call the deprecated ones by default, as on Android`() {
+        val seen = mutableListOf<String>()
+        val client =
+            object : WebViewClient() {
+                @Deprecated("Deprecated in Java")
+                override fun shouldOverrideUrlLoading(
+                    view: WebView,
+                    url: String,
+                ): Boolean {
+                    seen += "override $url"
+                    return true
+                }
+
+                @Deprecated("Deprecated in Java")
+                override fun shouldInterceptRequest(
+                    view: WebView,
+                    url: String,
+                ): WebResourceResponse? {
+                    seen += "intercept $url"
+                    return null
+                }
+
+                @Deprecated("Deprecated in Java")
+                override fun onReceivedError(
+                    view: WebView,
+                    errorCode: Int,
+                    description: String,
+                    failingUrl: String,
+                ) {
+                    seen += "error $errorCode $description $failingUrl"
+                }
+            }
+        AndroidHost.webViewProvider = WebViewProvider { RecordingEngine() }
+        val view = WebView(AndroidHost.application)
+        val request = request("https://example.org/x", mainFrame = true)
+        assertTrue(client.shouldOverrideUrlLoading(view, request))
+        assertNull(client.shouldInterceptRequest(view, request))
+        val error =
+            object : WebResourceError() {
+                override fun getErrorCode() = WebViewClient.ERROR_HOST_LOOKUP
+
+                override fun getDescription() = "net::ERR_NAME_NOT_RESOLVED"
+            }
+        client.onReceivedError(view, request, error)
+        client.onReceivedError(view, request("https://example.org/img.png", mainFrame = false), error)
+        assertEquals(
+            listOf(
+                "override https://example.org/x",
+                "intercept https://example.org/x",
+                "error -2 net::ERR_NAME_NOT_RESOLVED https://example.org/x",
+            ),
+            seen,
+        )
+    }
+
+    private fun request(
+        url: String,
+        mainFrame: Boolean,
+    ) = object : WebResourceRequest {
+        override fun getUrl(): Uri = Uri.parse(url)
+
+        override fun isForMainFrame() = mainFrame
+
+        override fun isRedirect() = false
+
+        override fun hasGesture() = false
+
+        override fun getMethod() = "GET"
+
+        override fun getRequestHeaders() = emptyMap<String, String>()
     }
 
     @Test

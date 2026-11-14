@@ -19,6 +19,7 @@ import org.testcontainers.containers.GenericContainer
 import org.testcontainers.containers.wait.strategy.Wait
 import org.testcontainers.utility.DockerImageName
 import panelarr.mihonsource.config.WebViewConfig
+import panelarr.mihonsource.fixtures.HeadlessChromium
 import java.net.InetAddress
 import java.time.Duration
 import kotlin.test.Test
@@ -130,9 +131,7 @@ class ChromiumIntegrationTest {
         }
 
     private companion object {
-        // Upstream headless Chromium, pinned by tag and digest. Bump both together.
-        const val IMAGE =
-            "chromedp/headless-shell:158.0.8127.18@sha256:830fa77e0602cb42e5cb2cbd9237ba27b649ad69d5fb82b54713aac8b7ab4f29"
+        const val IMAGE = HeadlessChromium.IMAGE
         const val DEVTOOLS_PORT = 9222
         const val NAME = "webview"
     }

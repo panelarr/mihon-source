@@ -43,6 +43,7 @@ dependencies {
 
     testExtensions(project(":test-extensions:lib14"))
     testExtensions(project(":test-extensions:lib16"))
+    testExtensions(project(":test-extensions:webview"))
 }
 
 application {

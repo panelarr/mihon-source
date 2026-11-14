@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- A test extension that drives a WebView, for mihon-source's own tests. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="panelarr.testext.webview"
+    android:versionCode="106001"
+    android:versionName="1.6.1">
+    <uses-feature android:name="tachiyomi.extension" />
+    <application android:label="Tachiyomi: WebView Test">
+        <meta-data android:name="tachiyomi.extension.class" android:value=".WebViewTestSource" />
+        <meta-data android:name="tachiyomi.extension.nsfw" android:value="0" />
+        <meta-data android:name="tachiyomix.name" android:value="WebView Test" />
+        <meta-data android:name="tachiyomix.extensionLib" android:value="1.6" />
+    </application>
+</manifest>

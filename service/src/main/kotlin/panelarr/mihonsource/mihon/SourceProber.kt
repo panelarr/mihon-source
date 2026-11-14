@@ -39,9 +39,14 @@ data class SourceCheckResult(
  * Walks a source the way a reader would: list → series → chapters → pages → image. Used
  * by on-demand checks, scheduled health checks and the compatibility checker. Calls go
  * through [MihonSources], so they use the source's network profile and rate limits.
+ *
+ * A WebView source's failures are reported as [NEEDS_WEBVIEW], with a hint on enabling the
+ * browser, while no browser is configured. With one they keep their own reason: the source
+ * is runnable, and a failure is a real one.
  */
 class SourceProber(
     private val sources: MihonSources,
+    private val webViewConfigured: Boolean = false,
 ) {
     suspend fun probe(
         source: MihonSource,
@@ -148,11 +153,12 @@ class SourceProber(
                 try {
                     StepOutcome(step, ok = true, duration = since(started), detail = block())
                 } catch (e: StatusException) {
+                    val needsBrowser = source.needsWebView && !webViewConfigured
                     StepOutcome(
                         step,
                         ok = false,
-                        reason = SourceErrors.outcome(e),
-                        message = e.status.description,
+                        reason = if (needsBrowser) NEEDS_WEBVIEW else SourceErrors.outcome(e),
+                        message = if (needsBrowser) "$WEBVIEW_HINT (${e.status.description})" else e.status.description,
                         duration = since(started),
                     )
                 }
@@ -176,7 +182,13 @@ class SourceProber(
 
     private fun since(started: Long): Duration = Duration.ofNanos(System.nanoTime() - started)
 
-    private companion object {
-        const val IMAGE_PROBE_BYTES = 64 * 1024
+    companion object {
+        /** The failure reason of a WebView source while no browser is configured. */
+        const val NEEDS_WEBVIEW = "NEEDS_WEBVIEW"
+
+        /** How to make a WebView source work, shown with [NEEDS_WEBVIEW]. */
+        const val WEBVIEW_HINT =
+            "this source needs a WebView: run the optional browser service (a headless Chromium) and set MIHON_WEBVIEW_URL to it"
+        private const val IMAGE_PROBE_BYTES = 64 * 1024
     }
 }

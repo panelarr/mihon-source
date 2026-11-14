@@ -115,6 +115,10 @@ class FakeSite : AutoCloseable {
                 html("""<div class="page" data-page="/html/page/0"></div><div class="page" data-page="/html/page/1"></div>""")
             }
 
+            path.startsWith("/web/") -> {
+                WebPages.respond(request)
+            }
+
             path.startsWith("/html/page/") -> {
                 html("""<img src="/images/html-${path.substringAfterLast('/')}.png">""")
             }

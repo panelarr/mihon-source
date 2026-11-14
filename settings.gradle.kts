@@ -44,5 +44,5 @@ dependencyResolutionManagement {
 rootProject.name = "mihon-source"
 
 include(":api", ":android-compat", ":extension-api", ":service", ":admin")
-include(":test-extensions:lib14", ":test-extensions:lib16")
+include(":test-extensions:lib14", ":test-extensions:lib16", ":test-extensions:webview")
 include(":tools:compat-check")

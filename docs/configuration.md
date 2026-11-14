@@ -46,10 +46,11 @@ A request counts as an anti-bot challenge when the site answers 403 or 503 with 
 
 ## The browser service for WebView sources
 
-Some extensions need a WebView. mihon-source has no browser of its own; it can use an optional headless Chromium running as its own container, spoken to over the Chrome DevTools Protocol (CDP). Without `MIHON_WEBVIEW_URL` nothing changes.
+Some extensions need a WebView. mihon-source has no browser of its own; it can use an optional headless Chromium running as its own container, spoken to over the Chrome DevTools Protocol (CDP). Without `MIHON_WEBVIEW_URL` nothing changes: WebView sources fail as before, and checks, health and the [compatibility checker](compat-check.md) report them as `NEEDS_WEBVIEW`, with a hint on enabling the browser.
 
 With it set:
 
+- Sources that drive a WebView become callable: each `android.webkit.WebView` an extension creates is a page in the browser (see [extensions](extensions.md#webview)). Checks and health report their real outcome.
 - mihon-source connects on first use and reconnects on the next call after the browser went away, so restarting the browser needs no restart of mihon-source.
 - `Health` treats the browser as an optional check: when it can't be reached the service reports `DEGRADED` with a message, never `NOT_SERVING`, and other sources keep working.
 - Metrics: `mihon_webview_up` (reachable when last tried), `mihon_webview_pages_open`, `mihon_webview_loads_total{outcome}` (`ok`, `timeout`, `error`) and `mihon_webview_failures_total{kind}` (`connect`, `disconnect`, `timeout`, `load`, `protocol`, `busy`). They appear only when the browser is configured.

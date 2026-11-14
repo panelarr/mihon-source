@@ -33,9 +33,31 @@ Extensions are written for Android, and some Android behaviour differs from the 
 
 - **Dates:** Android's `SimpleDateFormat` is ICU's, which accepts more pattern letters, reads `ZZZZZ` as an ISO offset (`+02:00`) and `SSSSSS` as a fraction of a second. When an extension is loaded, its `new SimpleDateFormat(…)` calls are rewritten to create an ICU-backed subclass, so dates parse as they do on a phone. Nothing else in the extension changes.
 
+## WebView
+
+mihon-source has no browser engine of its own. Extensions that subclass `WebViewClient` are flagged when they load and report the `needs_webview` capability. Without the [optional browser service](configuration.md#the-browser-service-for-webview-sources) creating a WebView throws, so most of their calls fail, and checks report `NEEDS_WEBVIEW` with a hint. With it, every WebView an extension creates drives a page in the browser over CDP:
+
+| Android | In the browser |
+|---|---|
+| `loadUrl` (with extra headers), `loadData`, `reload`, `stopLoading` | `Page.navigate`; extra headers are added to the main request only |
+| `loadDataWithBaseURL` | The base URL is loaded and its document is answered with the data, so the page gets the base URL's origin (a data URL when the base isn't http(s)) |
+| `evaluateJavascript` | `Runtime.evaluate`; the callback gets JSON, as on Android: strings quoted, `undefined`, functions and failures as `null`. Promises aren't awaited |
+| `addJavascriptInterface` | A CDP binding plus an injected object with the `@JavascriptInterface` methods, from the next page load on |
+| `getSettings`: user agent, JavaScript enabled | `Emulation.setUserAgentOverride`, `Emulation.setScriptExecutionDisabled`. JavaScript is off by default, as on Android |
+| `onPageStarted`, `onPageFinished` | The main frame's navigation and load events |
+| `shouldInterceptRequest`, `shouldOverrideUrlLoading` | Requests are paused (`Fetch.requestPaused`) and answered with `fulfillRequest`, `continueRequest` or, for an overridden navigation, `failRequest`. Only clients that override these pay for it |
+| `onReceivedError` | A main-frame load that failed or timed out, followed by `onPageFinished` |
+| `CookieManager` | Before a load the manager's cookies for the URL go into the page; after it, the page's cookies come back into the manager |
+| `destroy` | The page and its browser context close |
+
+**Threading.** Extensions use a WebView as on Android: they create and call it on the main looper (`Handler(Looper.getMainLooper())` or `Dispatchers.Main`) and wait on their own thread for a callback. A source call runs on one of the service's I/O threads, never an RPC thread, so that wait blocks only the call. Every WebView method just queues a command and returns, whatever thread calls it, so the main looper never waits for the browser. Each WebView runs its commands in order on its own coroutine. Page callbacks, URL-loading decisions and script results are posted to the main looper. `shouldInterceptRequest` and JavaScript interface methods run on a background thread, as on Android.
+
+Each WebView has its own browser context: WebViews share cookies only through `CookieManager`. A WebView the extension leaves idle for the load timeout (`MIHON_WEBVIEW_LOAD_TIMEOUT`) gives its page back, so a forgotten WebView can't hold one of the `MIHON_WEBVIEW_MAX_PAGES` pages; using it again opens a fresh page.
+
+Not supported yet: JavaScript interface methods can't return values to the page (CDP bindings are one-way), so sources that need that don't work. `WebChromeClient` and `onReceivedHttpError` are never called, and subresource failures aren't reported. Pages don't use the source's network profile (proxy, user agent) yet, and cookies don't sync with the source's own cookie jar. A challenge built to need a person may still fail headless.
+
 ## Limits
 
-- **WebView:** there's no browser engine. Sources that drive a WebView report the `needs_webview` capability and most of their calls fail.
 - **JavaScript:** QuickJS and Duktape are emulated on GraalJS, started on first use. Scripts get no host access and a 30-second limit per evaluation.
 - **Images:** WebP is decoded but not encoded. Extensions that re-encode images as WebP get JPEG or PNG instead.
 - **Untrusted code:** extensions run inside the service's JVM. Their classloader hides the service's own classes, but it's not a sandbox. Install only extensions you trust, verify fingerprints, and run the service in its own hardened container ([deployment](deployment.md)).
