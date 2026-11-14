@@ -24,6 +24,7 @@ class WebkitTest {
     fun tearDown() {
         AndroidHost.webViewProvider = null
         AndroidHost.cookieListener = null
+        AndroidHost.cookieStores = null
         CookieManager.getInstance().removeAllCookies(null)
     }
 
@@ -234,6 +235,62 @@ class WebkitTest {
         cookies.flush()
         cookies.removeAllCookies(null)
         assertFalse(cookies.hasCookies())
+    }
+
+    /** A source's own store, recording what reaches it. */
+    private class RecordingStore : WebCookieStore {
+        val cookies = mutableMapOf<String, String>()
+
+        override fun setCookie(
+            url: String,
+            setCookie: String,
+        ): Boolean {
+            cookies[setCookie.substringBefore('=')] = setCookie.substringAfter('=').substringBefore(';')
+            return true
+        }
+
+        override fun getCookie(url: String): String? = cookies.entries.joinToString("; ") { "${it.key}=${it.value}" }.ifEmpty { null }
+
+        override fun removeSessionCookies(): Boolean = removeAllCookies()
+
+        override fun removeAllCookies(): Boolean = cookies.isNotEmpty().also { cookies.clear() }
+
+        override fun removeExpiredCookies() = Unit
+
+        override fun hasCookies(): Boolean = cookies.isNotEmpty()
+    }
+
+    @Test
+    fun `code working for a source uses that source's store, and other code the shared one`() {
+        val a = RecordingStore()
+        val b = RecordingStore()
+        AndroidHost.cookieStores = WebCookieStores { id -> mapOf(1L to a, 2L to b)[id] }
+        val manager = CookieManager.getInstance()
+
+        SourceCaller.with(1L) { manager.setCookie("https://example.org/", "token=a") }
+        SourceCaller.with(2L) { manager.setCookie("https://example.org/", "token=b") }
+        manager.setCookie("https://example.org/", "token=shared")
+
+        assertEquals("token=a", SourceCaller.with(1L) { manager.getCookie("https://example.org/") })
+        assertEquals("token=b", SourceCaller.with(2L) { manager.getCookie("https://example.org/") })
+        assertEquals("token=shared", manager.getCookie("https://example.org/"))
+        // A source the host has no store for uses the shared one.
+        assertEquals("token=shared", SourceCaller.with(3L) { manager.getCookie("https://example.org/") })
+
+        // Clearing is per source too.
+        SourceCaller.with(1L) { manager.removeAllCookies(null) }
+        assertFalse(a.hasCookies())
+        assertTrue(b.hasCookies())
+        assertTrue(manager.hasCookies())
+
+        // Refused cookies stay refused, whichever the store.
+        manager.setAcceptCookie(false)
+        try {
+            SourceCaller.with(2L) { manager.setCookie("https://example.org/", "late=1") }
+            assertNull(b.cookies["late"])
+        } finally {
+            manager.setAcceptCookie(true)
+        }
     }
 
     @Test

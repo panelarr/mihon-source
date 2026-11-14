@@ -15,6 +15,7 @@ import kotlinx.coroutines.Dispatchers
 internal object WebViewDispatchers {
     private const val CDP_THREADS = 16
     private const val BLOCKING_THREADS = 32
+    private const val DISCOVERY_THREADS = 2
 
     /** CDP traffic and each view's command loop. It only suspends, so a few threads serve every view. */
     val cdp: CoroutineDispatcher = Dispatchers.IO.limitedParallelism(CDP_THREADS, "webview-cdp")
@@ -24,4 +25,10 @@ internal object WebViewDispatchers {
      * JavaScript interfaces, response streams) and plain HTTP calls. It stays off [cdp].
      */
     val blocking: CoroutineDispatcher = Dispatchers.IO.limitedParallelism(BLOCKING_THREADS, "webview-blocking")
+
+    /**
+     * Finding the browser's endpoint (a blocking HTTP call). Its own threads: extension code
+     * on [blocking] can't hold up a reconnect, and a slow browser can't use up [blocking].
+     */
+    val discovery: CoroutineDispatcher = Dispatchers.IO.limitedParallelism(DISCOVERY_THREADS, "webview-discovery")
 }

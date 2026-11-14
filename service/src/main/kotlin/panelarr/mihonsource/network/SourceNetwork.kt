@@ -16,6 +16,7 @@ import okhttp3.Protocol
 import okhttp3.Request
 import okhttp3.Response
 import okhttp3.ResponseBody.Companion.toResponseBody
+import panelarr.mihonsource.compat.SourceCaller
 import java.io.IOException
 import java.net.InetSocketAddress
 import java.net.ProxySelector
@@ -59,8 +60,10 @@ class SourceNetwork(
             synchronized(this) {
                 if (version != cachedVersion) {
                     val previous = cached
-                    cached = sourceId()?.let(networks::resolve) ?: networks.defaultProfile()
+                    val id = sourceId()
+                    cached = id?.let(networks::resolve) ?: networks.defaultProfile()
                     cachedVersion = version
+                    id?.let { networks.register(it, this) }
                     if (previous.proxy != cached.proxy) pool.evictAll()
                 }
             }
@@ -76,6 +79,15 @@ class SourceNetwork(
             UserAgentMode.RANDOM_DESKTOP -> UserAgents.desktopFor(sourceId() ?: 0)
             UserAgentMode.FROM_SOLVER, UserAgentMode.DEFAULT -> UserAgents.DEFAULT
         }
+    }
+
+    /**
+     * The user agent for requests to [host] that don't set their own: a solver's for a host it
+     * answered for (clearance cookies only work with it), unless the profile pins one.
+     */
+    fun userAgentFor(host: String): String {
+        val solverAgent = solverAgents[host]
+        return if (solverAgent != null && profile().userAgentMode != UserAgentMode.FIXED) solverAgent else userAgent()
     }
 
     override val cookieJar: CookieJar =
@@ -106,12 +118,25 @@ class SourceNetwork(
             .socketFactory(Socks5.SocketFactory { profile().proxy })
             .dns(Socks5.ProxyDns { profile().proxy })
             .cookieJar(cookieJar)
+            .addInterceptor(SourceCallerInterceptor())
             .addInterceptor(UncaughtExceptionInterceptor())
             .addInterceptor(TimeoutInterceptor())
             .addInterceptor(UserAgentInterceptor())
             .addInterceptor(LimitInterceptor())
             .addInterceptor(CloudflareInterceptor())
             .build()
+    }
+
+    /**
+     * Marks the request's thread as working for this source while the request runs, so an
+     * extension interceptor that opens a WebView or uses `CookieManager` acts for this source,
+     * also on OkHttp's own threads (async calls).
+     */
+    private inner class SourceCallerInterceptor : Interceptor {
+        override fun intercept(chain: Interceptor.Chain): Response {
+            val id = sourceId() ?: return chain.proceed(chain.request())
+            return SourceCaller.with(id) { chain.proceed(chain.request()) }
+        }
     }
 
     /** Turns unexpected exceptions into IOExceptions, so OkHttp's async calls report them. */
@@ -170,9 +195,7 @@ class SourceNetwork(
         if (current == null || UserAgents.isOurs(current)) {
             // Clearance cookies only work with the user agent they were issued for, so once a
             // solver has answered for this host its agent is used unless the profile pins one.
-            val solverAgent = solverAgents[request.url.host]
-            val agent = if (solverAgent != null && profile.userAgentMode != UserAgentMode.FIXED) solverAgent else userAgent()
-            builder.header(USER_AGENT, agent)
+            builder.header(USER_AGENT, userAgentFor(request.url.host))
         }
         profile.headers.forEach { (name, value) -> if (request.header(name) == null) builder.header(name, value) }
         return chain.proceed(builder.build())
@@ -351,6 +374,19 @@ class SourceNetworks(
     val version = AtomicLong()
     private val jars = ConcurrentHashMap<String, FileCookieJar>()
 
+    /** The latest network made for each source id, so code outside its client can use its state. */
+    private val live = ConcurrentHashMap<Long, SourceNetwork>()
+
+    internal fun register(
+        sourceId: Long,
+        network: SourceNetwork,
+    ) {
+        live[sourceId] = network
+    }
+
+    /** The network of [sourceId]: the one its extension uses, or a fresh one before it made any request. */
+    fun forSource(sourceId: Long): SourceNetwork = live[sourceId] ?: create { sourceId }
+
     fun configurationChanged() {
         version.incrementAndGet()
     }
@@ -380,6 +416,7 @@ class SourceNetworks(
 
     /** Deletes a source's own cookie jar. */
     fun deleteCookies(sourceId: Long) {
+        live.remove(sourceId)
         jars.remove(sourceId.toString())
         java.nio.file.Files
             .deleteIfExists(cookieDir.resolve("$sourceId.json"))

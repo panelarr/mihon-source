@@ -11,6 +11,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import okhttp3.Request
 import okhttp3.Response
+import panelarr.mihonsource.compat.SourceCaller
 import panelarr.mihonsource.extension.ExtensionManager
 import panelarr.mihonsource.extension.ExtensionRecord
 import panelarr.mihonsource.metrics.Metrics
@@ -31,6 +32,13 @@ class MihonSources(
     /** Last health check per source, set once health checking is wired up. */
     @Volatile
     var healthOf: (Long) -> SourceHealthService.Health? = { null }
+
+    /**
+     * Why a source's WebView couldn't reach the browser service at or after a `System.nanoTime`
+     * instant, or null. Set when a browser is configured; its failures become `WEBVIEW_UNAVAILABLE`.
+     */
+    @Volatile
+    var webViewOutage: (sourceId: Long, sinceNanos: Long) -> String? = { _, _ -> null }
 
     /** Whether scheduled checks are on for a source, set once health checking is wired up. */
     @Volatile
@@ -56,7 +64,9 @@ class MihonSources(
     ): T {
         val started = System.nanoTime()
         try {
-            val result = withContext(Dispatchers.IO) { withTimeout(callTimeout.toMillis()) { block(source) } }
+            // Marked as this source's work, so the WebViews and CookieManager it uses are the source's own.
+            val result =
+                withContext(Dispatchers.IO + SourceCaller.element(source.id)) { withTimeout(callTimeout.toMillis()) { block(source) } }
             metrics?.sourceCall(source.id, operation, OK, Duration.ofNanos(System.nanoTime() - started))
             return result
         } catch (
@@ -65,7 +75,8 @@ class MihonSources(
             if (e is VirtualMachineError && e !is OutOfMemoryError && e !is StackOverflowError) throw e
             // The caller was cancelled (not a call timeout): that isn't the source's failure.
             currentCoroutineContext().ensureActive()
-            val status = SourceErrors.toStatus(e, source.id)
+            val outage = webViewOutage(source.id, started)
+            val status = if (outage != null) SourceErrors.webViewUnavailable(outage) else SourceErrors.toStatus(e, source.id)
             metrics?.sourceCall(source.id, operation, SourceErrors.outcome(status), Duration.ofNanos(System.nanoTime() - started))
             throw status
         }

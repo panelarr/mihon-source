@@ -6,6 +6,7 @@ import android.os.Handler
 import android.os.Looper
 import android.webkit.ValueCallback
 import android.webkit.WebView
+import android.webkit.WebSettings
 import android.webkit.WebViewClient
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
@@ -28,7 +29,9 @@ import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import org.slf4j.LoggerFactory
+import panelarr.mihonsource.compat.SourceCaller
 import panelarr.mihonsource.compat.WebViewEngine
 import panelarr.mihonsource.compat.WebViewProvider
 import panelarr.mihonsource.config.WebViewConfig
@@ -39,14 +42,29 @@ import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicReference
 
-/** Backs every `android.webkit.WebView` with a page in the optional browser. */
+/**
+ * Backs every `android.webkit.WebView` with a page in the optional browser. A WebView made
+ * while working for a source ([SourceCaller]) uses that source's browser context, proxy, user
+ * agent and cookie jar ([sources]); one made for no known source gets a context of its own.
+ */
 class CdpWebViewProvider(
     private val browser: CdpBrowser,
     private val config: WebViewConfig,
+    private val sources: WebViewSources? = null,
+    /** When each source's WebViews last found the browser unreachable. */
+    val outages: WebViewOutages = WebViewOutages(),
 ) : WebViewProvider {
     private val ids = AtomicLong()
 
-    override fun create(view: WebView): WebViewEngine = CdpWebView(view, browser, "webview-${ids.incrementAndGet()}", config.loadTimeout)
+    override fun create(view: WebView): WebViewEngine =
+        CdpWebView(
+            view,
+            browser,
+            "webview-${ids.incrementAndGet()}",
+            config.loadTimeout,
+            source = sources?.let { found -> SourceCaller.current()?.let { CdpWebView.Owner(it, found) } },
+            outages = outages,
+        )
 }
 
 /**
@@ -69,9 +87,16 @@ class CdpWebViewProvider(
  * Android would: a throwing `shouldInterceptRequest` lets the request through, a broken
  * response stream fails that request. Nothing it throws ends the view.
  *
- * The page opens on the first command, in a browser context of its own (so views share no
- * cookies or storage except through `CookieManager`), and closes on [destroy]. A view left
- * idle for [idleLimit] gives its page back; the next command opens a fresh one.
+ * **Contexts.** A view made for a source opens its pages in that source's browser context,
+ * which all its views share and which the browser closes when idle: created with the profile's
+ * proxy, given the source's user agent unless the extension sets its own, and kept in step with
+ * the source's cookie jar (the jar goes in before each load, the context's cookies come back
+ * after loads and scripts). Loads of one host in one context take turns ([CdpBrowser.coalesced]).
+ * A view for no known source gets a context of its own, closed with its page, whose cookies go
+ * through `CookieManager`'s shared store as before.
+ *
+ * The page opens on the first command and closes on [destroy]. A view left idle for
+ * [idleLimit] gives its page back; the next command opens a fresh one.
  */
 internal class CdpWebView(
     private val view: WebView,
@@ -80,7 +105,28 @@ internal class CdpWebView(
     private val loadTimeout: Duration,
     private val idleLimit: Duration = loadTimeout,
     private val main: Handler = Handler(Looper.getMainLooper()),
+    /** The source the view works for, or null for none. */
+    private val source: Owner? = null,
+    private val outages: WebViewOutages? = null,
 ) : WebViewEngine {
+    /** The source a view works for, and where its settings come from. */
+    class Owner(
+        val sourceId: Long,
+        val sources: WebViewSources,
+    )
+
+    /** Where a session's page lives and what it takes from the source, fixed when the page opens. */
+    private class Binding(
+        val contextKey: String,
+        val proxyServer: String? = null,
+        val proxyCredentials: Pair<String, String>? = null,
+        val cookies: JarCookieSync? = null,
+        val userAgent: ((host: String) -> String)? = null,
+    ) {
+        /** A context for one view only, closed with its page. */
+        val ownContext: Boolean get() = cookies == null
+    }
+
     private sealed interface Command
 
     private data class Load(
@@ -214,13 +260,15 @@ internal class CdpWebView(
         while (true) {
             val first = commands.receiveCatching().getOrNull() ?: return
             var session: Session? = null
+            var binding: Binding? = null
             try {
-                browser.withPage(contextKey) { page -> Session(page).also { session = it }.serve(first) }
+                val bound = bind().also { binding = it }
+                browser.withPage(bound.contextKey, bound.proxyServer) { page -> Session(page, bound).also { session = it }.serve(first) }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: WebViewException) {
                 log.warn("A WebView couldn't use the browser: {}", e.message)
-                failPending(first.takeIf { session == null }, unavailable(e))
+                failPending(first.takeIf { session == null }, reason(e))
             } catch (
                 @Suppress("TooGenericExceptionCaught") e: Throwable,
             ) {
@@ -229,10 +277,52 @@ internal class CdpWebView(
                 log.error("A WebView's page failed: {}", e.javaClass.name)
                 failPending(first.takeIf { session == null }, "the WebView failed")
             } finally {
-                withContext(NonCancellable) { runCatching { browser.closeContext(contextKey) } }
+                // A source's context outlives its views (the browser closes it when idle); a view's own doesn't.
+                binding?.takeIf { it.ownContext }?.let { withContext(NonCancellable) { runCatching { browser.closeContext(it.contextKey) } } }
             }
         }
     }
+
+    /** Where the next page opens, from the source's settings as they are now. */
+    private fun bind(): Binding {
+        val owner = source ?: return Binding(contextKey)
+        val settings = owner.sources.settings(owner.sourceId)
+        val proxy = settings.proxy
+        val socks = proxy?.type == java.net.Proxy.Type.SOCKS
+        if (socks && proxy.username != null) {
+            throw WebViewSettingsException(
+                "the browser can't use a SOCKS proxy that needs a username and password; use an HTTP proxy for this source's profile",
+            )
+        }
+        val server = proxy?.let { "${if (socks) "socks5" else "http"}://${hostForUrl(it.host)}:${it.port}" }
+        // A new proxy needs a new context (the browser fixes it at creation); the old one closes when idle.
+        val key = "source-${owner.sourceId}" + (server?.let { "-" + digest("$it ${proxy.username.orEmpty()}") } ?: "")
+        return Binding(
+            contextKey = key,
+            proxyServer = server,
+            proxyCredentials = proxy?.username?.let { it to proxy.password.orEmpty() },
+            cookies = JarCookieSync(settings.jar),
+            userAgent = settings.userAgent,
+        )
+    }
+
+    /** Why a command failed, for the extension; an unreachable browser is noted for the source's call. */
+    private fun reason(e: WebViewException): String =
+        when (e) {
+            is WebViewUnavailableException -> {
+                val message = "the browser service is unavailable: ${e.message}"
+                source?.let { outages?.record(it.sourceId, e.message ?: "unreachable") }
+                message
+            }
+
+            is WebViewSettingsException -> {
+                e.message.orEmpty()
+            }
+
+            else -> {
+                "the browser couldn't serve the WebView: ${e.message}"
+            }
+        }
 
     /**
      * Fails [first] (a session that never opened owes it an answer; one that started has
@@ -261,6 +351,7 @@ internal class CdpWebView(
     /** A page and what was set up on it. Lives until the view is destroyed or idle. */
     private inner class Session(
         val page: CdpPage,
+        val binding: Binding,
     ) {
         private val pendingNavigation = AtomicReference<Navigation?>()
         private val inFlight = AtomicInteger()
@@ -270,6 +361,9 @@ internal class CdpWebView(
         private var userAgent: String? = null
         private var scriptsDisabled: Boolean? = null
         private var runtimeEnabled = false
+
+        /** Requests the proxy credentials were given for: asked again means they were refused. */
+        private val authAnswered = ConcurrentHashMap.newKeySet<String>()
 
         /** Whether the main frame shows Chromium's error page for a failed load, whose load event isn't Android's. */
         @Volatile private var showingError = false
@@ -288,6 +382,8 @@ internal class CdpWebView(
                 } finally {
                     handle.close()
                     events.close()
+                    // What the page set since the last load or script still reaches the jar.
+                    withContext(NonCancellable) { pullCookies() }
                 }
                 currentCoroutineContext()[Job]?.cancelChildren()
             }
@@ -314,6 +410,12 @@ internal class CdpWebView(
                                 touch()
                             }
                         }
+                    }
+
+                    // Proxy credentials, answered at once like paused requests.
+                    "Fetch.authRequired" -> {
+                        touch()
+                        session.launch { guarded(event.method) { answerAuth(event.params) } }
                     }
 
                     // Android calls interface methods on a background thread.
@@ -384,7 +486,7 @@ internal class CdpWebView(
                 when (command) {
                     is Load -> {
                         loadJob?.cancel()
-                        loadJob = scope.launch { load(command) }
+                        loadJob = scope.launch { coalesced(command) }
                     }
 
                     is Evaluate -> {
@@ -405,9 +507,19 @@ internal class CdpWebView(
                     }
                 }
             } catch (e: WebViewException) {
-                fail(command, unavailable(e))
+                fail(command, reason(e))
                 // The connection is gone: end the session, the next command reconnects.
                 if (e is WebViewUnavailableException) throw e
+            }
+        }
+
+        /** Loads [load], taking turns with the context's other loads of the same host. */
+        private suspend fun coalesced(load: Load) {
+            val host = if (isHttp(load.url)) load.url.toHttpUrlOrNull()?.host else null
+            if (host == null || binding.ownContext) {
+                load(load)
+            } else {
+                browser.coalesced("${binding.contextKey} $host") { load(load) }
             }
         }
 
@@ -416,20 +528,23 @@ internal class CdpWebView(
             progress = 0
             var navigation: Navigation? = null
             try {
-                applySettings()
+                applySettings(load.url)
                 if (!fetchEnabled && needsFetch(load)) {
                     page.send(
                         "Fetch.enable",
                         buildJsonObject {
                             put("patterns", jsonArrayOf(buildJsonObject { put("urlPattern", JsonPrimitive("*")) }))
+                            if (binding.proxyCredentials != null) put("handleAuthRequests", JsonPrimitive(true))
                         },
                     )
                     fetchEnabled = true
                 }
-                if (isHttp(load.url)) WebViewCookies.push(page, load.url)
+                if (isHttp(load.url)) binding.cookies?.push(page, load.url) ?: WebViewCookies.push(page, load.url)
                 navigation = Navigation(load)
                 pendingNavigation.set(navigation)
                 page.navigate(load.url)
+                // Before the next load of this host starts: it should find what this one earned.
+                if (binding.cookies != null) pullCookies()
             } catch (e: CdpLoadException) {
                 val text = e.message.orEmpty().substringAfter("load: ")
                 // An aborted load was replaced or cancelled on purpose (stopLoading, an overridden redirect).
@@ -439,7 +554,7 @@ internal class CdpWebView(
             } catch (e: CdpProtocolException) {
                 reportLoadError(load.url, WebViewClient.ERROR_UNKNOWN, e.message.orEmpty())
             } catch (e: WebViewUnavailableException) {
-                fail(load, unavailable(e))
+                fail(load, reason(e))
                 throw e
             } finally {
                 // Only this load's: a load that replaced it may have set its own already.
@@ -448,14 +563,27 @@ internal class CdpWebView(
             }
         }
 
-        /** Whether [load] needs requests paused: for its headers or document, or for the client. */
+        /** Whether [load] needs requests paused: for its headers or document, for the client, or for proxy credentials. */
         private fun needsFetch(load: Load): Boolean =
-            load.headers.isNotEmpty() || load.document != null || interceptsRequests(view.webViewClient)
+            load.headers.isNotEmpty() || load.document != null || interceptsRequests(view.webViewClient) ||
+                binding.proxyCredentials != null
 
-        /** The user agent and JavaScript switch from the view's settings, sent when they changed. */
-        private suspend fun applySettings() {
+        /**
+         * The user agent and JavaScript switch from the view's settings, sent when they changed.
+         * A view whose extension left the user agent alone uses the source's, as its HTTP
+         * client sends to [url]'s host: clearance cookies only work with the agent they were
+         * issued for.
+         */
+        private suspend fun applySettings(url: String) {
             val settings = view.settings
-            val agent = settings.userAgentString
+            val own = settings.userAgentString
+            val sourceAgent = binding.userAgent
+            val agent =
+                if (sourceAgent != null && own == WebSettings.getDefaultUserAgent(null)) {
+                    sourceAgent(url.toHttpUrlOrNull()?.host.orEmpty())
+                } else {
+                    own
+                }
             if (agent != userAgent) {
                 page.send("Emulation.setUserAgentOverride", buildJsonObject { put("userAgent", JsonPrimitive(agent)) })
                 userAgent = agent
@@ -484,7 +612,48 @@ internal class CdpWebView(
                     null
                 }
             val json = result?.let(::scriptResult) ?: NULL
+            // A script may set cookies (document.cookie): they reach the jar before the extension reads it.
+            if (binding.cookies != null) pullCookies()
             post { command.callback?.onReceiveValue(json) }
+        }
+
+        /** Copies the context's cookies into the source's jar; a failure only means they come back later. */
+        suspend fun pullCookies() {
+            val sync = binding.cookies ?: return
+            try {
+                sync.pull(page)
+            } catch (e: WebViewException) {
+                log.debug("Couldn't copy the page's cookies: {}", e.message)
+            }
+        }
+
+        /** Gives the profile's credentials to the proxy, once per request; anything else is cancelled, as Android does. */
+        private suspend fun answerAuth(params: JsonObject) {
+            val id = params.string("requestId") ?: return
+            val credentials = binding.proxyCredentials
+            val fromProxy = (params["authChallenge"] as? JsonObject)?.string("source") == "Proxy"
+            val provide = fromProxy && credentials != null && authAnswered.add(id)
+            try {
+                page.send(
+                    "Fetch.continueWithAuth",
+                    buildJsonObject {
+                        put("requestId", JsonPrimitive(id))
+                        put(
+                            "authChallengeResponse",
+                            buildJsonObject {
+                                put("response", JsonPrimitive(if (provide) "ProvideCredentials" else "CancelAuth"))
+                                if (provide) {
+                                    put("username", JsonPrimitive(credentials!!.first))
+                                    put("password", JsonPrimitive(credentials.second))
+                                }
+                            },
+                        )
+                    },
+                )
+            } catch (e: WebViewException) {
+                log.debug("Couldn't answer an authentication request: {}", e.message)
+            }
+            if (fromProxy && !provide && credentials != null) log.warn("The proxy refused the credentials of a source's profile")
         }
 
         private suspend fun install(name: String) {
@@ -525,7 +694,11 @@ internal class CdpWebView(
         private suspend fun onLoaded() {
             if (showingError) return
             val loaded = url?.takeUnless(::isErrorPage) ?: return
-            if (isHttp(loaded)) WebViewCookies.pull(page, loaded)
+            if (binding.cookies != null) {
+                pullCookies()
+            } else if (isHttp(loaded)) {
+                WebViewCookies.pull(page, loaded)
+            }
             title =
                 try {
                     (page.evaluate("document.title") as? JsonPrimitive)?.content
@@ -659,9 +832,9 @@ internal class CdpWebView(
         }
     }
 
-    /** Runs [block] on the main looper, unless the view is destroyed by then. */
+    /** Runs [block] on the main looper as working for the view's source, unless the view is destroyed by then. */
     private fun post(block: () -> Unit) {
-        main.post { if (!destroyed) block() }
+        main.post(SourceCaller.bind(source?.sourceId) { if (!destroyed) block() })
     }
 
     /** Runs [block] on the main looper and waits for its answer, at most the load timeout. */
@@ -671,14 +844,16 @@ internal class CdpWebView(
         block: () -> T,
     ): T {
         val answer = CompletableDeferred<T>()
-        main.post {
-            try {
-                answer.complete(if (destroyed) fallback else extension(what, fallback, block))
-            } finally {
-                // A fatal error rethrown by [extension] still leaves the browser an answer.
-                answer.complete(fallback)
-            }
-        }
+        main.post(
+            SourceCaller.bind(source?.sourceId) {
+                try {
+                    answer.complete(if (destroyed) fallback else extension(what, fallback, block))
+                } finally {
+                    // A fatal error rethrown by [extension] still leaves the browser an answer.
+                    answer.complete(fallback)
+                }
+            },
+        )
         return withTimeoutOrNull(loadTimeout.toMillis()) { answer.await() } ?: fallback
     }
 
@@ -712,7 +887,18 @@ internal class CdpWebView(
 
         private fun isErrorPage(url: String): Boolean = url.startsWith("chrome-error:")
 
-        private fun unavailable(e: WebViewException) = "the browser service is unavailable: ${e.message}"
+        /** A host as it goes in a URL: IPv6 addresses in brackets. */
+        private fun hostForUrl(host: String): String = if (':' in host && !host.startsWith("[")) "[$host]" else host
+
+        /** A short stable name for [text], so context keys never carry proxy addresses or user names. */
+        private fun digest(text: String): String =
+            java.security.MessageDigest
+                .getInstance("SHA-256")
+                .digest(text.toByteArray())
+                .take(DIGEST_BYTES)
+                .joinToString("") { "%02x".format(it) }
+
+        private const val DIGEST_BYTES = 6
 
         /** A JVM that can't go on, as the source calls treat it; anything else a view survives. */
         private fun fatal(e: Throwable): Boolean = e is VirtualMachineError && e !is OutOfMemoryError && e !is StackOverflowError

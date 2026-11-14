@@ -80,6 +80,7 @@ class CdpBrowser(
     private val pages = Semaphore(config.maxPages)
     private val openPages = AtomicInteger()
     private val contexts = ConcurrentHashMap<String, Context>()
+    private val gates = ConcurrentHashMap<String, Gate>()
     private val scope = CoroutineScope(SupervisorJob() + WebViewDispatchers.cdp)
 
     @Volatile private var current: CdpConnection? = null
@@ -107,6 +108,75 @@ class CdpBrowser(
     /** Pages open right now. */
     fun openPages(): Int = openPages.get()
 
+    /** The most pages open at once. */
+    val maxPages: Int get() = config.maxPages
+
+    /** The result of [test]. */
+    data class TestResult(
+        val ok: Boolean,
+        val message: String,
+        val browser: String? = null,
+        val latency: Duration,
+    )
+
+    /**
+     * Checks the browser end to end, as a WebView would use it: connects (now, not from a
+     * cached check), opens a page in a context of its own, runs a script and closes both.
+     */
+    suspend fun test(): TestResult {
+        val started = System.nanoTime()
+        val since = { Duration.ofNanos(System.nanoTime() - started) }
+        val status = check(fresh = true)
+        if (!status.up) return TestResult(false, status.error ?: "the browser is unreachable", latency = since())
+        val key = "test-${java.util.UUID.randomUUID()}"
+        return try {
+            val answer = withPage(key) { page -> page.evaluate("6 * 7") }
+            if (answer?.toString() == "42") {
+                TestResult(true, "opened a page and ran a script", status.browser, since())
+            } else {
+                TestResult(false, "the browser ran a test script but answered unexpectedly", status.browser, since())
+            }
+        } catch (e: WebViewException) {
+            TestResult(false, e.message ?: "the test page failed", status.browser, since())
+        } finally {
+            withContext(NonCancellable) { runCatching { closeContext(key) } }
+        }
+    }
+
+    /**
+     * Runs [block] while no other block runs for the same [key]: loads of one host in one
+     * context take turns, as solves of one host do, so the second load finds the cookies the
+     * first one earned (a passed challenge, say) instead of facing the same page again.
+     */
+    suspend fun <T> coalesced(
+        key: String,
+        block: suspend () -> T,
+    ): T {
+        val gate =
+            gates.compute(key) { _, existing -> (existing ?: Gate()).also { it.waiting++ } }!!
+        try {
+            return gate.mutex.withLock { block() }
+        } finally {
+            gates.computeIfPresent(key) { _, existing -> existing.also { it.waiting-- }.takeIf { it.waiting > 0 } }
+        }
+    }
+
+    /** A lock for [coalesced], dropped once nobody waits on it. Counted only inside the map's compute calls. */
+    private class Gate {
+        val mutex = Mutex()
+        var waiting = 0
+    }
+
+    /** One browser context: who it's for and how many pages it has open. */
+    data class ContextInfo(
+        val key: String,
+        val pages: Int,
+        val lastUsed: Instant,
+    )
+
+    /** The browser contexts open now. */
+    fun contexts(): List<ContextInfo> = contexts.map { (key, context) -> ContextInfo(key, context.users.get(), context.lastUsed) }
+
     /** The last known status, without checking. Null until the first check or use. */
     fun lastStatus(): Status? = status
 
@@ -114,10 +184,13 @@ class CdpBrowser(
      * Checks that the browser answers, connecting if needed, within [timeout]. Results are
      * reused for a few seconds, so frequent health probes don't hammer the browser.
      */
-    suspend fun check(timeout: Duration = CHECK_TIMEOUT): Status =
+    suspend fun check(
+        timeout: Duration = CHECK_TIMEOUT,
+        fresh: Boolean = false,
+    ): Status =
         checkLock.withLock {
             // Only a check's own result is reused: connecting or a drop updates [status] too, without a product.
-            lastCheck?.takeIf { it === status && Duration.between(it.checkedAt, now()) < STATUS_TTL }?.let { return it }
+            if (!fresh) lastCheck?.takeIf { it === status && Duration.between(it.checkedAt, now()) < STATUS_TTL }?.let { return it }
             val result =
                 try {
                     withTimeoutOrNull(timeout.toMillis()) {
@@ -293,8 +366,8 @@ class CdpBrowser(
 
     /** Reads the browser's WebSocket path from `/json/version` and points it at [target]. */
     private suspend fun discover(): String =
-        // Its own threads: source calls waiting on WebViews may hold every I/O thread.
-        withContext(WebViewDispatchers.blocking) {
+        // Its own threads: source calls waiting on WebViews may hold every I/O thread, and extension code the blocking ones.
+        withContext(WebViewDispatchers.discovery) {
             val request =
                 Request
                     .Builder()
@@ -392,7 +465,8 @@ class CdpBrowser(
                         put("flatten", JsonPrimitive(true))
                     },
                 )
-            val page = CdpPage(connection, targetId, attached.required("sessionId"), config.loadTimeout) { metrics?.webViewLoad(it) }
+            val page =
+                CdpPage(connection, targetId, attached.required("sessionId"), contextId, config.loadTimeout) { metrics?.webViewLoad(it) }
             page.send("Page.enable")
             ready = true
             return page
