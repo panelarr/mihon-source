@@ -27,6 +27,7 @@ import panelarr.mihonsource.mihon.SourceSettings
 import panelarr.mihonsource.mihon.UrlMatch
 import panelarr.mihonsource.network.EffectiveProfile
 import panelarr.mihonsource.network.PushedProfiles
+import panelarr.mihonsource.webview.CdpBrowser
 import panelarr.source.v1.CommonService
 import panelarr.source.v1.FetchImageRequest
 import panelarr.source.v1.FetchImageResponse
@@ -103,6 +104,8 @@ class SourcePluginApi(
             .toString(),
     /** The profile a source uses: pushed, assigned, default or none. */
     private val profiles: (Long) -> EffectiveProfile = { EffectiveProfile.DIRECT },
+    /** The optional browser service, an optional check for Health: unreachable means degraded, never down. */
+    private val browser: CdpBrowser? = null,
 ) : SourcePluginServiceGrpcKt.SourcePluginServiceCoroutineImplBase() {
     override suspend fun getInfo(request: GetInfoRequest): GetInfoResponse =
         getInfoResponse {
@@ -120,9 +123,15 @@ class SourcePluginApi(
 
     override suspend fun health(request: HealthRequest): HealthResponse {
         val failed = failedExtensions()
+        val browserDown = browser?.check()?.takeIf { !it.up }
+        val problems =
+            listOfNotNull(
+                "$failed extension(s) failed to load".takeIf { failed > 0 },
+                browserDown?.let { "the browser service for WebView sources is unreachable" },
+            )
         return healthResponse {
-            status = if (failed == 0) HealthStatus.HEALTH_STATUS_SERVING else HealthStatus.HEALTH_STATUS_DEGRADED
-            if (failed > 0) message = "$failed extension(s) failed to load"
+            status = if (problems.isEmpty()) HealthStatus.HEALTH_STATUS_SERVING else HealthStatus.HEALTH_STATUS_DEGRADED
+            if (problems.isNotEmpty()) message = problems.joinToString("; ")
             instanceId = this@SourcePluginApi.instanceId
         }
     }

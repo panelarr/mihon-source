@@ -35,6 +35,8 @@ data class AppConfig(
     val cacheMaxBytes: Long = DEFAULT_CACHE_MB * MB,
     /** Finished runs kept per job. */
     val jobHistory: Int = DEFAULT_JOB_HISTORY,
+    /** The optional browser service for WebView sources. Null means off. */
+    val webView: WebViewConfig? = null,
 ) {
     companion object {
         const val DEFAULT_PORT = 8902
@@ -133,6 +135,7 @@ data class AppConfig(
                 cacheTtls = cacheTtls(::value),
                 cacheMaxBytes = (number("MIHON_CACHE_MAX_MB") ?: DEFAULT_CACHE_MB) * MB,
                 jobHistory = number("MIHON_JOB_HISTORY")?.toInt() ?: DEFAULT_JOB_HISTORY,
+                webView = WebViewConfig.fromEnv(::value),
             )
         }
     }

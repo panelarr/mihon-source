@@ -36,6 +36,7 @@ dependencies {
 
     testImplementation(libs.armeria.junit5)
     testImplementation(libs.okhttp.mockwebserver)
+    testImplementation(libs.testcontainers)
     testImplementation(libs.r8)
     testImplementation(libs.bouncycastle.pkix)
     testImplementation(project(":tools:compat-check"))

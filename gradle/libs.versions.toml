@@ -39,6 +39,8 @@ nodejs = "24.21.0"
 jacksonBuild = "2.22.4"
 graalvm = "25.0.4"
 twelvemonkeys = "3.15.3"
+# Tests only: the browser service integration test runs a real headless Chromium in Docker.
+testcontainers = "2.0.5"
 
 [libraries]
 junit-bom = { module = "org.junit:junit-bom", version.ref = "junit" }
@@ -87,6 +89,7 @@ graalvm-polyglot = { module = "org.graalvm.polyglot:polyglot", version.ref = "gr
 graalvm-js = { module = "org.graalvm.polyglot:js-community", version.ref = "graalvm" }
 twelvemonkeys-webp = { module = "com.twelvemonkeys.imageio:imageio-webp", version.ref = "twelvemonkeys" }
 twelvemonkeys-jpeg = { module = "com.twelvemonkeys.imageio:imageio-jpeg", version.ref = "twelvemonkeys" }
+testcontainers = { module = "org.testcontainers:testcontainers", version.ref = "testcontainers" }
 
 # Plugins used by the convention plugins in build-logic/.
 gradle-kotlin = { module = "org.jetbrains.kotlin:kotlin-gradle-plugin", version.ref = "kotlin" }
