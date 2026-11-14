@@ -60,6 +60,7 @@ import panelarr.mihonsource.store.StoreIcons
 import panelarr.mihonsource.store.StoreManager
 import panelarr.mihonsource.store.StoreReader
 import panelarr.mihonsource.store.StoreRefreshJob
+import panelarr.mihonsource.webview.CdpBrowser
 import java.nio.file.Files
 import kotlin.system.exitProcess
 
@@ -79,6 +80,9 @@ class Application(
     val extensions: ExtensionManager
     val networks: SourceNetworks
     val metrics = Metrics()
+
+    /** The optional browser service for WebView sources; null when `MIHON_WEBVIEW_URL` isn't set. */
+    val webView: CdpBrowser? = config.webView?.let { CdpBrowser(it, metrics = metrics) }
 
     /** Identifies this run of the service (Health.instance_id). */
     val instanceId: String =
@@ -181,6 +185,7 @@ class Application(
                             failedExtensions = { extensions.list().count { !it.loaded } },
                             instanceId = instanceId,
                             profiles = resolver::resolve,
+                            browser = webView,
                         ),
                         ExtensionsApi(extensions, installer, sources, prober, health, healthSchedules),
                         StoresApi(stores),
@@ -228,6 +233,7 @@ class Application(
         jobs.stop()
         server.stop().join()
         extensions.close()
+        webView?.close()
         scope.cancel()
     }
 
@@ -245,6 +251,7 @@ fun main(args: Array<String>) {
     val port = app.start()
     Runtime.getRuntime().addShutdownHook(Thread { app.stop() })
     log.info("{} {} listening on {}:{} (data in {})", SERVICE_NAME, BuildInfo.version, app.config.host, port, app.config.dataDir)
+    app.webView?.let { log.info("Browser service for WebView sources configured at {}", it.address) }
     app.adminToken.generated?.let { token ->
         // Printed once, to stdout rather than the log, so it isn't kept in log files.
         println(

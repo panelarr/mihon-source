@@ -13,3 +13,10 @@ The v0 plan, in slices. Each slice works end to end, has tests and ends with `ma
 - [x] **9. Image and docs:** multi-arch Docker image, quick start, configuration and API docs.
 
 All v0 slices are done. The image is built by `make docker` (local platform) and by the Docker workflow (linux/amd64 and linux/arm64, pushed on main and tags).
+
+## Optional browser service for WebView sources
+
+- [x] **M1. Browser connection:** `MIHON_WEBVIEW_*` settings, a CDP client on OkHttp WebSockets (connect, reconnect, sessions, timeouts, page limit, idle contexts), an optional health check (degraded when unreachable) and metrics. Tested against a fake CDP server and a real headless Chromium (testcontainers).
+- [ ] **M2. `android.webkit` on CDP:** WebView, WebViewClient and CookieManager shims, and a fixture extension that drives a WebView.
+- [ ] **M3. Per-source contexts and networking:** the profile's proxy and UA, cookie sync with the source's jar, coalescing, `WEBVIEW_UNAVAILABLE`, the admin Integrations card.
+- [ ] **M4. Cookie import and clear** per source in the admin API and UI.

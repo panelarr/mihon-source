@@ -24,6 +24,10 @@ mihon-source reads a few environment variables at start. Each one can also be gi
 | `MIHON_CACHE_TTL_PAGES` | `30m` | The same for a chapter's page list. Images themselves are never cached. |
 | `MIHON_CACHE_TTL_FILTERS` | `1h` | The same for a source's filters. |
 | `MIHON_CACHE_MAX_MB` | `64` | Memory the result cache may use; the least recently used results go first. `0` turns the cache off. |
+| `MIHON_WEBVIEW_URL` | *(off)* | The optional browser service for WebView sources: a headless Chromium's DevTools endpoint, e.g. `http://webview:9222` (the WebSocket address is read from `/json/version`) or a `ws://…/devtools/browser/<id>` URL. Empty means off, and nothing changes. See [the browser service](#the-browser-service-for-webview-sources). |
+| `MIHON_WEBVIEW_MAX_PAGES` | `2` | Browser pages open at once, across all sources. A call that finds none free waits up to the load timeout. |
+| `MIHON_WEBVIEW_LOAD_TIMEOUT` | `60s` | How long one page load (or script) in the browser may take. |
+| `MIHON_WEBVIEW_IDLE_TIMEOUT` | `5m` | Browser contexts nobody used for this long are closed. |
 | `MIHON_ADMIN_DIR` | *(bundled)* | Serve the admin UI from this directory instead of the copy in the jar. For development. |
 
 ## Network settings: solvers, profiles, assignments
@@ -39,6 +43,20 @@ Each source uses, in order: a profile pushed by a host (`SetNetworkProfile`), it
 The common setup, a solver for every source, is one step: add the solver while no profiles exist and a profile `default` that uses it is created and made the default. Later, the Integrations page flags solvers that no profile uses, with a button to put one on the default profile.
 
 A request counts as an anti-bot challenge when the site answers 403 or 503 with `cf-mitigated: challenge`, with a Cloudflare `Server` header, or with a challenge page in the body. A challenge is sent to the source's solver. Requests made after that use the clearance cookies and the user agent the solver reported, unless the profile pins a fixed user agent. A challenge with no solver configured fails with the `CLOUDFLARE_CHALLENGE` error reason. Other 403 and 503 responses are logged with the host, status and `Server` header, which helps when a challenge isn't recognized.
+
+## The browser service for WebView sources
+
+Some extensions need a WebView. mihon-source has no browser of its own; it can use an optional headless Chromium running as its own container, spoken to over the Chrome DevTools Protocol (CDP). Without `MIHON_WEBVIEW_URL` nothing changes.
+
+With it set:
+
+- mihon-source connects on first use and reconnects on the next call after the browser went away, so restarting the browser needs no restart of mihon-source.
+- `Health` treats the browser as an optional check: when it can't be reached the service reports `DEGRADED` with a message, never `NOT_SERVING`, and other sources keep working.
+- Metrics: `mihon_webview_up` (reachable when last tried), `mihon_webview_pages_open`, `mihon_webview_loads_total{outcome}` (`ok`, `timeout`, `error`) and `mihon_webview_failures_total{kind}` (`connect`, `disconnect`, `timeout`, `load`, `protocol`, `busy`). They appear only when the browser is configured.
+
+**Keep the DevTools port internal.** CDP has no authentication: anyone who reaches the port controls the browser and everything open in it. Never publish it; put the browser on a network only mihon-source can reach.
+
+Chromium refuses DevTools requests whose `Host` header is a name rather than an IP address or `localhost`. Over plain `http://` or `ws://` to a named host (a compose service name, say), mihon-source therefore sends `Host: localhost`. Over `https://` or `wss://` the real name is kept, for a proxy in front.
 
 ## Data directory
 

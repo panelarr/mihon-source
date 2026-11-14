@@ -29,6 +29,7 @@ class TestService(
     storeRefreshInterval: java.time.Duration = java.time.Duration.ZERO,
     /** Tests see fresh results unless they test caching. */
     cacheTtls: Map<String, java.time.Duration> = AppConfig.DEFAULT_CACHE_TTLS.mapValues { java.time.Duration.ZERO },
+    webView: panelarr.mihonsource.config.WebViewConfig? = null,
 ) : AutoCloseable {
     val app =
         Application(
@@ -43,6 +44,7 @@ class TestService(
                 healthCheckSample = healthCheckSample,
                 storeRefreshInterval = storeRefreshInterval,
                 cacheTtls = cacheTtls,
+                webView = webView,
             ),
         )
     val base = "http://127.0.0.1:${app.start()}"

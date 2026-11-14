@@ -152,5 +152,48 @@ class Metrics {
             .register(registry)
     }
 
+    /**
+     * Gauges for the optional browser service, read at scrape time: whether it was reachable
+     * when last tried (1 or 0) and the pages open now. Registered only when it's configured.
+     */
+    fun webViewGauges(
+        up: () -> Int,
+        pagesOpen: () -> Int,
+    ) {
+        Gauge
+            .builder("mihon_webview_up", up) { it().toDouble() }
+            .description("Whether the browser service was reachable when last tried: 1 or 0")
+            .strongReference(true)
+            .register(registry)
+        Gauge
+            .builder("mihon_webview_pages_open", pagesOpen) { it().toDouble() }
+            .description("Browser pages open now")
+            .strongReference(true)
+            .register(registry)
+    }
+
+    /** One page load in the browser: [outcome] is "ok", "timeout" or "error". */
+    fun webViewLoad(outcome: String) {
+        Counter
+            .builder("mihon_webview_loads")
+            .description("Page loads in the browser service")
+            .tag("outcome", outcome)
+            .register(registry)
+            .increment()
+    }
+
+    /**
+     * A failure talking to the browser: [kind] is "connect", "disconnect", "timeout",
+     * "load", "protocol" or "busy" (no free page in time).
+     */
+    fun webViewFailure(kind: String) {
+        Counter
+            .builder("mihon_webview_failures")
+            .description("Failures talking to the browser service")
+            .tag("kind", kind)
+            .register(registry)
+            .increment()
+    }
+
     fun scrape(): String = registry.scrape()
 }
