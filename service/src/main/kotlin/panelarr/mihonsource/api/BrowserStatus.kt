@@ -8,6 +8,7 @@ import panelarr.mihon.v1.TestBrowserResponse
 import panelarr.mihon.v1.browser
 import panelarr.mihon.v1.testBrowserResponse
 import panelarr.mihonsource.webview.CdpBrowser
+import panelarr.mihonsource.webview.test
 
 /** The browser service as the admin API shows it: checked when read (at most every few seconds). */
 internal suspend fun browserStatus(browser: CdpBrowser?): Browser {

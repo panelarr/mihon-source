@@ -153,7 +153,10 @@ class SourceContextsTest {
         }
     }
 
-    private fun FakeCdp.contextsOfTargets(): List<String?> = sent("Target.createTarget").map { it.params["browserContextId"]?.jsonPrimitive?.content }
+    private fun FakeCdp.contextsOfTargets(): List<String?> =
+        sent("Target.createTarget").map {
+            it.params["browserContextId"]?.jsonPrimitive?.content
+        }
 
     @Test
     fun `views of one source share its context, other sources and unknown callers get their own`() {
@@ -193,7 +196,14 @@ class SourceContextsTest {
         view.loadUrl("http://site.example/")
         assertEquals("finished http://site.example/", recorder.next())
         val created = fake.sent("Target.createBrowserContext")
-        assertEquals("http://proxy.example:8080", created.single().params["proxyServer"]?.jsonPrimitive?.content)
+        assertEquals(
+            "http://proxy.example:8080",
+            created
+                .single()
+                .params["proxyServer"]
+                ?.jsonPrimitive
+                ?.content,
+        )
 
         // The profile switches proxies: the next page opens in a new context, created with the new one.
         settings[1] = settings.getValue(1).copy(proxy = proxy.copy(type = java.net.Proxy.Type.SOCKS, port = 1080))
@@ -206,7 +216,7 @@ class SourceContextsTest {
             fake.sent("Target.createBrowserContext").map { it.params["proxyServer"]?.jsonPrimitive?.content },
         )
         // Context keys never carry the proxy's address.
-        assertTrue(browsers.single().contexts().none { "proxy.example" in it.key })
+        assertTrue(browsers.single().contextInfo.none { "proxy.example" in it.key })
     }
 
     @Test
@@ -273,7 +283,11 @@ class SourceContextsTest {
         assertEquals("finished http://site.example/again", recorder.next())
         assertEquals(
             listOf("Source-UA for site.example", "Extension-UA"),
-            fake.sent("Emulation.setUserAgentOverride").map { it.params.getValue("userAgent").jsonPrimitive.content },
+            fake.sent("Emulation.setUserAgentOverride").map {
+                it.params
+                    .getValue("userAgent")
+                    .jsonPrimitive.content
+            },
         )
     }
 
@@ -344,7 +358,14 @@ class SourceContextsTest {
         assertEquals("finished http://site.example/elsewhere", elsewhereRecorder.next())
         Thread.sleep(SETTLE_MILLIS)
         assertNull(secondRecorder.events.poll(), "the second load of the host waits for the first")
-        assertTrue(fake.sent("Page.navigate").none { it.params.getValue("url").jsonPrimitive.content.endsWith("/second") })
+        assertTrue(
+            fake.sent("Page.navigate").none {
+                it.params
+                    .getValue("url")
+                    .jsonPrimitive.content
+                    .endsWith("/second")
+            },
+        )
 
         val held = fake.sent("Page.navigate").first()
         fake.emit("Page.frameNavigated", frame("http://site.example/held"), held.sessionId)

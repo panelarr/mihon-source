@@ -5,8 +5,8 @@ package panelarr.mihonsource.webview
 import android.os.Handler
 import android.os.Looper
 import android.webkit.ValueCallback
-import android.webkit.WebView
 import android.webkit.WebSettings
+import android.webkit.WebView
 import android.webkit.WebViewClient
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
@@ -91,7 +91,7 @@ class CdpWebViewProvider(
  * which all its views share and which the browser closes when idle: created with the profile's
  * proxy, given the source's user agent unless the extension sets its own, and kept in step with
  * the source's cookie jar (the jar goes in before each load, the context's cookies come back
- * after loads and scripts). Loads of one host in one context take turns ([CdpBrowser.coalesced]).
+ * after loads and scripts). Loads of one host in one context take turns ([HostGates.coalesced]).
  * A view for no known source gets a context of its own, closed with its page, whose cookies go
  * through `CookieManager`'s shared store as before.
  *
@@ -278,7 +278,11 @@ internal class CdpWebView(
                 failPending(first.takeIf { session == null }, "the WebView failed")
             } finally {
                 // A source's context outlives its views (the browser closes it when idle); a view's own doesn't.
-                binding?.takeIf { it.ownContext }?.let { withContext(NonCancellable) { runCatching { browser.closeContext(it.contextKey) } } }
+                binding?.takeIf { it.ownContext }?.let {
+                    withContext(
+                        NonCancellable,
+                    ) { runCatching { browser.closeContext(it.contextKey) } }
+                }
             }
         }
     }
@@ -362,8 +366,7 @@ internal class CdpWebView(
         private var scriptsDisabled: Boolean? = null
         private var runtimeEnabled = false
 
-        /** Requests the proxy credentials were given for: asked again means they were refused. */
-        private val authAnswered = ConcurrentHashMap.newKeySet<String>()
+        private val proxyAuth = binding.proxyCredentials?.let(::ProxyAuth)
 
         /** Whether the main frame shows Chromium's error page for a failed load, whose load event isn't Android's. */
         @Volatile private var showingError = false
@@ -383,7 +386,7 @@ internal class CdpWebView(
                     handle.close()
                     events.close()
                     // What the page set since the last load or script still reaches the jar.
-                    withContext(NonCancellable) { pullCookies() }
+                    withContext(NonCancellable) { binding.cookies?.pullQuietly(page) }
                 }
                 currentCoroutineContext()[Job]?.cancelChildren()
             }
@@ -415,7 +418,7 @@ internal class CdpWebView(
                     // Proxy credentials, answered at once like paused requests.
                     "Fetch.authRequired" -> {
                         touch()
-                        session.launch { guarded(event.method) { answerAuth(event.params) } }
+                        proxyAuth?.let { auth -> session.launch { guarded(event.method) { auth.answer(page, event.params) } } }
                     }
 
                     // Android calls interface methods on a background thread.
@@ -519,7 +522,7 @@ internal class CdpWebView(
             if (host == null || binding.ownContext) {
                 load(load)
             } else {
-                browser.coalesced("${binding.contextKey} $host") { load(load) }
+                browser.gates.coalesced("${binding.contextKey} $host") { load(load) }
             }
         }
 
@@ -544,7 +547,7 @@ internal class CdpWebView(
                 pendingNavigation.set(navigation)
                 page.navigate(load.url)
                 // Before the next load of this host starts: it should find what this one earned.
-                if (binding.cookies != null) pullCookies()
+                binding.cookies?.pullQuietly(page)
             } catch (e: CdpLoadException) {
                 val text = e.message.orEmpty().substringAfter("load: ")
                 // An aborted load was replaced or cancelled on purpose (stopLoading, an overridden redirect).
@@ -613,47 +616,8 @@ internal class CdpWebView(
                 }
             val json = result?.let(::scriptResult) ?: NULL
             // A script may set cookies (document.cookie): they reach the jar before the extension reads it.
-            if (binding.cookies != null) pullCookies()
+            binding.cookies?.pullQuietly(page)
             post { command.callback?.onReceiveValue(json) }
-        }
-
-        /** Copies the context's cookies into the source's jar; a failure only means they come back later. */
-        suspend fun pullCookies() {
-            val sync = binding.cookies ?: return
-            try {
-                sync.pull(page)
-            } catch (e: WebViewException) {
-                log.debug("Couldn't copy the page's cookies: {}", e.message)
-            }
-        }
-
-        /** Gives the profile's credentials to the proxy, once per request; anything else is cancelled, as Android does. */
-        private suspend fun answerAuth(params: JsonObject) {
-            val id = params.string("requestId") ?: return
-            val credentials = binding.proxyCredentials
-            val fromProxy = (params["authChallenge"] as? JsonObject)?.string("source") == "Proxy"
-            val provide = fromProxy && credentials != null && authAnswered.add(id)
-            try {
-                page.send(
-                    "Fetch.continueWithAuth",
-                    buildJsonObject {
-                        put("requestId", JsonPrimitive(id))
-                        put(
-                            "authChallengeResponse",
-                            buildJsonObject {
-                                put("response", JsonPrimitive(if (provide) "ProvideCredentials" else "CancelAuth"))
-                                if (provide) {
-                                    put("username", JsonPrimitive(credentials!!.first))
-                                    put("password", JsonPrimitive(credentials.second))
-                                }
-                            },
-                        )
-                    },
-                )
-            } catch (e: WebViewException) {
-                log.debug("Couldn't answer an authentication request: {}", e.message)
-            }
-            if (fromProxy && !provide && credentials != null) log.warn("The proxy refused the credentials of a source's profile")
         }
 
         private suspend fun install(name: String) {
@@ -695,7 +659,7 @@ internal class CdpWebView(
             if (showingError) return
             val loaded = url?.takeUnless(::isErrorPage) ?: return
             if (binding.cookies != null) {
-                pullCookies()
+                binding.cookies.pullQuietly(page)
             } else if (isHttp(loaded)) {
                 WebViewCookies.pull(page, loaded)
             }

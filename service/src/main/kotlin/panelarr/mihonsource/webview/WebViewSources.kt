@@ -98,6 +98,15 @@ internal class JarCookieSync(
         }
     }
 
+    /** [pull], where a failure only means the cookies come back with a later pull. */
+    suspend fun pullQuietly(page: CdpPage) {
+        try {
+            pull(page)
+        } catch (e: WebViewException) {
+            log.debug("Couldn't copy the page's cookies: {}", e.message)
+        }
+    }
+
     companion object {
         private const val MILLIS = 1000.0
 
@@ -137,7 +146,13 @@ internal class JarCookieSync(
             }
         }
 
-        private fun Cookie.matchesHost(host: String): Boolean = if (hostOnly) host == domain else host == domain || host.endsWith(".$domain")
+        private fun Cookie.matchesHost(host: String): Boolean =
+            if (hostOnly) {
+                host == domain
+            } else {
+                host == domain ||
+                    host.endsWith(".$domain")
+            }
 
         /** A CDP `Cookie` as the jar keeps it, or null when it can't be one (an invalid domain, say). */
         fun fromCdp(cookie: JsonObject): Cookie? {
@@ -163,5 +178,47 @@ internal class JarCookieSync(
                     }.build()
             }.getOrNull()
         }
+    }
+}
+
+/**
+ * Answers a proxy's authentication challenges (`Fetch.authRequired`) with a profile's
+ * credentials, once per request: asked again means they were refused, so it gives up rather
+ * than loop. Challenges from anything but the proxy are cancelled, as Android does.
+ */
+internal class ProxyAuth(
+    private val credentials: Pair<String, String>,
+) {
+    private val log = LoggerFactory.getLogger(ProxyAuth::class.java)
+    private val answered = ConcurrentHashMap.newKeySet<String>()
+
+    suspend fun answer(
+        page: CdpPage,
+        params: JsonObject,
+    ) {
+        val id = params.string("requestId") ?: return
+        val fromProxy = (params["authChallenge"] as? JsonObject)?.string("source") == "Proxy"
+        val provide = fromProxy && answered.add(id)
+        try {
+            page.send(
+                "Fetch.continueWithAuth",
+                buildJsonObject {
+                    put("requestId", JsonPrimitive(id))
+                    put(
+                        "authChallengeResponse",
+                        buildJsonObject {
+                            put("response", JsonPrimitive(if (provide) "ProvideCredentials" else "CancelAuth"))
+                            if (provide) {
+                                put("username", JsonPrimitive(credentials.first))
+                                put("password", JsonPrimitive(credentials.second))
+                            }
+                        },
+                    )
+                },
+            )
+        } catch (e: WebViewException) {
+            log.debug("Couldn't answer an authentication request: {}", e.message)
+        }
+        if (fromProxy && !provide) log.warn("The proxy refused the credentials of a source's profile")
     }
 }

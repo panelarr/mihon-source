@@ -80,7 +80,6 @@ class CdpBrowser(
     private val pages = Semaphore(config.maxPages)
     private val openPages = AtomicInteger()
     private val contexts = ConcurrentHashMap<String, Context>()
-    private val gates = ConcurrentHashMap<String, Gate>()
     private val scope = CoroutineScope(SupervisorJob() + WebViewDispatchers.cdp)
 
     @Volatile private var current: CdpConnection? = null
@@ -117,61 +116,13 @@ class CdpBrowser(
     /** How long a browser context may sit unused before it's closed. */
     val idleTimeout: Duration get() = config.idleTimeout
 
-    /** The result of [test]. */
+    /** The result of [CdpBrowser.test]. */
     data class TestResult(
         val ok: Boolean,
         val message: String,
         val browser: String? = null,
         val latency: Duration,
     )
-
-    /**
-     * Checks the browser end to end, as a WebView would use it: connects (now, not from a
-     * cached check), opens a page in a context of its own, runs a script and closes both.
-     */
-    suspend fun test(): TestResult {
-        val started = System.nanoTime()
-        val since = { Duration.ofNanos(System.nanoTime() - started) }
-        val status = check(fresh = true)
-        if (!status.up) return TestResult(false, status.error ?: "the browser is unreachable", latency = since())
-        val key = "test-${java.util.UUID.randomUUID()}"
-        return try {
-            val answer = withPage(key) { page -> page.evaluate("6 * 7") }
-            if (answer?.toString() == "42") {
-                TestResult(true, "opened a page and ran a script", status.browser, since())
-            } else {
-                TestResult(false, "the browser ran a test script but answered unexpectedly", status.browser, since())
-            }
-        } catch (e: WebViewException) {
-            TestResult(false, e.message ?: "the test page failed", status.browser, since())
-        } finally {
-            withContext(NonCancellable) { runCatching { closeContext(key) } }
-        }
-    }
-
-    /**
-     * Runs [block] while no other block runs for the same [key]: loads of one host in one
-     * context take turns, as solves of one host do, so the second load finds the cookies the
-     * first one earned (a passed challenge, say) instead of facing the same page again.
-     */
-    suspend fun <T> coalesced(
-        key: String,
-        block: suspend () -> T,
-    ): T {
-        val gate =
-            gates.compute(key) { _, existing -> (existing ?: Gate()).also { it.waiting++ } }!!
-        try {
-            return gate.mutex.withLock { block() }
-        } finally {
-            gates.computeIfPresent(key) { _, existing -> existing.also { it.waiting-- }.takeIf { it.waiting > 0 } }
-        }
-    }
-
-    /** A lock for [coalesced], dropped once nobody waits on it. Counted only inside the map's compute calls. */
-    private class Gate {
-        val mutex = Mutex()
-        var waiting = 0
-    }
 
     /** One browser context: who it's for and how many pages it has open. */
     data class ContextInfo(
@@ -181,7 +132,11 @@ class CdpBrowser(
     )
 
     /** The browser contexts open now. */
-    fun contexts(): List<ContextInfo> = contexts.map { (key, context) -> ContextInfo(key, context.users.get(), context.lastUsed) }
+    val contextInfo: List<ContextInfo>
+        get() = contexts.map { (key, context) -> ContextInfo(key, context.users.get(), context.lastUsed) }
+
+    /** Takes turns between loads of one host in one context. */
+    val gates = HostGates()
 
     /** The last known status, without checking. Null until the first check or use. */
     fun lastStatus(): Status? = status
