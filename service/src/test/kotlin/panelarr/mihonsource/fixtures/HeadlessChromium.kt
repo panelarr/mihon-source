@@ -19,7 +19,8 @@ import java.time.Duration
  */
 class HeadlessChromium private constructor(
     private val container: GenericContainer<*>,
-    port: Int,
+    /** The DevTools port; [start] it again on this port to bring "the same" browser back. */
+    val port: Int,
 ) : AutoCloseable {
     /** The DevTools address, as `MIHON_WEBVIEW_URL` takes it. */
     val url = "http://127.0.0.1:$port"
@@ -31,11 +32,10 @@ class HeadlessChromium private constructor(
         const val IMAGE =
             "chromedp/headless-shell:158.0.8127.18@sha256:830fa77e0602cb42e5cb2cbd9237ba27b649ad69d5fb82b54713aac8b7ab4f29"
 
-        fun start(): HeadlessChromium {
+        fun start(port: Int = ServerSocket(0).use { it.localPort }): HeadlessChromium {
             val docker = DockerClientFactory.instance().isDockerAvailable
             if (System.getenv("CI").isNullOrEmpty()) assumeTrue(docker, "Docker isn't available")
             check(docker) { "Docker isn't available, and CI needs it for this test" }
-            val port = ServerSocket(0).use { it.localPort }
             val container =
                 GenericContainer(DockerImageName.parse(IMAGE))
                     .withNetworkMode("host")

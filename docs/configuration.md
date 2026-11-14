@@ -55,7 +55,11 @@ With it set:
 - `Health` treats the browser as an optional check: when it can't be reached the service reports `DEGRADED` with a message, never `NOT_SERVING`, and other sources keep working.
 - Metrics: `mihon_webview_up` (reachable when last tried), `mihon_webview_pages_open`, `mihon_webview_loads_total{outcome}` (`ok`, `timeout`, `error`) and `mihon_webview_failures_total{kind}` (`connect`, `disconnect`, `timeout`, `load`, `protocol`, `busy`). They appear only when the browser is configured.
 
-**Keep the DevTools port internal.** CDP has no authentication: anyone who reaches the port controls the browser and everything open in it. Never publish it; put the browser on a network only mihon-source can reach.
+- Each source gets its own browser context with its profile's proxy, user agent and cookie jar; `CookieManager` uses the source's jar while a browser is configured (see [extensions](extensions.md#webview)).
+- A WebView source called while the browser is unreachable fails with `WEBVIEW_UNAVAILABLE` (ErrorInfo metadata on a `SOURCE_DOWN` error), and its health says so.
+- The admin UI's Integrations page shows the browser (configured, up or down, pages and contexts open) with a Test button; the API is `GET /v1/admin/browser` and `POST /v1/admin/browser/test`.
+
+**Keep the DevTools port internal.** CDP has no authentication: anyone who reaches the port controls the browser and everything open in it: every source's cookies and logins in their contexts, pages through every source's proxy, and files the browser can read. Never publish it (no `ports:` in compose); put the browser on a network only mihon-source can reach, run it as non-root with a memory limit. If Chromium's sandbox is off in the container, the container is the boundary.
 
 Chromium refuses DevTools requests whose `Host` header is a name rather than an IP address or `localhost`. Over plain `http://` or `ws://` to a named host (a compose service name, say), mihon-source therefore sends `Host: localhost`. Over `https://` or `wss://` the real name is kept, for a proxy in front.
 

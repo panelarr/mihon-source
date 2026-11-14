@@ -68,3 +68,34 @@ interface WebViewEngine {
     /** 0 to 100: how far the current load is. */
     val progress: Int
 }
+
+/**
+ * The cookies `android.webkit.CookieManager` reads and writes for one source. On Android the
+ * manager and the app's HTTP cookie jar are one store; a host can make them one here too, per
+ * source, through [AndroidHost.cookieStores].
+ */
+interface WebCookieStore {
+    /** Stores [setCookie] (`Set-Cookie` syntax) as received from [url]. False when it was refused. */
+    fun setCookie(
+        url: String,
+        setCookie: String,
+    ): Boolean
+
+    /** The cookies for [url] as a `Cookie` header value (`a=1; b=2`), or null when there are none. */
+    fun getCookie(url: String): String?
+
+    /** Removes cookies without an expiry. True when there were any. */
+    fun removeSessionCookies(): Boolean
+
+    /** Removes every cookie. True when there were any. */
+    fun removeAllCookies(): Boolean
+
+    fun removeExpiredCookies()
+
+    fun hasCookies(): Boolean
+}
+
+/** Finds the cookie store of a source, or null to use the manager's own process-wide store. */
+fun interface WebCookieStores {
+    fun forSource(sourceId: Long): WebCookieStore?
+}

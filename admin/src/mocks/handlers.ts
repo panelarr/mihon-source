@@ -6,6 +6,7 @@ import { delay, HttpResponse, http, type JsonBodyType } from "msw";
 import type {
   Assignment,
   AvailableExtension,
+  Browser,
   Client,
   Extension,
   FilterValue,
@@ -21,6 +22,7 @@ import {
   fakeHash,
   MOCK_ADMIN_TOKEN,
   mockAvailable,
+  mockBrowser,
   mockChapters,
   mockClients,
   mockExtensions,
@@ -53,6 +55,8 @@ type Db = {
   assignments: Map<string, string>;
   pushed: Map<string, string>;
   settings: Map<string, JsonObject>;
+  /** The browser service for WebView sources, as GetBrowser reports it. */
+  browser: Browser;
   jobs: Job[];
   /** Every job's runs, newest first. */
   runs: JobRun[];
@@ -73,6 +77,7 @@ export function createDb(): Db {
     assignments: new Map([["2001", "via-proxy"]]),
     pushed: new Map([["1002", "host-pushed-example"]]),
     settings: new Map([["1001", structuredClone(mockSettingsValues)]]),
+    browser: mockBrowser(),
     jobs: mockJobs(),
     runs: mockJobRuns(),
     nextId: 1,
@@ -693,6 +698,29 @@ export function createHandlers(db: Db = createDb(), latency = 0) {
     }),
 
     // ----- MihonIntegrationsService -----------------------------------------------
+    http.get(`${base}/admin/browser`, async ({ request }) => {
+      await wait();
+      return guard(request, true) ?? ok({ browser: db.browser });
+    }),
+
+    http.post(`${base}/admin/browser/test`, async ({ request }) => {
+      await wait();
+      const denied = guard(request, true);
+      if (denied) return denied;
+      const browser = db.browser;
+      if (!browser.configured) {
+        return grpcError(
+          "FAILED_PRECONDITION",
+          "no browser service is configured: set MIHON_WEBVIEW_URL to a headless Chromium",
+        );
+      }
+      return ok(
+        browser.up
+          ? { ok: true, message: "opened a page and ran a script", product: browser.product, latency: "0.120s" }
+          : { ok: false, message: browser.error ?? "the browser is unreachable", latency: "3s" },
+      );
+    }),
+
     http.get(`${base}/admin/solvers`, async ({ request }) => {
       await wait();
       return guard(request, true) ?? ok({ solvers: db.solvers });

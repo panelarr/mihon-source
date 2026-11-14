@@ -7,6 +7,7 @@ import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import panelarr.mihonsource.compat.SourceCaller;
 
 /**
  * Android's Looper. There is exactly one: the main looper, a single daemon thread named
@@ -65,10 +66,12 @@ public final class Looper {
         return Thread.currentThread() == thread;
     }
 
+    /** Runs {@code task} later on the main thread, as working for the source of the thread that scheduled it. */
     ScheduledFuture<?> schedule(Runnable task, long delayMillis) {
+        Runnable bound = SourceCaller.bind(task);
         Runnable guarded = () -> {
             try {
-                task.run();
+                bound.run();
             } catch (Throwable t) {
                 // On Android this would crash the app; here we log and keep the thread alive.
                 LOG.log(Level.SEVERE, "Uncaught exception on the main looper", t);

@@ -18,6 +18,8 @@ class CdpPage internal constructor(
     private val connection: CdpConnection,
     val targetId: String,
     val sessionId: String,
+    /** The browser context the page lives in: its cookies and storage. */
+    val browserContextId: String?,
     private val loadTimeout: Duration,
     private val loaded: (outcome: String) -> Unit = {},
 ) {
@@ -27,6 +29,16 @@ class CdpPage internal constructor(
         params: JsonObject = CdpConnection.EMPTY,
         timeout: Duration = CdpConnection.DEFAULT_TIMEOUT,
     ): JsonObject = connection.send(method, params, sessionId, timeout)
+
+    /** Sends a command to the browser itself, such as `Storage.*` for this page's context. */
+    suspend fun sendToBrowser(
+        method: String,
+        params: JsonObject = CdpConnection.EMPTY,
+        timeout: Duration = CdpConnection.DEFAULT_TIMEOUT,
+    ): JsonObject = connection.send(method, params, timeout = timeout)
+
+    /** Whether the connection the page lives on is still open. */
+    val isOpen: Boolean get() = connection.isOpen
 
     /** Calls [listener] for this page's events until the returned handle is closed. */
     fun onEvent(listener: (CdpEvent) -> Unit): AutoCloseable = connection.onEvent { if (it.sessionId == sessionId) listener(it) }

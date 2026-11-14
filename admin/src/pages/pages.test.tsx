@@ -380,6 +380,50 @@ describe("integrations", () => {
     app.dispose();
   });
 
+  it("shows the browser service and tests it", async () => {
+    const db = createDb();
+    server.resetHandlers(...createHandlers(db));
+    const app = renderApp("/integrations");
+    const section = (await screen.findByRole("heading", { name: "Browser service" })).closest("section") as HTMLElement;
+    expect(await within(section).findByText("Up")).toBeInTheDocument();
+    expect(within(section).getByText("HeadlessChrome/140.0.0.0")).toBeInTheDocument();
+    expect(within(section).getByText("1 of 2")).toBeInTheDocument();
+    await userEvent.click(within(section).getByRole("button", { name: "Test" }));
+    expect(await within(section).findByText("Test passed")).toBeInTheDocument();
+    expect(within(section).getByRole("status")).toHaveTextContent("opened a page and ran a script");
+    app.dispose();
+  });
+
+  it("shows a browser that is down", async () => {
+    const db = createDb();
+    db.browser = {
+      ...db.browser,
+      up: false,
+      product: "",
+      pagesOpen: 0,
+      error: "can't reach the browser: Connection refused",
+    };
+    server.resetHandlers(...createHandlers(db));
+    const app = renderApp("/integrations");
+    const section = (await screen.findByRole("heading", { name: "Browser service" })).closest("section") as HTMLElement;
+    expect(await within(section).findByText("Down")).toBeInTheDocument();
+    expect(within(section).getByText("can't reach the browser: Connection refused")).toBeInTheDocument();
+    await userEvent.click(within(section).getByRole("button", { name: "Test" }));
+    expect(await within(section).findByText("Test failed")).toBeInTheDocument();
+    app.dispose();
+  });
+
+  it("explains how to set up a browser when none is configured", async () => {
+    const db = createDb();
+    db.browser = { configured: false };
+    server.resetHandlers(...createHandlers(db));
+    const app = renderApp("/integrations");
+    const section = (await screen.findByRole("heading", { name: "Browser service" })).closest("section") as HTMLElement;
+    expect(await within(section).findByText("Not configured")).toBeInTheDocument();
+    expect(within(section).queryByRole("button", { name: "Test" })).not.toBeInTheDocument();
+    app.dispose();
+  });
+
   it("shows the API's error when a solver is still in use", async () => {
     const app = renderApp("/integrations");
     const row = (await screen.findByText("Main solver")).closest("tr") as HTMLElement;

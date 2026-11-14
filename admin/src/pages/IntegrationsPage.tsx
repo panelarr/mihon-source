@@ -4,11 +4,19 @@ import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/r
 import { Link } from "@tanstack/react-router";
 import { type FormEvent, useMemo, useState } from "react";
 import { api, unwrap } from "../api/client";
-import type { Assignment, NetworkProfile, ProfileOrigin, Solver, SolverType, UserAgentMode } from "../api/types";
+import type {
+  Assignment,
+  Browser,
+  NetworkProfile,
+  ProfileOrigin,
+  Solver,
+  SolverType,
+  UserAgentMode,
+} from "../api/types";
 import { ConfirmDialog, Dialog } from "../components/Dialog";
 import { Badge, Empty, ErrorBox, Field, Loading, Mono, PageHeader, type Tone } from "../components/ui";
 import { durationInput, formatDuration, secondsToDuration } from "../lib/duration";
-import { enumLabel } from "../lib/format";
+import { enumLabel, formatDate } from "../lib/format";
 import { formToProfile, idPattern, type ProfileForm, profileToForm } from "../lib/profileForm";
 import { sourcesQuery } from "./sources/queries";
 
@@ -53,10 +61,102 @@ export function IntegrationsPage() {
         A source uses, in order: a profile pushed by a host, the profile assigned to it here, the default profile, or a
         direct connection.
       </p>
+      <BrowserSection />
       <SolversSection />
       <ProfilesSection />
       <AssignmentsSection />
     </>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Browser service
+// ---------------------------------------------------------------------------
+
+const browserQuery = () =>
+  queryOptions({
+    queryKey: ["browser"],
+    queryFn: async () => (await unwrap(api.GET("/v1/admin/browser"))).browser ?? {},
+    // The service checks the browser when asked (at most every few seconds): keep the status current.
+    refetchInterval: 15_000,
+  });
+
+function browserState(browser: Browser): { tone: Tone; label: string } {
+  if (!browser.configured) return { tone: "neutral", label: "Not configured" };
+  return browser.up ? { tone: "good", label: "Up" } : { tone: "bad", label: "Down" };
+}
+
+/** The optional browser service WebView sources need: whether it's there, and a test that opens a page. */
+function BrowserSection() {
+  const queryClient = useQueryClient();
+  const browser = useQuery(browserQuery());
+  const test = useMutation({
+    mutationFn: () => unwrap(api.POST("/v1/admin/browser/test", { body: {} })),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ["browser"] }),
+  });
+  const data = browser.data;
+  const state = data ? browserState(data) : null;
+  return (
+    <section className="section">
+      <header className="section-header">
+        <h2>Browser service</h2>
+      </header>
+      <p className="muted">
+        Sources that use a WebView run it in an optional headless Chromium, set with <Mono>MIHON_WEBVIEW_URL</Mono>.
+        Each source gets its own browser context, with its profile's proxy, user agent and cookies.
+      </p>
+      {browser.isPending ? <Loading /> : null}
+      <ErrorBox error={browser.error} onRetry={() => browser.refetch()} />
+      {data && state ? (
+        <article className="card">
+          <header className="card-header">
+            <div>
+              <h3>Headless Chromium</h3>
+              {data.address ? <span className="muted small wrap">{data.address}</span> : null}
+            </div>
+            <Badge tone={state.tone}>{state.label}</Badge>
+          </header>
+          {data.configured ? (
+            <>
+              {data.error ? <pre className="load-error">{data.error}</pre> : null}
+              <dl className="details compact">
+                <dt>Browser</dt>
+                <dd>{data.product || "—"}</dd>
+                <dt>Pages open</dt>
+                <dd>
+                  {data.pagesOpen ?? 0} of {data.maxPages ?? 0}
+                </dd>
+                <dt>Browser contexts</dt>
+                <dd>{data.contextsOpen ?? 0}</dd>
+                <dt>Load timeout</dt>
+                <dd>{formatDuration(data.loadTimeout)}</dd>
+                <dt>Idle contexts close after</dt>
+                <dd>{formatDuration(data.idleTimeout)}</dd>
+                <dt>Checked</dt>
+                <dd>{formatDate(data.checkedAt)}</dd>
+              </dl>
+              <ErrorBox error={test.error} title="Test" />
+              {test.data ? (
+                <p role="status">
+                  <Badge tone={test.data.ok ? "good" : "bad"}>{test.data.ok ? "Test passed" : "Test failed"}</Badge>{" "}
+                  {test.data.message} ({formatDuration(test.data.latency)})
+                </p>
+              ) : null}
+              <div className="actions">
+                <button type="button" onClick={() => test.mutate()} disabled={test.isPending}>
+                  {test.isPending ? "Testing…" : "Test"}
+                </button>
+              </div>
+            </>
+          ) : (
+            <p className="muted">
+              No browser is configured, so WebView sources report that they need one. Run a headless Chromium on an
+              internal network and set <Mono>MIHON_WEBVIEW_URL</Mono> to it (see the configuration docs).
+            </p>
+          )}
+        </article>
+      ) : null}
+    </section>
   );
 }
 

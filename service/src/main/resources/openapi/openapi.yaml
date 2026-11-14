@@ -47,6 +47,42 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/panelarr.mihon.v1.AssignProfileResponse'
+    /v1/admin/browser:
+        get:
+            tags:
+                - MihonIntegrationsService
+            description: |-
+                GetBrowser reports the optional browser service WebView sources use: whether it's
+                 configured (MIHON_WEBVIEW_URL), whether it answers, and how much of it is in use.
+            operationId: MihonIntegrationsService_GetBrowser
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/panelarr.mihon.v1.GetBrowserResponse'
+    /v1/admin/browser/test:
+        post:
+            tags:
+                - MihonIntegrationsService
+            description: |-
+                TestBrowser connects to the browser service now and opens a page in it, as a
+                 WebView would. Fails with FAILED_PRECONDITION when no browser is configured.
+            operationId: MihonIntegrationsService_TestBrowser
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/panelarr.mihon.v1.TestBrowserRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/panelarr.mihon.v1.TestBrowserResponse'
     /v1/admin/checks:
         post:
             tags:
@@ -1938,6 +1974,47 @@ components:
                     description: |-
                         IDs the source will be known by in other apps, as "<scheme>:<id>": "mihon:<id>".
                          The same as Source.compat_ids in panelarr.source.v1 once installed.
+        panelarr.mihon.v1.Browser:
+            type: object
+            properties:
+                configured:
+                    type: boolean
+                    description: Whether a browser is configured. Without one, WebView sources can't run.
+                address:
+                    type: string
+                    description: 'Where it is: host and port only.'
+                up:
+                    type: boolean
+                    description: |-
+                        Whether it answered the last check. The check runs when this is read, at most
+                         every few seconds.
+                product:
+                    type: string
+                    description: The browser's product, e.g. "Chrome/140.0.0.0", when up.
+                error:
+                    type: string
+                    description: Why it's down, when it isn't up.
+                checkedAt:
+                    type: string
+                    format: date-time
+                pagesOpen:
+                    type: integer
+                    description: Pages open now, and the most open at once (MIHON_WEBVIEW_MAX_PAGES).
+                    format: uint32
+                maxPages:
+                    type: integer
+                    format: uint32
+                contextsOpen:
+                    type: integer
+                    description: 'Browser contexts open now: one per source with WebViews in use, closed when idle.'
+                    format: uint32
+                loadTimeout:
+                    pattern: ^-?(?:0|[1-9][0-9]{0,11})(?:\.[0-9]{1,9})?s$
+                    type: string
+                idleTimeout:
+                    pattern: ^-?(?:0|[1-9][0-9]{0,11})(?:\.[0-9]{1,9})?s$
+                    type: string
+            description: Browser is the state of the optional browser service.
         panelarr.mihon.v1.CancelJobRunRequest:
             type: object
             properties:
@@ -2127,6 +2204,11 @@ components:
                     description: |-
                         IDs the source is known by in other apps, as "<scheme>:<id>": "mihon:<id>".
                          The same as Source.compat_ids in panelarr.source.v1.
+        panelarr.mihon.v1.GetBrowserResponse:
+            type: object
+            properties:
+                browser:
+                    $ref: '#/components/schemas/panelarr.mihon.v1.Browser'
         panelarr.mihon.v1.GetExtensionResponse:
             type: object
             properties:
@@ -2746,6 +2828,23 @@ components:
                 extensionCount:
                     type: integer
                     format: uint32
+        panelarr.mihon.v1.TestBrowserRequest:
+            type: object
+            properties: {}
+        panelarr.mihon.v1.TestBrowserResponse:
+            type: object
+            properties:
+                ok:
+                    type: boolean
+                message:
+                    type: string
+                    description: What worked, or what failed.
+                product:
+                    type: string
+                    description: The browser's product, when it answered.
+                latency:
+                    pattern: ^-?(?:0|[1-9][0-9]{0,11})(?:\.[0-9]{1,9})?s$
+                    type: string
         panelarr.mihon.v1.UninstallExtensionResponse:
             type: object
             properties: {}

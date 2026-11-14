@@ -51,6 +51,43 @@ class FileCookieJar(
     @Synchronized
     fun get(url: HttpUrl): List<Cookie> = cookies.filter { it.matches(url) && it.expiresAt > now() }
 
+    /** Every cookie in the jar that hasn't expired. */
+    @Synchronized
+    fun all(): List<Cookie> {
+        val time = now()
+        return cookies.filter { it.expiresAt > time }
+    }
+
+    /**
+     * Stores [incoming], replacing cookies with the same name, domain and path, and writes the
+     * file only when something changed. Returns how many cookies were new or different.
+     */
+    @Synchronized
+    fun merge(incoming: List<Cookie>): Int {
+        val time = now()
+        var changed = 0
+        incoming.forEach { cookie ->
+            val index = cookies.indexOfFirst { it.name == cookie.name && it.domain == cookie.domain && it.path == cookie.path }
+            val existing = cookies.getOrNull(index)
+            when {
+                cookie.expiresAt <= time -> if (existing != null) cookies.removeAt(index).also { changed++ }
+                existing == cookie -> Unit
+                existing != null -> cookies[index] = cookie.also { changed++ }
+                else -> cookies.add(cookie).also { changed++ }
+            }
+        }
+        if (changed > 0) persist()
+        return changed
+    }
+
+    /** Removes the cookies [predicate] matches. True when there were any. */
+    @Synchronized
+    fun removeIf(predicate: (Cookie) -> Boolean): Boolean {
+        val removed = cookies.removeAll(predicate)
+        if (removed) persist()
+        return removed
+    }
+
     /** Removes cookies for [url]'s host, optionally only those named in [names]. Returns how many. */
     @Synchronized
     fun remove(

@@ -21,6 +21,7 @@ import panelarr.mihonsource.auth.Authenticator
 import panelarr.mihonsource.auth.ClientRegistry
 import panelarr.mihonsource.auth.Scopes
 import panelarr.mihonsource.compat.AndroidHost
+import panelarr.mihonsource.compat.WebCookieStores
 import panelarr.mihonsource.config.AppConfig
 import panelarr.mihonsource.extension.DateFormatRewriter
 import panelarr.mihonsource.extension.ExtensionIcons
@@ -51,6 +52,7 @@ import panelarr.mihonsource.mihon.SourceHealthService
 import panelarr.mihonsource.mihon.SourceProber
 import panelarr.mihonsource.net.Downloader
 import panelarr.mihonsource.network.FileIntegrationsStore
+import panelarr.mihonsource.network.JarCookieStore
 import panelarr.mihonsource.network.ProfileResolver
 import panelarr.mihonsource.network.PushedProfiles
 import panelarr.mihonsource.network.SolverClient
@@ -62,6 +64,8 @@ import panelarr.mihonsource.store.StoreReader
 import panelarr.mihonsource.store.StoreRefreshJob
 import panelarr.mihonsource.webview.CdpBrowser
 import panelarr.mihonsource.webview.CdpWebViewProvider
+import panelarr.mihonsource.webview.WebViewSourceSettings
+import panelarr.mihonsource.webview.WebViewSources
 import java.nio.file.Files
 import kotlin.system.exitProcess
 
@@ -86,7 +90,10 @@ class Application(
     val webView: CdpBrowser? = config.webView?.let { CdpBrowser(it, metrics = metrics) }
 
     /** Backs `android.webkit.WebView` with [webView]; without a browser, WebViews can't be created. */
-    private val webViewProvider = webView?.let { CdpWebViewProvider(it, config.webView!!) }
+    private val webViewProvider: CdpWebViewProvider?
+
+    /** Keeps `CookieManager` in each source's own jar while a browser is configured. */
+    private val cookieStores: WebCookieStores?
 
     /** Identifies this run of the service (Health.instance_id). */
     val instanceId: String =
@@ -111,7 +118,19 @@ class Application(
         networks = SourceNetworks(resolver, dataDir.resolve("cookies"), SolverClient(Downloader.defaultClient(), metrics))
         integrations.addListener(networks::configurationChanged)
         MihonHost.install(dataDir, networks)
+        webViewProvider =
+            webView?.let { browser ->
+                val sourceSettings =
+                    WebViewSources { id ->
+                        val network = networks.forSource(id)
+                        WebViewSourceSettings(network.profile().proxy, network::userAgentFor, network.jar())
+                    }
+                CdpWebViewProvider(browser, config.webView!!, sourceSettings)
+            }
+        cookieStores = webView?.let { WebCookieStores { id -> JarCookieStore { networks.forSource(id).jar() } } }
         AndroidHost.webViewProvider = webViewProvider
+        // Only with a browser: without one, CookieManager stays the shared in-memory store it always was.
+        AndroidHost.cookieStores = cookieStores
 
         extensions = ExtensionManager(dataDir.resolve("extensions"), MihonInstantiator(), transform = DateFormatRewriter::rewrite)
         val installer =
@@ -159,6 +178,7 @@ class Application(
                 metrics = metrics,
             )
         healthSchedules.addListener { jobs.reschedule(SourceHealthJob.ID) }
+        webViewProvider?.let { sources.webViewOutage = it.outages::since }
         sources.healthOf = health::get
         sources.checksEnabled = health::enabled
         val metricsService = OpsService.metrics(metrics::scrape)
@@ -196,7 +216,7 @@ class Application(
                         StoresApi(stores),
                         JobsApi(jobs),
                         ClientsApi(clients),
-                        IntegrationsApi(integrations, resolver, secrets) { extensions.sources().map { it.id } },
+                        IntegrationsApi(integrations, resolver, secrets, { extensions.sources().map { it.id } }, webView),
                         // Lets tools such as grpcurl discover the API. Needs the admin scope.
                         ProtoReflectionServiceV1.newInstance(),
                     ),
@@ -239,6 +259,7 @@ class Application(
         server.stop().join()
         extensions.close()
         if (AndroidHost.webViewProvider === webViewProvider) AndroidHost.webViewProvider = null
+        if (AndroidHost.cookieStores === cookieStores) AndroidHost.cookieStores = null
         webView?.close()
         scope.cancel()
     }

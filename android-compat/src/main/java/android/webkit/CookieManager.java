@@ -10,15 +10,20 @@ import java.util.List;
 import java.util.Locale;
 import panelarr.mihonsource.compat.AndroidHost;
 import panelarr.mihonsource.compat.CookieListener;
+import panelarr.mihonsource.compat.SourceCaller;
+import panelarr.mihonsource.compat.WebCookieStore;
+import panelarr.mihonsource.compat.WebCookieStores;
 
 /**
- * Android's CookieManager as an in-memory cookie store shared by the whole process. Cookies
- * follow the usual domain, path, expiry and secure rules. Every {@link #setCookie} is also
- * passed to {@link AndroidHost#getCookieListener()}, so the host can copy cookies into its own
- * cookie jars.
+ * Android's CookieManager. Code working for a source ({@link SourceCaller}) uses that source's
+ * own store when the host provides one ({@link AndroidHost#getCookieStores()}), so one source's
+ * cookies never reach another. Anything else uses an in-memory store shared by the whole
+ * process. Cookies follow the usual domain, path, expiry and secure rules. Every
+ * {@link #setCookie} into the shared store is also passed to
+ * {@link AndroidHost#getCookieListener()}.
  */
 public abstract class CookieManager {
-    private static final CookieManager INSTANCE = new MemoryCookieManager();
+    private static final CookieManager INSTANCE = new HostCookieManager();
 
     protected CookieManager() {}
 
@@ -63,15 +68,20 @@ public abstract class CookieManager {
 
     public static void setAcceptFileSchemeCookies(boolean accept) {}
 
-    private static final class MemoryCookieManager extends CookieManager {
-        private record Stored(HttpCookie cookie, String domain, boolean hostOnly, long expiresAt) {
-            boolean expired(long now) {
-                return expiresAt >= 0 && now >= expiresAt;
-            }
-        }
-
-        private final List<Stored> cookies = new ArrayList<>();
+    /** Passes each call to the store of the calling source, or to the shared one. */
+    private static final class HostCookieManager extends CookieManager {
+        private final MemoryCookieStore shared = new MemoryCookieStore();
         private volatile boolean accept = true;
+
+        private WebCookieStore store() {
+            Long sourceId = SourceCaller.current();
+            WebCookieStores stores = AndroidHost.INSTANCE.getCookieStores();
+            if (sourceId != null && stores != null) {
+                WebCookieStore own = stores.forSource(sourceId);
+                if (own != null) return own;
+            }
+            return shared;
+        }
 
         @Override
         public void setAcceptCookie(boolean accept) {
@@ -90,6 +100,69 @@ public abstract class CookieManager {
         public boolean acceptThirdPartyCookies(WebView webview) {
             return false;
         }
+
+        @Override
+        public void setCookie(String url, String value) {
+            setCookie(url, value, null);
+        }
+
+        @Override
+        public void setCookie(String url, String value, ValueCallback<Boolean> callback) {
+            boolean stored = accept && url != null && value != null && store().setCookie(url, value);
+            if (callback != null) callback.onReceiveValue(stored);
+        }
+
+        @Override
+        public String getCookie(String url) {
+            return url == null ? null : store().getCookie(url);
+        }
+
+        @Override
+        public void removeSessionCookie() {
+            removeSessionCookies(null);
+        }
+
+        @Override
+        public void removeSessionCookies(ValueCallback<Boolean> callback) {
+            boolean removed = store().removeSessionCookies();
+            if (callback != null) callback.onReceiveValue(removed);
+        }
+
+        @Override
+        public void removeAllCookie() {
+            removeAllCookies(null);
+        }
+
+        @Override
+        public void removeAllCookies(ValueCallback<Boolean> callback) {
+            boolean had = store().removeAllCookies();
+            if (callback != null) callback.onReceiveValue(had);
+        }
+
+        @Override
+        public void removeExpiredCookie() {
+            store().removeExpiredCookies();
+        }
+
+        @Override
+        public boolean hasCookies() {
+            return store().hasCookies();
+        }
+
+        /** The host's stores write through; the shared one lives in memory only. */
+        @Override
+        public void flush() {}
+    }
+
+    /** The process-wide store: in memory only. */
+    private static final class MemoryCookieStore implements WebCookieStore {
+        private record Stored(HttpCookie cookie, String domain, boolean hostOnly, long expiresAt) {
+            boolean expired(long now) {
+                return expiresAt >= 0 && now >= expiresAt;
+            }
+        }
+
+        private final List<Stored> cookies = new ArrayList<>();
 
         private static URI uri(String url) {
             try {
@@ -119,18 +192,13 @@ public abstract class CookieManager {
         }
 
         @Override
-        public void setCookie(String url, String value) {
-            setCookie(url, value, null);
-        }
-
-        @Override
-        public void setCookie(String url, String value, ValueCallback<Boolean> callback) {
-            boolean stored = accept && store(url, value);
+        public boolean setCookie(String url, String value) {
+            boolean stored = store(url, value);
             if (stored) {
                 CookieListener listener = AndroidHost.INSTANCE.getCookieListener();
                 if (listener != null) listener.onCookieSet(url, value);
             }
-            if (callback != null) callback.onReceiveValue(stored);
+            return stored;
         }
 
         private boolean store(String url, String value) {
@@ -189,26 +257,14 @@ public abstract class CookieManager {
         }
 
         @Override
-        public void removeSessionCookie() {
-            removeSessionCookies(null);
-        }
-
-        @Override
-        public void removeSessionCookies(ValueCallback<Boolean> callback) {
-            boolean removed;
+        public boolean removeSessionCookies() {
             synchronized (cookies) {
-                removed = cookies.removeIf(s -> s.expiresAt < 0);
+                return cookies.removeIf(s -> s.expiresAt < 0);
             }
-            if (callback != null) callback.onReceiveValue(removed);
         }
 
         @Override
-        public void removeAllCookie() {
-            removeAllCookies(null);
-        }
-
-        @Override
-        public void removeAllCookies(ValueCallback<Boolean> callback) {
+        public boolean removeAllCookies() {
             boolean had;
             synchronized (cookies) {
                 had = !cookies.isEmpty();
@@ -216,11 +272,11 @@ public abstract class CookieManager {
             }
             CookieListener listener = AndroidHost.INSTANCE.getCookieListener();
             if (listener != null) listener.onCookiesCleared();
-            if (callback != null) callback.onReceiveValue(had);
+            return had;
         }
 
         @Override
-        public void removeExpiredCookie() {
+        public void removeExpiredCookies() {
             long now = System.currentTimeMillis();
             synchronized (cookies) {
                 cookies.removeIf(s -> s.expired(now));
@@ -234,8 +290,5 @@ public abstract class CookieManager {
             }
         }
 
-        /** Cookies live in memory only, so there is nothing to write. */
-        @Override
-        public void flush() {}
     }
 }

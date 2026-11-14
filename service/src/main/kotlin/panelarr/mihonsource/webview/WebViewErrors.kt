@@ -31,3 +31,8 @@ class CdpProtocolException(
 class CdpLoadException(
     message: String,
 ) : WebViewException(message)
+
+/** The source's settings ask for something the browser can't do, such as a SOCKS proxy with a password. */
+class WebViewSettingsException(
+    message: String,
+) : WebViewException(message)

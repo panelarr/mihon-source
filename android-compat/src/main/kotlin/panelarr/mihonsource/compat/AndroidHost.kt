@@ -42,6 +42,14 @@ object AndroidHost {
     var cookieListener: CookieListener? = null
 
     /**
+     * Where `android.webkit.CookieManager` keeps the cookies of the source the calling code
+     * works for ([SourceCaller]). Null (the default), or code working for no known source,
+     * uses the manager's own in-memory store, shared by the whole process.
+     */
+    @Volatile
+    var cookieStores: WebCookieStores? = null
+
+    /**
      * Makes the engine behind `android.webkit.WebView`, when the host has a browser. Null
      * (the default) means there's none, and constructing a WebView throws.
      */

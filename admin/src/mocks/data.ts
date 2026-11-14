@@ -4,6 +4,7 @@
 // example.com / *.example) and hashes.
 import type {
   AvailableExtension,
+  Browser,
   Chapter,
   Client,
   Extension,
@@ -367,6 +368,22 @@ export function mockSolvers(): Solver[] {
       asResponseFallback: false,
     },
   ];
+}
+
+/** A configured browser service that answers, with one page open. */
+export function mockBrowser(): Browser {
+  return {
+    configured: true,
+    address: "webview.example:9222",
+    up: true,
+    product: "HeadlessChrome/140.0.0.0",
+    checkedAt: "2026-01-01T00:00:00Z",
+    pagesOpen: 1,
+    maxPages: 2,
+    contextsOpen: 1,
+    loadTimeout: "60s",
+    idleTimeout: "300s",
+  };
 }
 
 export function mockProfiles(): NetworkProfile[] {

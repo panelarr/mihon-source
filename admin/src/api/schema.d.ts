@@ -39,6 +39,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/admin/browser": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description GetBrowser reports the optional browser service WebView sources use: whether it's
+         *      configured (MIHON_WEBVIEW_URL), whether it answers, and how much of it is in use.
+         */
+        get: operations["MihonIntegrationsService_GetBrowser"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/browser/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * @description TestBrowser connects to the browser service now and opens a page in it, as a
+         *      WebView would. Fails with FAILED_PRECONDITION when no browser is configured.
+         */
+        post: operations["MihonIntegrationsService_TestBrowser"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/admin/checks": {
         parameters: {
             query?: never;
@@ -1386,6 +1426,38 @@ export interface components {
              */
             compatIds?: string[];
         };
+        /** @description Browser is the state of the optional browser service. */
+        "panelarr.mihon.v1.Browser": {
+            /** @description Whether a browser is configured. Without one, WebView sources can't run. */
+            configured?: boolean;
+            /** @description Where it is: host and port only. */
+            address?: string;
+            /**
+             * @description Whether it answered the last check. The check runs when this is read, at most
+             *      every few seconds.
+             */
+            up?: boolean;
+            /** @description The browser's product, e.g. "Chrome/140.0.0.0", when up. */
+            product?: string;
+            /** @description Why it's down, when it isn't up. */
+            error?: string;
+            /** Format: date-time */
+            checkedAt?: string;
+            /**
+             * Format: uint32
+             * @description Pages open now, and the most open at once (MIHON_WEBVIEW_MAX_PAGES).
+             */
+            pagesOpen?: number;
+            /** Format: uint32 */
+            maxPages?: number;
+            /**
+             * Format: uint32
+             * @description Browser contexts open now: one per source with WebViews in use, closed when idle.
+             */
+            contextsOpen?: number;
+            loadTimeout?: string;
+            idleTimeout?: string;
+        };
         "panelarr.mihon.v1.CancelJobRunRequest": {
             runId?: string;
         };
@@ -1489,6 +1561,9 @@ export interface components {
              *      The same as Source.compat_ids in panelarr.source.v1.
              */
             compatIds?: string[];
+        };
+        "panelarr.mihon.v1.GetBrowserResponse": {
+            browser?: components["schemas"]["panelarr.mihon.v1.Browser"];
         };
         "panelarr.mihon.v1.GetExtensionResponse": {
             extension?: components["schemas"]["panelarr.mihon.v1.Extension"];
@@ -1866,6 +1941,15 @@ export interface components {
             lastError?: string;
             /** Format: uint32 */
             extensionCount?: number;
+        };
+        "panelarr.mihon.v1.TestBrowserRequest": Record<string, never>;
+        "panelarr.mihon.v1.TestBrowserResponse": {
+            ok?: boolean;
+            /** @description What worked, or what failed. */
+            message?: string;
+            /** @description The browser's product, when it answered. */
+            product?: string;
+            latency?: string;
         };
         "panelarr.mihon.v1.UninstallExtensionResponse": Record<string, never>;
         "panelarr.mihon.v1.UpdateClientRequest": {
@@ -2590,6 +2674,50 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["panelarr.mihon.v1.AssignProfileResponse"];
+                };
+            };
+        };
+    };
+    MihonIntegrationsService_GetBrowser: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["panelarr.mihon.v1.GetBrowserResponse"];
+                };
+            };
+        };
+    };
+    MihonIntegrationsService_TestBrowser: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["panelarr.mihon.v1.TestBrowserRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["panelarr.mihon.v1.TestBrowserResponse"];
                 };
             };
         };

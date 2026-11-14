@@ -107,6 +107,37 @@ class CdpBrowser(
     /** Pages open right now. */
     fun openPages(): Int = openPages.get()
 
+    /** The most pages open at once. */
+    val maxPages: Int get() = config.maxPages
+
+    /** How long one page load may take. */
+    val loadTimeout: Duration get() = config.loadTimeout
+
+    /** How long a browser context may sit unused before it's closed. */
+    val idleTimeout: Duration get() = config.idleTimeout
+
+    /** The result of [CdpBrowser.test]. */
+    data class TestResult(
+        val ok: Boolean,
+        val message: String,
+        val browser: String? = null,
+        val latency: Duration,
+    )
+
+    /** One browser context: who it's for and how many pages it has open. */
+    data class ContextInfo(
+        val key: String,
+        val pages: Int,
+        val lastUsed: Instant,
+    )
+
+    /** The browser contexts open now. */
+    val contextInfo: List<ContextInfo>
+        get() = contexts.map { (key, context) -> ContextInfo(key, context.users.get(), context.lastUsed) }
+
+    /** Takes turns between loads of one host in one context. */
+    val gates = HostGates()
+
     /** The last known status, without checking. Null until the first check or use. */
     fun lastStatus(): Status? = status
 
@@ -114,10 +145,13 @@ class CdpBrowser(
      * Checks that the browser answers, connecting if needed, within [timeout]. Results are
      * reused for a few seconds, so frequent health probes don't hammer the browser.
      */
-    suspend fun check(timeout: Duration = CHECK_TIMEOUT): Status =
+    suspend fun check(
+        timeout: Duration = CHECK_TIMEOUT,
+        fresh: Boolean = false,
+    ): Status =
         checkLock.withLock {
             // Only a check's own result is reused: connecting or a drop updates [status] too, without a product.
-            lastCheck?.takeIf { it === status && Duration.between(it.checkedAt, now()) < STATUS_TTL }?.let { return it }
+            if (!fresh) lastCheck?.takeIf { it === status && Duration.between(it.checkedAt, now()) < STATUS_TTL }?.let { return it }
             val result =
                 try {
                     withTimeoutOrNull(timeout.toMillis()) {
@@ -293,8 +327,8 @@ class CdpBrowser(
 
     /** Reads the browser's WebSocket path from `/json/version` and points it at [target]. */
     private suspend fun discover(): String =
-        // Its own threads: source calls waiting on WebViews may hold every I/O thread.
-        withContext(WebViewDispatchers.blocking) {
+        // Its own threads: source calls waiting on WebViews may hold every I/O thread, and extension code the blocking ones.
+        withContext(WebViewDispatchers.discovery) {
             val request =
                 Request
                     .Builder()
@@ -392,7 +426,8 @@ class CdpBrowser(
                         put("flatten", JsonPrimitive(true))
                     },
                 )
-            val page = CdpPage(connection, targetId, attached.required("sessionId"), config.loadTimeout) { metrics?.webViewLoad(it) }
+            val page =
+                CdpPage(connection, targetId, attached.required("sessionId"), contextId, config.loadTimeout) { metrics?.webViewLoad(it) }
             page.send("Page.enable")
             ready = true
             return page

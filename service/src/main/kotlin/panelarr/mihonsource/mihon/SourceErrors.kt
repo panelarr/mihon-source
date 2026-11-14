@@ -26,6 +26,12 @@ import java.util.concurrent.TimeoutException
  */
 object SourceErrors {
     const val DOMAIN = "source.panelarr"
+
+    /** A failure reason health reports for WebView sources whose browser service is unreachable. */
+    const val WEBVIEW_UNAVAILABLE = "WEBVIEW_UNAVAILABLE"
+
+    /** The ErrorInfo metadata key that refines a contract reason, e.g. with [WEBVIEW_UNAVAILABLE]. */
+    const val DETAIL = "detail"
     private val log = LoggerFactory.getLogger(SourceErrors::class.java)
     private const val DEFAULT_RETRY_SECONDS = 30L
 
@@ -101,15 +107,29 @@ object SourceErrors {
             }
         }
 
-    /** A short, bounded outcome label for [status]: its ErrorInfo reason, else its code name. */
-    fun outcome(status: StatusException): String =
-        StatusProto
-            .fromThrowable(status)
-            ?.detailsList
-            ?.firstOrNull { it.`is`(ErrorInfo::class.java) }
-            ?.unpack(ErrorInfo::class.java)
-            ?.reason
-            ?: status.status.code.name
+    /** A short, bounded outcome label for [status]: [WEBVIEW_UNAVAILABLE], its ErrorInfo reason, else its code name. */
+    fun outcome(status: StatusException): String {
+        val info =
+            StatusProto
+                .fromThrowable(status)
+                ?.detailsList
+                ?.firstOrNull { it.`is`(ErrorInfo::class.java) }
+                ?.unpack(ErrorInfo::class.java)
+        return info?.metadataMap?.get(DETAIL)?.takeIf { it == WEBVIEW_UNAVAILABLE } ?: info?.reason ?: status.status.code.name
+    }
+
+    /**
+     * The source needs the browser service, which is configured but can't be reached. It's a
+     * SOURCE_DOWN to the contract (no ErrorReason of its own), told apart by the ErrorInfo
+     * metadata `detail` = [WEBVIEW_UNAVAILABLE], which [outcome] and health checks report.
+     */
+    fun webViewUnavailable(cause: String): StatusException =
+        status(
+            Code.UNAVAILABLE,
+            "SOURCE_DOWN",
+            "the browser service for WebView sources is unreachable ($cause)",
+            metadata = mapOf(DETAIL to WEBVIEW_UNAVAILABLE),
+        )
 
     fun notFound(message: String): StatusException = status(Code.NOT_FOUND, "NOT_FOUND", message)
 
@@ -120,6 +140,7 @@ object SourceErrors {
         reason: String?,
         message: String,
         retryAfterSeconds: Long? = null,
+        metadata: Map<String, String> = emptyMap(),
     ): StatusException {
         val builder =
             com.google.rpc.Status
@@ -133,6 +154,7 @@ object SourceErrors {
                         .newBuilder()
                         .setReason(reason)
                         .setDomain(DOMAIN)
+                        .putAllMetadata(metadata)
                         .build(),
                 ),
             )
