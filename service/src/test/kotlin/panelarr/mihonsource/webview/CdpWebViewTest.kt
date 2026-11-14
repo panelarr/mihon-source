@@ -10,6 +10,9 @@ import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -22,16 +25,21 @@ import panelarr.mihonsource.compat.AndroidHost
 import panelarr.mihonsource.compat.WebViewProvider
 import panelarr.mihonsource.config.WebViewConfig
 import panelarr.mihonsource.fixtures.FakeCdp
+import java.io.IOException
+import java.io.InputStream
 import java.net.ServerSocket
 import java.time.Duration
 import java.util.Base64
 import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.CountDownLatch
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.test.fail
 
@@ -226,10 +234,19 @@ class CdpWebViewTest {
     fun `an idle view gives its page back and opens a new one when used again`() {
         val fake = fake()
         val view = webView(fake.url, idleLimit = Duration.ofMillis(100))
+        val recorder = Recorder()
+        view.webViewClient = recorder
+        view.loadUrl("http://site.example/")
+        recorder.next()
+        recorder.next()
         val results = LinkedBlockingQueue<String>()
         view.evaluateJavascript("1") { results += it }
         assertNotNull(results.poll(5, TimeUnit.SECONDS))
         eventually { fake.targets.isEmpty() }
+        // The next page is a blank one: the old page's state is gone with it.
+        eventually { view.url == null }
+        assertNull(view.title)
+        assertEquals(0, view.progress)
         view.evaluateJavascript("2") { results += it }
         assertEquals("\"evaluated: 2\"", results.poll(5, TimeUnit.SECONDS))
         assertEquals(2, fake.sent("Target.createTarget").size)
@@ -419,5 +436,152 @@ class CdpWebViewTest {
         val script = bridge.script()
         assertTrue("\"android\"" in script && "\"deliver\"" in script && "hidden" !in script, script)
         assertEquals("__panelarrBridge_android", bridge.binding)
+        // Names that only differ in characters a binding can't hold still get bindings of their own.
+        assertNotEquals(JsBridge.of(target, "a.b").binding, JsBridge.of(target, "a_b").binding)
+    }
+
+    /** The parameters of a `Fetch.requestPaused` event. */
+    private fun paused(
+        id: String,
+        url: String,
+        type: String,
+        frame: String,
+    ) = buildJsonObject {
+        put("requestId", JsonPrimitive(id))
+        put(
+            "request",
+            buildJsonObject {
+                put("url", JsonPrimitive(url))
+                put("method", JsonPrimitive("GET"))
+                put("headers", buildJsonObject { put("Accept", JsonPrimitive("*/*")) })
+            },
+        )
+        put("resourceType", JsonPrimitive(type))
+        put("frameId", JsonPrimitive(frame))
+    }
+
+    private fun FakeCdp.answered(
+        method: String,
+        requestId: String,
+    ): FakeCdp.Command? = sent(method).firstOrNull { it.params.string("requestId") == requestId }
+
+    @Test
+    fun `whatever extension code throws, the view keeps working`() {
+        val fake = fake()
+        val view = webView(fake.url)
+        view.webViewClient =
+            object : WebViewClient() {
+                override fun shouldOverrideUrlLoading(
+                    view: WebView,
+                    request: WebResourceRequest,
+                ): Boolean = throw NoClassDefFoundError("a missing class")
+
+                override fun shouldInterceptRequest(
+                    view: WebView,
+                    request: WebResourceRequest,
+                ): WebResourceResponse? =
+                    when (request.url.path) {
+                        "/error.js" -> throw StackOverflowError()
+                        "/io.js" -> throw IOException("no network")
+                        "/stream.js" -> WebResourceResponse("text/plain", "utf-8", BrokenStream())
+                        else -> null
+                    }
+            }
+        view.loadUrl("http://site.example/")
+        eventually { fake.sent("Page.navigate").isNotEmpty() }
+        val session = fake.sent("Page.navigate").single().sessionId!!
+        val target = session.removePrefix("session-")
+
+        // A throwing shouldInterceptRequest lets the request through, as on Android.
+        fake.emit("Fetch.requestPaused", paused("r1", "http://site.example/error.js", "Script", target), session)
+        fake.emit("Fetch.requestPaused", paused("r2", "http://site.example/io.js", "Script", target), session)
+        eventually { fake.answered("Fetch.continueRequest", "r1") != null && fake.answered("Fetch.continueRequest", "r2") != null }
+        // A response stream that breaks fails that request only.
+        fake.emit("Fetch.requestPaused", paused("r3", "http://site.example/stream.js", "Script", target), session)
+        eventually { fake.answered("Fetch.failRequest", "r3") != null }
+        assertEquals("Failed", fake.answered("Fetch.failRequest", "r3")!!.params.string("errorReason"))
+        // A throwing shouldOverrideUrlLoading doesn't take the navigation over.
+        fake.emit("Fetch.requestPaused", paused("r4", "http://site.example/next", "Document", target), session)
+        eventually { fake.answered("Fetch.continueRequest", "r4") != null }
+
+        val results = LinkedBlockingQueue<String>()
+        view.evaluateJavascript("1") { results += it }
+        assertEquals("\"evaluated: 1\"", results.poll(5, TimeUnit.SECONDS))
+        view.loadUrl("http://site.example/b")
+        eventually { fake.sent("Page.navigate").size == 2 }
+    }
+
+    private class BrokenStream : InputStream() {
+        override fun read(): Int = throw IOException("the stream broke")
+    }
+
+    @Test
+    fun `I O threads held by waiting source calls don't starve the view`() {
+        val fake = fake()
+        val view = webView(fake.url)
+        val release = CountDownLatch(1)
+        // More than the I/O dispatcher's 64 threads, all blocked as source calls waiting on a WebView are.
+        val blocked = CountDownLatch(IO_THREADS)
+        val scope = CoroutineScope(Dispatchers.IO)
+        repeat(IO_THREADS + 16) {
+            scope.launch {
+                blocked.countDown()
+                release.await()
+            }
+        }
+        try {
+            assertTrue(blocked.await(5, TimeUnit.SECONDS))
+            val results = LinkedBlockingQueue<String>()
+            view.evaluateJavascript("1") { results += it }
+            assertEquals("\"evaluated: 1\"", results.poll(5, TimeUnit.SECONDS))
+        } finally {
+            release.countDown()
+        }
+    }
+
+    @Test
+    fun `reload repeats the extension's own document`() {
+        val fake = fake()
+        val view = webView(fake.url)
+        view.webViewClient = Recorder()
+        val navigations =
+            java.util.concurrent.atomic
+                .AtomicInteger()
+        fake.handler = { command ->
+            if (command.method == "Page.navigate") {
+                // Like Chromium: the main request pauses before the navigation answers.
+                val session = command.sessionId!!
+                val url =
+                    command.params
+                        .getValue("url")
+                        .jsonPrimitive.content
+                fake.emit(
+                    "Fetch.requestPaused",
+                    paused("nav-${navigations.incrementAndGet()}", url, "Document", session.removePrefix("session-")),
+                    session,
+                )
+                Thread.sleep(PAUSE_MILLIS)
+            }
+            null
+        }
+        view.loadDataWithBaseURL("http://site.example/", "<p>made up</p>", "text/html", "utf-8", null)
+        eventually { fake.sent("Fetch.fulfillRequest").size == 1 }
+        view.reload()
+        eventually { fake.sent("Fetch.fulfillRequest").size == 2 }
+        val body =
+            fake
+                .sent("Fetch.fulfillRequest")
+                .last()
+                .params
+                .getValue("body")
+                .jsonPrimitive.content
+        assertEquals("<p>made up</p>", String(Base64.getDecoder().decode(body)))
+    }
+
+    private companion object {
+        const val IO_THREADS = 64
+
+        /** Long enough for the paused request to be taken before the navigation answers. */
+        const val PAUSE_MILLIS = 300L
     }
 }

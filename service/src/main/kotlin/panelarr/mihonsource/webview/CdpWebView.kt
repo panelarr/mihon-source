@@ -11,7 +11,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
@@ -21,6 +21,8 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.selects.onTimeout
+import kotlinx.coroutines.selects.select
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.JsonObject
@@ -56,10 +58,16 @@ class CdpWebViewProvider(
  * thread is one of the service's I/O threads, never an RPC thread. So:
  * - every WebView method only queues a command and returns, from whatever thread it's called
  *   on: the main looper never waits for the browser;
- * - commands run in order on this view's own coroutine (I/O dispatcher), which talks CDP;
+ * - commands run in order on this view's own coroutine, which talks CDP. It runs on
+ *   [WebViewDispatchers.cdp], never on the I/O threads blocked source calls hold, so the
+ *   callbacks they wait for can't starve;
  * - page callbacks, URL-loading decisions and `evaluateJavascript` results are posted to the
- *   main looper; `shouldInterceptRequest` and JavaScript interface methods run on an I/O
- *   thread, as Android runs them on background threads.
+ *   main looper; `shouldInterceptRequest` and JavaScript interface methods run on
+ *   [WebViewDispatchers.blocking], as Android runs them on background threads.
+ *
+ * Anything extension code throws in a callback is logged (by class only) and answered as
+ * Android would: a throwing `shouldInterceptRequest` lets the request through, a broken
+ * response stream fails that request. Nothing it throws ends the view.
  *
  * The page opens on the first command, in a browser context of its own (so views share no
  * cookies or storage except through `CookieManager`), and closes on [destroy]. A view left
@@ -103,12 +111,20 @@ internal class CdpWebView(
 
     private data object Stop : Command
 
+    /** One navigation of a [Load]: a token of its own, as a reload queues the same load again. */
+    private class Navigation(
+        val load: Load,
+    )
+
     private val log = LoggerFactory.getLogger(CdpWebView::class.java)
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO + CoroutineName("webview-$contextKey"))
+    private val scope = CoroutineScope(SupervisorJob() + WebViewDispatchers.cdp + CoroutineName("webview-$contextKey"))
     private val commands = Channel<Command>(Channel.UNLIMITED)
     private val bridges = ConcurrentHashMap<String, JsBridge>()
 
     @Volatile private var destroyed = false
+
+    /** The last load the extension asked for, so [reload] repeats its headers and document. */
+    @Volatile private var lastLoad: Load? = null
 
     @Volatile override var url: String? = null
         private set
@@ -129,7 +145,7 @@ internal class CdpWebView(
     override fun loadUrl(
         url: String,
         headers: Map<String, String>,
-    ) = queue(Load(url, headers))
+    ) = load(Load(url, headers))
 
     override fun loadDataWithBaseURL(
         baseUrl: String?,
@@ -140,12 +156,17 @@ internal class CdpWebView(
     ) {
         val type = mimeType?.takeIf { it.isNotBlank() } ?: "text/html"
         if (baseUrl != null && isHttp(baseUrl)) {
-            queue(Load(baseUrl, document = Document(data, type)))
+            load(Load(baseUrl, document = Document(data, type)))
         } else {
             // No http(s) origin to borrow: a data URL, which has an opaque origin like Android's about:blank base.
             val encoded = Base64.getEncoder().encodeToString(data.toByteArray(Charsets.UTF_8))
-            queue(Load("data:$type;charset=utf-8;base64,$encoded"))
+            load(Load("data:$type;charset=utf-8;base64,$encoded"))
         }
+    }
+
+    private fun load(load: Load) {
+        lastLoad = load
+        queue(load)
     }
 
     override fun evaluateJavascript(
@@ -168,7 +189,13 @@ internal class CdpWebView(
     override fun stopLoading() = queue(Stop)
 
     override fun reload() {
-        (originalUrl ?: url)?.let { queue(Load(it)) }
+        val last = lastLoad
+        val current = url
+        // The extension's own load comes back whole (headers, document); a page the site moved on to by URL.
+        when {
+            last != null && (current == null || current == last.url) -> queue(last)
+            current != null -> queue(Load(current))
+        }
     }
 
     override fun destroy() {
@@ -193,23 +220,39 @@ internal class CdpWebView(
                 throw e
             } catch (e: WebViewException) {
                 log.warn("A WebView couldn't use the browser: {}", e.message)
-                // A session that started has answered its own commands; one that never opened owes the first.
-                if (session == null) fail(first, e)
-                // Whatever was queued meanwhile fails the same way; later commands try again.
-                while (true) fail(commands.tryReceive().getOrNull() ?: break, e)
+                failPending(first.takeIf { session == null }, unavailable(e))
+            } catch (
+                @Suppress("TooGenericExceptionCaught") e: Throwable,
+            ) {
+                // Never let one failure end the view: its later commands would go unanswered for good.
+                if (fatal(e)) throw e
+                log.error("A WebView's page failed: {}", e.javaClass.name)
+                failPending(first.takeIf { session == null }, "the WebView failed")
             } finally {
                 withContext(NonCancellable) { runCatching { browser.closeContext(contextKey) } }
             }
         }
     }
 
+    /**
+     * Fails [first] (a session that never opened owes it an answer; one that started has
+     * answered its own commands) and whatever was queued meanwhile. Later commands try again.
+     */
+    private fun failPending(
+        first: Command?,
+        reason: String,
+    ) {
+        first?.let { fail(it, reason) }
+        while (true) fail(commands.tryReceive().getOrNull() ?: break, reason)
+    }
+
     /** Tells the extension a command couldn't run: a load reports an error, a script returns null. */
     private fun fail(
         command: Command,
-        error: WebViewException,
+        reason: String,
     ) {
         when (command) {
-            is Load -> reportLoadError(command.url, WebViewClient.ERROR_CONNECT, "the browser service is unavailable: ${error.message}")
+            is Load -> reportLoadError(command.url, WebViewClient.ERROR_CONNECT, reason)
             is Evaluate -> post { command.callback?.onReceiveValue(NULL) }
             else -> Unit
         }
@@ -219,13 +262,17 @@ internal class CdpWebView(
     private inner class Session(
         val page: CdpPage,
     ) {
-        private val pendingNavigation = AtomicReference<Load?>()
+        private val pendingNavigation = AtomicReference<Navigation?>()
         private val inFlight = AtomicInteger()
         private val scriptIds = ConcurrentHashMap<String, String>()
         private var loadJob: Job? = null
         private var fetchEnabled = false
         private var userAgent: String? = null
         private var scriptsDisabled: Boolean? = null
+        private var runtimeEnabled = false
+
+        /** Whether the main frame shows Chromium's error page for a failed load, whose load event isn't Android's. */
+        @Volatile private var showingError = false
 
         @Volatile private var lastActivity = System.nanoTime()
 
@@ -235,7 +282,6 @@ internal class CdpWebView(
                 val handle = listen(this, events)
                 try {
                     launch { pageEvents(events) }
-                    page.send("Runtime.enable")
                     bridges.keys.forEach { install(it) }
                     handle(this, first)
                     serveCommands(this)
@@ -262,7 +308,7 @@ internal class CdpWebView(
                         inFlight.incrementAndGet()
                         session.launch {
                             try {
-                                intercept(event.params)
+                                guarded(event.method) { intercept(event.params) }
                             } finally {
                                 inFlight.decrementAndGet()
                                 touch()
@@ -273,7 +319,7 @@ internal class CdpWebView(
                     // Android calls interface methods on a background thread.
                     "Runtime.bindingCalled" -> {
                         touch()
-                        session.launch { bindingCalled(event.params) }
+                        session.launch(WebViewDispatchers.blocking) { guarded(event.method) { bindingCalled(event.params) } }
                     }
 
                     "Page.frameNavigated", "Page.loadEventFired" -> {
@@ -286,7 +332,7 @@ internal class CdpWebView(
             for (event in events) {
                 try {
                     touch()
-                    if (event.method == "Page.frameNavigated") onFrameNavigated(event.params) else onLoaded()
+                    guarded(event.method) { if (event.method == "Page.frameNavigated") onFrameNavigated(event.params) else onLoaded() }
                 } catch (e: WebViewUnavailableException) {
                     throw e
                 } catch (e: WebViewException) {
@@ -296,12 +342,23 @@ internal class CdpWebView(
         }
 
         /** Runs commands as they come, until the view is destroyed or has been idle long enough. */
+        @OptIn(ExperimentalCoroutinesApi::class)
         private suspend fun serveCommands(scope: CoroutineScope) {
             while (true) {
-                val received = withTimeoutOrNull(POLL.toMillis()) { commands.receiveCatching() }
+                // A select, not a timeout around receive: cancelling a receive can lose the command it took.
+                val received =
+                    select {
+                        commands.onReceiveCatching { it }
+                        onTimeout(POLL.toMillis()) { null }
+                    }
                 if (received == null) {
                     if (idle()) {
                         log.debug("Closing the page of a WebView idle for {}s", idleLimit.toSeconds())
+                        // The next command opens a blank page: don't report this one's state any longer.
+                        url = null
+                        originalUrl = null
+                        title = null
+                        progress = 0
                         return
                     }
                     continue
@@ -348,7 +405,7 @@ internal class CdpWebView(
                     }
                 }
             } catch (e: WebViewException) {
-                fail(command, e)
+                fail(command, unavailable(e))
                 // The connection is gone: end the session, the next command reconnects.
                 if (e is WebViewUnavailableException) throw e
             }
@@ -357,6 +414,7 @@ internal class CdpWebView(
         private suspend fun load(load: Load) {
             originalUrl = load.url
             progress = 0
+            var navigation: Navigation? = null
             try {
                 applySettings()
                 if (!fetchEnabled && needsFetch(load)) {
@@ -369,7 +427,8 @@ internal class CdpWebView(
                     fetchEnabled = true
                 }
                 if (isHttp(load.url)) WebViewCookies.push(page, load.url)
-                pendingNavigation.set(load)
+                navigation = Navigation(load)
+                pendingNavigation.set(navigation)
                 page.navigate(load.url)
             } catch (e: CdpLoadException) {
                 val text = e.message.orEmpty().substringAfter("load: ")
@@ -380,10 +439,11 @@ internal class CdpWebView(
             } catch (e: CdpProtocolException) {
                 reportLoadError(load.url, WebViewClient.ERROR_UNKNOWN, e.message.orEmpty())
             } catch (e: WebViewUnavailableException) {
-                fail(load, e)
+                fail(load, unavailable(e))
                 throw e
             } finally {
-                pendingNavigation.set(null)
+                // Only this load's: a load that replaced it may have set its own already.
+                navigation?.let { pendingNavigation.compareAndSet(it, null) }
                 touch()
             }
         }
@@ -429,6 +489,11 @@ internal class CdpWebView(
 
         private suspend fun install(name: String) {
             val bridge = bridges[name] ?: return
+            // Only once a binding needs it: sites can detect the Runtime domain.
+            if (!runtimeEnabled) {
+                page.send("Runtime.enable")
+                runtimeEnabled = true
+            }
             page.send("Runtime.addBinding", buildJsonObject { put("name", JsonPrimitive(bridge.binding)) })
             val added =
                 page.send("Page.addScriptToEvaluateOnNewDocument", buildJsonObject { put("source", JsonPrimitive(bridge.script())) })
@@ -448,14 +513,17 @@ internal class CdpWebView(
         private fun onFrameNavigated(params: JsonObject) {
             val frame = params["frame"] as? JsonObject
             val navigated = frame?.string("url")
-            // Child frames and Chromium's own error pages aren't page loads to Android.
-            if (navigated == null || frame.string("parentId") != null || isErrorPage(navigated)) return
+            if (navigated == null || frame.string("parentId") != null) return
+            // Chromium's own error page for a failed load isn't a page load to Android; the failure was reported.
+            showingError = isErrorPage(navigated) || frame.string("unreachableUrl") != null
+            if (showingError) return
             url = navigated
             progress = STARTED
             post { view.webViewClient.onPageStarted(view, navigated, null) }
         }
 
         private suspend fun onLoaded() {
+            if (showingError) return
             val loaded = url?.takeUnless(::isErrorPage) ?: return
             if (isHttp(loaded)) WebViewCookies.pull(page, loaded)
             title =
@@ -477,7 +545,7 @@ internal class CdpWebView(
 
         private suspend fun intercept(params: JsonObject) {
             val paused = PausedRequest.from(params, page.targetId) ?: return
-            val ours = if (paused.mainFrame && !paused.redirect) pendingNavigation.getAndSet(null) else null
+            val ours = if (paused.mainFrame && !paused.redirect) pendingNavigation.getAndSet(null)?.load else null
             try {
                 val document = ours?.document
                 when {
@@ -488,13 +556,7 @@ internal class CdpWebView(
 
                     // A navigation the page started, or a redirect: the extension may take it over.
                     paused.mainFrame && ours == null && overridden(paused) -> {
-                        page.send(
-                            "Fetch.failRequest",
-                            buildJsonObject {
-                                put("requestId", JsonPrimitive(paused.id))
-                                put("errorReason", JsonPrimitive("Aborted"))
-                            },
-                        )
+                        page.abort(paused.id, "Aborted")
                     }
 
                     else -> {
@@ -504,6 +566,15 @@ internal class CdpWebView(
             } catch (e: WebViewException) {
                 // The page or connection went away; the browser drops the request with it.
                 log.debug("Couldn't answer an intercepted request: {}", e.message)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (
+                @Suppress("TooGenericExceptionCaught") e: Throwable,
+            ) {
+                if (fatal(e)) throw e
+                // Never leave the browser waiting on it: that request fails, the page goes on.
+                log.warn("Couldn't answer an intercepted request: {}", e.javaClass.name)
+                page.abort(paused.id, "Failed")
             }
         }
 
@@ -518,7 +589,10 @@ internal class CdpWebView(
             extraHeaders: Map<String, String>,
         ) {
             val request = paused.toWebResourceRequest(extraHeaders)
-            val response = extension("shouldInterceptRequest", null) { view.webViewClient.shouldInterceptRequest(view, request) }
+            val response =
+                withContext(WebViewDispatchers.blocking) {
+                    extension("shouldInterceptRequest", null) { view.webViewClient.shouldInterceptRequest(view, request) }
+                }
             if (response == null) {
                 page.send(
                     "Fetch.continueRequest",
@@ -529,7 +603,15 @@ internal class CdpWebView(
                 )
                 return
             }
-            val body = response.data?.use { it.readAllBytes() } ?: ByteArray(0)
+            val body =
+                withContext(WebViewDispatchers.blocking) {
+                    extension("shouldInterceptRequest's response", null) { response.data?.use { it.readAllBytes() } ?: ByteArray(0) }
+                }
+            if (body == null) {
+                // Android fails the request when the extension's stream breaks.
+                page.abort(paused.id, "Failed")
+                return
+            }
             val headers = response.responseHeaders.orEmpty().toMutableMap()
             if (headers.keys.none { it.equals("Content-Type", ignoreCase = true) } && response.mimeType != null) {
                 headers["Content-Type"] = response.mimeType + (response.encoding?.let { "; charset=$it" } ?: "")
@@ -543,12 +625,37 @@ internal class CdpWebView(
         code: Int,
         description: String,
     ) {
+        // Android shows the failed URL from now on, not the page before it.
+        url = failed
+        title = failed
         progress = DONE
         val request = WebViewRequest(failed, mainFrame = true)
         val error = WebViewError(code, description)
         post {
             view.webViewClient.onReceivedError(view, request, error)
             view.webViewClient.onPageFinished(view, failed)
+        }
+    }
+
+    /**
+     * Runs [block], logging anything but a WebView error or cancellation (by class only: it may
+     * come from extension code) instead of letting it end the session.
+     */
+    private suspend fun guarded(
+        what: String,
+        block: suspend () -> Unit,
+    ) {
+        try {
+            block()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: WebViewException) {
+            throw e
+        } catch (
+            @Suppress("TooGenericExceptionCaught") e: Throwable,
+        ) {
+            if (fatal(e)) throw e
+            log.warn("Couldn't handle {}: {}", what, e.javaClass.name)
         }
     }
 
@@ -564,11 +671,21 @@ internal class CdpWebView(
         block: () -> T,
     ): T {
         val answer = CompletableDeferred<T>()
-        main.post { answer.complete(if (destroyed) fallback else extension(what, fallback, block)) }
+        main.post {
+            try {
+                answer.complete(if (destroyed) fallback else extension(what, fallback, block))
+            } finally {
+                // A fatal error rethrown by [extension] still leaves the browser an answer.
+                answer.complete(fallback)
+            }
+        }
         return withTimeoutOrNull(loadTimeout.toMillis()) { answer.await() } ?: fallback
     }
 
-    /** Calls extension code; a throw is logged (never with values) and answered with [fallback]. */
+    /**
+     * Calls extension code; anything it throws (an `Error` too, as a missing class or `TODO()`
+     * gives) is logged by class only and answered with [fallback]. Only a broken JVM goes on.
+     */
     private fun <T> extension(
         what: String,
         fallback: T,
@@ -577,8 +694,9 @@ internal class CdpWebView(
         try {
             block()
         } catch (
-            @Suppress("TooGenericExceptionCaught") e: RuntimeException,
+            @Suppress("TooGenericExceptionCaught") e: Throwable,
         ) {
+            if (fatal(e)) throw e
             log.warn("The extension's {} failed: {}", what, e.javaClass.name)
             fallback
         }
@@ -593,6 +711,11 @@ internal class CdpWebView(
         fun isHttp(url: String): Boolean = url.startsWith("http://", ignoreCase = true) || url.startsWith("https://", ignoreCase = true)
 
         private fun isErrorPage(url: String): Boolean = url.startsWith("chrome-error:")
+
+        private fun unavailable(e: WebViewException) = "the browser service is unavailable: ${e.message}"
+
+        /** A JVM that can't go on, as the source calls treat it; anything else a view survives. */
+        private fun fatal(e: Throwable): Boolean = e is VirtualMachineError && e !is OutOfMemoryError && e !is StackOverflowError
 
         /** Whether [client] overrides the callbacks that need requests paused. */
         fun interceptsRequests(client: WebViewClient): Boolean {

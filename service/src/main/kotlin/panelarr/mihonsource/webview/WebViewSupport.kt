@@ -57,6 +57,24 @@ internal suspend fun CdpPage.fulfill(
     )
 }
 
+/** Fails a paused request with a CDP `ErrorReason`, if the page is still there. */
+internal suspend fun CdpPage.abort(
+    requestId: String,
+    reason: String,
+) {
+    try {
+        send(
+            "Fetch.failRequest",
+            buildJsonObject {
+                put("requestId", JsonPrimitive(requestId))
+                put("errorReason", JsonPrimitive(reason))
+            },
+        )
+    } catch (e: WebViewException) {
+        LoggerFactory.getLogger(CdpPage::class.java).debug("Couldn't fail an intercepted request: {}", e.message)
+    }
+}
+
 /** A request the browser paused for us (`Fetch.requestPaused`). */
 internal data class PausedRequest(
     val id: String,
@@ -137,8 +155,16 @@ internal class JsBridge private constructor(
 ) {
     private val log = LoggerFactory.getLogger(JsBridge::class.java)
 
-    /** The binding's global name: unlikely to clash with a site's own. */
-    val binding: String = "__panelarrBridge_" + name.replace(Regex("[^A-Za-z0-9_$]"), "_")
+    /**
+     * The binding's global name: unlikely to clash with a site's own, and one to one with
+     * [name] (`a.b` and `a_b` get different bindings): letters and digits stay, anything else
+     * becomes `_<hex>_`.
+     */
+    val binding: String =
+        "__panelarrBridge_" +
+            name.codePoints().toArray().joinToString("") { c ->
+                if (c < ASCII && Character.isLetterOrDigit(c)) Character.toString(c) else "_${Integer.toHexString(c)}_"
+            }
 
     /** Defines the object in every new document, before the page's own scripts. */
     fun script(): String {
@@ -174,6 +200,8 @@ internal class JsBridge private constructor(
     }
 
     companion object {
+        private const val ASCII = 0x80
+
         fun of(
             target: Any,
             name: String,
