@@ -7,6 +7,7 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.time.Duration
 import kotlin.test.Test
+import kotlin.test.assertContains
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
@@ -70,6 +71,20 @@ class AppConfigTest {
         assertFailsWith<IllegalStateException> { AppConfig.fromEnv(mapOf(url, "MIHON_WEBVIEW_MAX_PAGES" to "0")) }
         assertFailsWith<IllegalStateException> { AppConfig.fromEnv(mapOf(url, "MIHON_WEBVIEW_LOAD_TIMEOUT" to "0")) }
         assertFailsWith<IllegalStateException> { AppConfig.fromEnv(mapOf(url, "MIHON_WEBVIEW_IDLE_TIMEOUT" to "soon")) }
+    }
+
+    @Test
+    fun `a browser host with an underscore is accepted, a missing host gets a clear error`() {
+        // Compose service names may contain underscores, which java.net.URI doesn't take as a host.
+        assertEquals(
+            "http://mihon_webview:9222",
+            AppConfig.fromEnv(mapOf("MIHON_WEBVIEW_URL" to "http://mihon_webview:9222/")).webView?.url,
+        )
+        assertEquals("ws://mihon_webview:9222/devtools/browser/x", WebViewConfig.validUrl("ws://mihon_webview:9222/devtools/browser/x"))
+        val missing = assertFailsWith<IllegalStateException> { WebViewConfig.validUrl("http://:9222") }
+        assertContains(missing.message.orEmpty(), "no valid host")
+        val spaced = assertFailsWith<IllegalStateException> { WebViewConfig.validUrl("http://web view:9222") }
+        assertContains(spaced.message.orEmpty(), "'web view:9222'")
     }
 
     @Test

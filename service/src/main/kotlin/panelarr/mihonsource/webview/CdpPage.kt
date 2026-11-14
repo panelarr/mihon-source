@@ -42,7 +42,10 @@ class CdpPage internal constructor(
         try {
             val done =
                 withTimeoutOrNull(loadTimeout.toMillis()) {
-                    val result = send("Page.navigate", buildJsonObject { put("url", JsonPrimitive(url)) }, loadTimeout)
+                    // The send may wait longer than the load: the overall timeout above always fires first,
+                    // so the load is stopped below instead of the send failing on its own.
+                    val result =
+                        send("Page.navigate", buildJsonObject { put("url", JsonPrimitive(url)) }, loadTimeout.plus(STOP_TIMEOUT))
                     result.string("errorText")?.let { throw CdpLoadException("the page didn't load: $it") }
                     // Without a loader the navigation stayed in the same document: no load event follows.
                     if (result.string("loaderId") != null) loadFired.await()

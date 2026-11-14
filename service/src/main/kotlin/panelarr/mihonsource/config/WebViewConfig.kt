@@ -2,7 +2,7 @@
 
 package panelarr.mihonsource.config
 
-import java.net.URI
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import java.time.Duration
 
 /**
@@ -50,13 +50,21 @@ data class WebViewConfig(
                     AppConfig.duration(it)
                 }?.also { check(!it.isZero && !it.isNegative) { "$name must be longer than zero, got '$text'" } }
 
-        /** [url] if it's an absolute http(s) or ws(s) URL with a host. */
+        /**
+         * [url] if it's an absolute http(s) or ws(s) URL with a host. It's parsed the way the
+         * browser client parses it, so names `java.net.URI` rejects, such as compose service
+         * names with an underscore, are accepted.
+         */
         fun validUrl(url: String): String {
-            val uri = runCatching { URI(url.trim()) }.getOrNull()
-            check(uri != null && uri.scheme?.lowercase() in SCHEMES && !uri.host.isNullOrEmpty()) {
-                "MIHON_WEBVIEW_URL must be an http(s):// or ws(s):// URL with a host"
+            val text = url.trim()
+            val scheme = text.substringBefore("://", "").lowercase()
+            check(scheme in SCHEMES) { "MIHON_WEBVIEW_URL must be an http(s):// or ws(s):// URL, got scheme '$scheme'" }
+            val parsed = text.replaceFirst(Regex("^ws", RegexOption.IGNORE_CASE), "http").toHttpUrlOrNull()
+            check(parsed != null && parsed.host.isNotEmpty()) {
+                val host = text.substringAfter("://").substringBefore('/').substringAfterLast('@')
+                "MIHON_WEBVIEW_URL has no valid host: '$host' isn't a host name, IP address or host:port"
             }
-            return url.trim().trimEnd('/')
+            return text.trimEnd('/')
         }
     }
 }

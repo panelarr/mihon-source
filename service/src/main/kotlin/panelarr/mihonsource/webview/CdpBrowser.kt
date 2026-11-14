@@ -36,7 +36,7 @@ import java.util.concurrent.atomic.AtomicInteger
 /**
  * The connection to the optional browser service: a headless Chromium spoken to over the
  * Chrome DevTools Protocol. It connects on first use, reconnects on the next call after
- * the browser went away, keeps at most [WebViewConfig.maxPages] pages open at once, and
+ * the browser went away (until [close]), keeps at most [WebViewConfig.maxPages] pages open at once, and
  * closes browser contexts nobody used for [WebViewConfig.idleTimeout].
  *
  * The DevTools port has no authentication: anyone who reaches it controls the browser. It
@@ -44,7 +44,7 @@ import java.util.concurrent.atomic.AtomicInteger
  */
 class CdpBrowser(
     private val config: WebViewConfig,
-    private val http: OkHttpClient = defaultClient(),
+    http: OkHttpClient? = null,
     private val metrics: Metrics? = null,
     private val now: () -> Instant = Instant::now,
 ) : AutoCloseable {
@@ -67,6 +67,10 @@ class CdpBrowser(
     }
 
     private val log = LoggerFactory.getLogger(CdpBrowser::class.java)
+
+    /** Without a client given, one is made here, and shut down again by [close]. */
+    private val ownsClient = http == null
+    private val http: OkHttpClient = http ?: defaultClient()
     private val scheme = config.url.substringBefore(':').lowercase()
 
     /** The configured URL, as http(s) (OkHttp's URLs only know those). */
@@ -136,9 +140,19 @@ class CdpBrowser(
     suspend fun connection(): CdpConnection {
         current?.takeIf { it.isOpen }?.let { return it }
         return connectLock.withLock {
-            current?.takeIf { it.isOpen } ?: connect().also { current = it }
+            if (closing) throw closedError()
+            current?.takeIf { it.isOpen } ?: connect().also { fresh ->
+                // [close] ran while connecting: don't leave the new connection behind.
+                if (closing) {
+                    fresh.close()
+                    throw closedError()
+                }
+                current = fresh
+            }
         }
     }
+
+    private fun closedError() = WebViewUnavailableException("the browser connection was shut down")
 
     /**
      * Opens a page, runs [block] with it and closes it. With a [contextKey] the page opens
@@ -150,20 +164,29 @@ class CdpBrowser(
         proxyServer: String? = null,
         block: suspend (CdpPage) -> T,
     ): T {
-        val permit = withTimeoutOrNull(config.loadTimeout.toMillis()) { pages.acquire() }
-        if (permit == null) {
+        // Decided by a flag rather than the timeout's result: the timeout can fire right after the
+        // permit was taken, and that permit must still be released.
+        var acquired = false
+        withTimeoutOrNull(config.loadTimeout.toMillis()) {
+            pages.acquire()
+            acquired = true
+        }
+        if (!acquired) {
             metrics?.webViewFailure("busy")
             throw CdpTimeoutException("all ${config.maxPages} browser pages stayed busy for ${config.loadTimeout.toSeconds()}s")
         }
         try {
+            val existing = current?.takeIf { it.isOpen }
             val (context, page) =
                 try {
-                    open(contextKey, proxyServer)
+                    open(existing ?: connection(), contextKey, proxyServer)
                 } catch (
                     @Suppress("SwallowedException") e: WebViewUnavailableException,
                 ) {
-                    // The browser may have gone away before the drop was noticed: retry once, on a new connection.
-                    open(contextKey, proxyServer)
+                    // The browser may have gone away before the drop was noticed: retry once, on a new
+                    // connection. A connect that just failed isn't tried again.
+                    if (existing == null) throw e
+                    open(connection(), contextKey, proxyServer)
                 }
             openPages.incrementAndGet()
             try {
@@ -183,10 +206,10 @@ class CdpBrowser(
 
     /** Opens a page, in [contextKey]'s context when there's a key. */
     private suspend fun open(
+        connection: CdpConnection,
         contextKey: String?,
         proxyServer: String?,
     ): Pair<Context?, CdpPage> {
-        val connection = connection()
         val context = contextKey?.let { acquireContext(connection, it, proxyServer) }
         try {
             return context to openPage(connection, context?.id)
@@ -216,12 +239,17 @@ class CdpBrowser(
     /** Browser contexts open right now. */
     fun openContexts(): Int = contexts.size
 
+    /** Closes the connection; later calls fail with [WebViewUnavailableException] instead of reconnecting. */
     override fun close() {
         closing = true
         scope.cancel()
         current?.close()
         current = null
         contexts.clear()
+        if (ownsClient) {
+            http.dispatcher.executorService.shutdown()
+            http.connectionPool.evictAll()
+        }
     }
 
     private suspend fun connect(): CdpConnection {
@@ -354,6 +382,7 @@ class CdpBrowser(
                 },
             )
         val targetId = created.required("targetId")
+        var ready = false
         try {
             val attached =
                 connection.send(
@@ -365,12 +394,21 @@ class CdpBrowser(
                 )
             val page = CdpPage(connection, targetId, attached.required("sessionId"), config.loadTimeout) { metrics?.webViewLoad(it) }
             page.send("Page.enable")
+            ready = true
             return page
-        } catch (e: WebViewException) {
-            withContext(NonCancellable) {
-                runCatching { connection.send("Target.closeTarget", buildJsonObject { put("targetId", JsonPrimitive(targetId)) }) }
+        } finally {
+            // Any failure, cancellation included: the tab exists in the browser and nothing else would close it.
+            if (!ready) {
+                withContext(NonCancellable) {
+                    runCatching {
+                        connection.send(
+                            "Target.closeTarget",
+                            buildJsonObject { put("targetId", JsonPrimitive(targetId)) },
+                            timeout = CLOSE_TIMEOUT,
+                        )
+                    }
+                }
             }
-            throw e
         }
     }
 
@@ -411,6 +449,7 @@ class CdpBrowser(
     companion object {
         val CONNECT_TIMEOUT: Duration = Duration.ofSeconds(5)
         val CHECK_TIMEOUT: Duration = Duration.ofSeconds(3)
+        private val CLOSE_TIMEOUT: Duration = Duration.ofSeconds(5)
         private val STATUS_TTL: Duration = Duration.ofSeconds(10)
         private const val REAPS_PER_TIMEOUT = 4L
         private val MIN_REAP: Duration = Duration.ofSeconds(1)

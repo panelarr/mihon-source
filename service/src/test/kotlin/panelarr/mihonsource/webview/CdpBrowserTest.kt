@@ -4,6 +4,7 @@ package panelarr.mihonsource.webview
 
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -45,7 +46,7 @@ class CdpBrowserTest {
         maxPages: Int = 2,
         loadTimeout: Duration = Duration.ofSeconds(5),
         idleTimeout: Duration = Duration.ofMinutes(5),
-        http: OkHttpClient = CdpBrowser.defaultClient(),
+        http: OkHttpClient? = null,
     ): CdpBrowser = CdpBrowser(WebViewConfig(url, maxPages, loadTimeout, idleTimeout), http, metrics).also { browsers += it }
 
     /** Resolves the made-up name `webview` (a compose service name, say) to this machine. */
@@ -99,6 +100,14 @@ class CdpBrowserTest {
             assertFailsWith<WebViewUnavailableException> { browser.withPage { } }
             assertContains(metrics.scrape(), "mihon_webview_failures_total{kind=\"connect\"}")
             assertContains(metrics.scrape(), "mihon_webview_up 0.0")
+        }
+
+    @Test
+    fun `an unreachable browser is tried once per call`() =
+        runBlocking {
+            val browser = browser(url = "http://127.0.0.1:${freePort()}")
+            assertFailsWith<WebViewUnavailableException> { browser.withPage { } }
+            assertContains(metrics.scrape(), "mihon_webview_failures_total{kind=\"connect\"} 1.0")
         }
 
     @Test
@@ -182,6 +191,30 @@ class CdpBrowserTest {
         }
 
     @Test
+    fun `a call cancelled while the page opens still closes the tab`() =
+        runBlocking {
+            val enabling = CompletableDeferred<Unit>()
+            fake.handler = {
+                if (it.method == "Page.enable") {
+                    enabling.complete(Unit)
+                    FakeCdp.Ignore
+                } else {
+                    null
+                }
+            }
+            val browser = browser()
+            val call = launch { browser.withPage { } }
+            enabling.await()
+            assertEquals(1, fake.targets.size)
+            call.cancelAndJoin()
+            assertEquals(1, fake.sent("Target.closeTarget").size)
+            assertTrue(fake.targets.isEmpty(), "the tab is still open")
+            assertEquals(0, browser.openPages())
+            fake.handler = { null }
+            browser.withPage(block = { }) // The page permit came back.
+        }
+
+    @Test
     fun `navigate waits for the load event`() =
         runBlocking {
             val loaded = CompletableDeferred<Unit>()
@@ -222,6 +255,16 @@ class CdpBrowserTest {
             assertEquals(1, fake.sent("Page.stopLoading").size)
             assertTrue(fake.targets.isEmpty())
             assertContains(metrics.scrape(), "mihon_webview_loads_total{outcome=\"timeout\"} 1.0")
+        }
+
+    @Test
+    fun `a navigation the browser never answers is stopped too`() =
+        runBlocking {
+            fake.handler = { if (it.method == "Page.navigate") FakeCdp.Ignore else null }
+            val browser = browser(loadTimeout = Duration.ofMillis(300))
+            val e = assertFailsWith<CdpTimeoutException> { browser.withPage { it.navigate("http://site.example/") } }
+            assertContains(e.message.orEmpty(), "to load")
+            assertEquals(1, fake.sent("Page.stopLoading").size)
         }
 
     @Test
@@ -381,6 +424,19 @@ class CdpBrowserTest {
             fake.dropConnections()
             browser.withPage("source-1") { }
             assertEquals(2, fake.sent("Target.createBrowserContext").size)
+        }
+
+    @Test
+    fun `a closed browser doesn't reconnect, and leaves a given client alone`() =
+        runBlocking {
+            val http = CdpBrowser.defaultClient()
+            val browser = browser(http = http)
+            browser.withPage { }
+            browser.close()
+            assertFailsWith<WebViewUnavailableException> { browser.withPage { } }
+            assertFalse(browser.check().up)
+            assertEquals(1, fake.connections.get())
+            assertFalse(http.dispatcher.executorService.isShutdown, "the client belongs to the caller")
         }
 
     @Test
