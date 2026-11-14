@@ -30,10 +30,10 @@ The output lists each extension as it's done, then a summary. Load failures are 
 |---|---|
 | `missing class` / `missing member` | The extension uses an Android or library API the host doesn't provide (yet) |
 | `bad bytecode` | The APK conversion produced classes the JVM rejects |
-| `needs webview` | The extension needs a browser engine |
+| `needs webview` | The extension needs a browser engine (see below) |
 | `unsupported lib` | Built against an extensions-lib version outside 1.4–1.6 |
 | `signature` | The file isn't signed by the store's pinned key |
 
-Failing checks are grouped by step and error reason (for example `popular: CLOUDFLARE_CHALLENGE`). The JSON report has every detail, including load error messages and each step's timing. Checks run through each source's own network profile and count towards its health (see [API](api.md#checking-sources)).
+Failing checks are grouped by step and error reason (for example `popular: CLOUDFLARE_CHALLENGE`). Sources that drive a WebView fail with `NEEDS_WEBVIEW` while the service has no [browser service](configuration.md#the-browser-service-for-webview-sources), and the summary says how to enable it. With the browser configured they're checked like any other source. The JSON report has every detail, including load error messages and each step's timing. Checks run through each source's own network profile and count towards its health (see [API](api.md#checking-sources)).
 
 Be considerate: `--checks` makes real requests to every chosen site. Prefer `--random` or `--pkg` over checking a whole store.

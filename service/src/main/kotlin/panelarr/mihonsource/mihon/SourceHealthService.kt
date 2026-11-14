@@ -52,7 +52,8 @@ class SourceHealthService(
     /** Records a finished check as the source's health. */
     fun record(result: SourceCheckResult) {
         val failure = result.failure
-        val reason = failure?.reason?.let { if (result.source.needsWebView) "NEEDS_WEBVIEW" else it }
+        // NEEDS_WEBVIEW comes from the prober, which knows whether a browser is configured.
+        val reason = failure?.reason
         results[result.source.id] =
             Health(
                 ok = result.ok,

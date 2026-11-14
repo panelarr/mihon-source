@@ -3,7 +3,6 @@
 package panelarr.mihonsource.webview
 
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
@@ -81,7 +80,7 @@ class CdpBrowser(
     private val pages = Semaphore(config.maxPages)
     private val openPages = AtomicInteger()
     private val contexts = ConcurrentHashMap<String, Context>()
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val scope = CoroutineScope(SupervisorJob() + WebViewDispatchers.cdp)
 
     @Volatile private var current: CdpConnection? = null
 
@@ -294,7 +293,8 @@ class CdpBrowser(
 
     /** Reads the browser's WebSocket path from `/json/version` and points it at [target]. */
     private suspend fun discover(): String =
-        withContext(Dispatchers.IO) {
+        // Its own threads: source calls waiting on WebViews may hold every I/O thread.
+        withContext(WebViewDispatchers.blocking) {
             val request =
                 Request
                     .Builder()

@@ -2,7 +2,7 @@
 
 package android.webkit;
 
-/** A WebView's settings. Stored only: no WebView ever exists on this host. */
+/** A WebView's settings. The browser-backed WebView applies the user agent and whether JavaScript runs; the rest are stored only. */
 public abstract class WebSettings {
     public static final int LOAD_DEFAULT = -1;
     public static final int LOAD_NO_CACHE = 2;

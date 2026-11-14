@@ -61,6 +61,7 @@ import panelarr.mihonsource.store.StoreManager
 import panelarr.mihonsource.store.StoreReader
 import panelarr.mihonsource.store.StoreRefreshJob
 import panelarr.mihonsource.webview.CdpBrowser
+import panelarr.mihonsource.webview.CdpWebViewProvider
 import java.nio.file.Files
 import kotlin.system.exitProcess
 
@@ -83,6 +84,9 @@ class Application(
 
     /** The optional browser service for WebView sources; null when `MIHON_WEBVIEW_URL` isn't set. */
     val webView: CdpBrowser? = config.webView?.let { CdpBrowser(it, metrics = metrics) }
+
+    /** Backs `android.webkit.WebView` with [webView]; without a browser, WebViews can't be created. */
+    private val webViewProvider = webView?.let { CdpWebViewProvider(it, config.webView!!) }
 
     /** Identifies this run of the service (Health.instance_id). */
     val instanceId: String =
@@ -107,6 +111,7 @@ class Application(
         networks = SourceNetworks(resolver, dataDir.resolve("cookies"), SolverClient(Downloader.defaultClient(), metrics))
         integrations.addListener(networks::configurationChanged)
         MihonHost.install(dataDir, networks)
+        AndroidHost.webViewProvider = webViewProvider
 
         extensions = ExtensionManager(dataDir.resolve("extensions"), MihonInstantiator(), transform = DateFormatRewriter::rewrite)
         val installer =
@@ -135,7 +140,7 @@ class Application(
             sources = { extensions.sources().size },
         )
         val sources = MihonSources(extensions, metrics)
-        val prober = SourceProber(sources)
+        val prober = SourceProber(sources, webViewConfigured = webView != null)
         val health = SourceHealthService(dataDir.resolve("config/source-health.json"), metrics)
         val healthSchedules =
             HealthCheckSchedules(
@@ -233,6 +238,7 @@ class Application(
         jobs.stop()
         server.stop().join()
         extensions.close()
+        if (AndroidHost.webViewProvider === webViewProvider) AndroidHost.webViewProvider = null
         webView?.close()
         scope.cancel()
     }

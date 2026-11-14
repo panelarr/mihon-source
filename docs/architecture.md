@@ -8,7 +8,7 @@ mihon-source is one JVM process with no database. Its state is plain files under
 |---|---|
 | `api` | Code generated from `proto/` (the admin API) and `third_party/source-api/proto/` (the source API, pinned from source-api): messages, gRPC stubs, Kotlin coroutine stubs. Nothing hand-written |
 | `extension-api` | The Mihon source API extensions are compiled against (`eu.kanade.tachiyomi.*`), binary compatible with extensions-lib 1.4 and 1.6, plus the libraries extensions expect from their host |
-| `android-compat` | Our own replacements for the Android APIs extensions use: Context and SharedPreferences, Uri, Base64, Bitmap/Canvas (on Java 2D), Html, Looper/Handler and `Dispatchers.Main`, preference classes, QuickJS/Duktape on GraalJS, and inert stubs for UI and WebView |
+| `android-compat` | Our own replacements for the Android APIs extensions use: Context and SharedPreferences, Uri, Base64, Bitmap/Canvas (on Java 2D), Html, Looper/Handler and `Dispatchers.Main`, preference classes, QuickJS/Duktape on GraalJS, inert UI stubs, and `android.webkit` with a hook (`WebViewProvider`) the service fills when a browser is configured |
 | `service` | The service itself |
 | `admin` | The admin web UI (React + TanStack), built with Node through Gradle and bundled into the service jar |
 | `test-extensions/*` | Small extensions built the way real ones are, used as test fixtures |
@@ -26,6 +26,7 @@ mihon-source is one JVM process with no database. Its state is plain files under
 | `network` | Per-source networking: profiles and their store, the per-source client, solvers, cookies, rate limits |
 | `store` | Extension stores: index formats, pinning, install and update, and the `store-refresh` job |
 | `jobs` | Background jobs: the runner (schedules, one run at a time, cancelling), run history files and params. Each job is a `BackgroundJob` next to the code it drives, such as `mihon/SourceHealthJob` |
+| `webview` | The optional browser service: the CDP client (`CdpBrowser`, pages, limits, health) and the engine behind `android.webkit.WebView` (`CdpWebView`). Its threading is described in [extensions](extensions.md#webview) |
 | `secret`, `storage`, `config`, `net` | Encryption of secrets at rest, atomic JSON files, environment settings, downloads |
 
 ## Loading an extension

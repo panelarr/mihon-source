@@ -41,6 +41,13 @@ object AndroidHost {
     @Volatile
     var cookieListener: CookieListener? = null
 
+    /**
+     * Makes the engine behind `android.webkit.WebView`, when the host has a browser. Null
+     * (the default) means there's none, and constructing a WebView throws.
+     */
+    @Volatile
+    var webViewProvider: WebViewProvider? = null
+
     /** Told when a preferences file couldn't be read and was set aside as `keptAs`, so the host can log it. */
     @Volatile
     var damagedPreferencesListener: ((file: Path, keptAs: Path) -> Unit)? = null

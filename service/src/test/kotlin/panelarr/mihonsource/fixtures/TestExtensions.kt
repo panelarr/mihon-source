@@ -23,8 +23,12 @@ object TestExtensions {
     val lib16: Path get() = jar("lib16")
     val lib14: Path get() = jar("lib14")
 
+    /** Drives a WebView; needs the browser service. */
+    val webview: Path get() = jar("webview")
+
     const val LIB16_PKG = "panelarr.testext.lib16"
     const val LIB14_PKG = "panelarr.testext.lib14"
+    const val WEBVIEW_PKG = "panelarr.testext.webview"
 
     private fun jar(name: String): Path =
         jars.firstOrNull { it.fileName.toString().startsWith(name) } ?: error("test extension $name not built")
