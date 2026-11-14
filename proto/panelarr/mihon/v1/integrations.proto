@@ -6,6 +6,7 @@ package panelarr.mihon.v1;
 
 import "google/api/annotations.proto";
 import "google/protobuf/duration.proto";
+import "google/protobuf/timestamp.proto";
 
 option java_multiple_files = true;
 option java_package = "panelarr.mihon.v1";
@@ -78,6 +79,21 @@ service MihonIntegrationsService {
   rpc SetDefaultProfile(SetDefaultProfileRequest) returns (SetDefaultProfileResponse) {
     option (google.api.http) = {
       put: "/v1/admin/default-profile"
+      body: "*"
+    };
+  }
+
+  // GetBrowser reports the optional browser service WebView sources use: whether it's
+  // configured (MIHON_WEBVIEW_URL), whether it answers, and how much of it is in use.
+  rpc GetBrowser(GetBrowserRequest) returns (GetBrowserResponse) {
+    option (google.api.http) = {get: "/v1/admin/browser"};
+  }
+
+  // TestBrowser connects to the browser service now and opens a page in it, as a
+  // WebView would. Fails with FAILED_PRECONDITION when no browser is configured.
+  rpc TestBrowser(TestBrowserRequest) returns (TestBrowserResponse) {
+    option (google.api.http) = {
+      post: "/v1/admin/browser/test"
       body: "*"
     };
   }
@@ -240,3 +256,43 @@ message SetDefaultProfileRequest {
 }
 
 message SetDefaultProfileResponse {}
+
+message GetBrowserRequest {}
+
+message GetBrowserResponse {
+  Browser browser = 1;
+}
+
+// Browser is the state of the optional browser service.
+message Browser {
+  // Whether a browser is configured. Without one, WebView sources can't run.
+  bool configured = 1;
+  // Where it is: host and port only.
+  string address = 2;
+  // Whether it answered the last check. The check runs when this is read, at most
+  // every few seconds.
+  bool up = 3;
+  // The browser's product, e.g. "Chrome/140.0.0.0", when up.
+  string product = 4;
+  // Why it's down, when it isn't up.
+  string error = 5;
+  google.protobuf.Timestamp checked_at = 6;
+  // Pages open now, and the most open at once (MIHON_WEBVIEW_MAX_PAGES).
+  uint32 pages_open = 7;
+  uint32 max_pages = 8;
+  // Browser contexts open now: one per source with WebViews in use, closed when idle.
+  uint32 contexts_open = 9;
+  google.protobuf.Duration load_timeout = 10;
+  google.protobuf.Duration idle_timeout = 11;
+}
+
+message TestBrowserRequest {}
+
+message TestBrowserResponse {
+  bool ok = 1;
+  // What worked, or what failed.
+  string message = 2;
+  // The browser's product, when it answered.
+  string product = 3;
+  google.protobuf.Duration latency = 4;
+}

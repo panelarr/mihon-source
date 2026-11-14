@@ -111,6 +111,12 @@ class CdpBrowser(
     /** The most pages open at once. */
     val maxPages: Int get() = config.maxPages
 
+    /** How long one page load may take. */
+    val loadTimeout: Duration get() = config.loadTimeout
+
+    /** How long a browser context may sit unused before it's closed. */
+    val idleTimeout: Duration get() = config.idleTimeout
+
     /** The result of [test]. */
     data class TestResult(
         val ok: Boolean,

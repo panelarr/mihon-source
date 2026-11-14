@@ -10,6 +10,8 @@ import panelarr.mihon.v1.DeleteProfileRequest
 import panelarr.mihon.v1.DeleteProfileResponse
 import panelarr.mihon.v1.DeleteSolverRequest
 import panelarr.mihon.v1.DeleteSolverResponse
+import panelarr.mihon.v1.GetBrowserRequest
+import panelarr.mihon.v1.GetBrowserResponse
 import panelarr.mihon.v1.ListAssignmentsRequest
 import panelarr.mihon.v1.ListAssignmentsResponse
 import panelarr.mihon.v1.ListProfilesRequest
@@ -27,11 +29,14 @@ import panelarr.mihon.v1.SetDefaultProfileRequest
 import panelarr.mihon.v1.SetDefaultProfileResponse
 import panelarr.mihon.v1.Solver
 import panelarr.mihon.v1.SolverType
+import panelarr.mihon.v1.TestBrowserRequest
+import panelarr.mihon.v1.TestBrowserResponse
 import panelarr.mihon.v1.UserAgentMode
 import panelarr.mihon.v1.assignProfileResponse
 import panelarr.mihon.v1.assignment
 import panelarr.mihon.v1.deleteProfileResponse
 import panelarr.mihon.v1.deleteSolverResponse
+import panelarr.mihon.v1.getBrowserResponse
 import panelarr.mihon.v1.listAssignmentsResponse
 import panelarr.mihon.v1.listProfilesResponse
 import panelarr.mihon.v1.listSolversResponse
@@ -52,6 +57,7 @@ import panelarr.mihonsource.network.RateLimitSettings
 import panelarr.mihonsource.network.SolverSettings
 import panelarr.mihonsource.network.Urls
 import panelarr.mihonsource.secret.SecretBox
+import panelarr.mihonsource.webview.CdpBrowser
 import panelarr.mihonsource.network.UserAgentMode as Mode
 
 private const val DEFAULT_PROFILE_ID = "default"
@@ -63,7 +69,14 @@ class IntegrationsApi(
     private val secrets: SecretBox,
     /** Ids of the sources currently installed. */
     private val sourceIds: () -> List<Long>,
+    /** The optional browser service for WebView sources, or null when none is configured. */
+    private val browser: CdpBrowser? = null,
 ) : MihonIntegrationsServiceGrpcKt.MihonIntegrationsServiceCoroutineImplBase() {
+    override suspend fun getBrowser(request: GetBrowserRequest): GetBrowserResponse =
+        rpc { getBrowserResponse { browser = browserStatus(this@IntegrationsApi.browser) } }
+
+    override suspend fun testBrowser(request: TestBrowserRequest): TestBrowserResponse = rpc { runBrowserTest(browser) }
+
     override suspend fun listSolvers(request: ListSolversRequest): ListSolversResponse =
         rpc {
             listSolversResponse {

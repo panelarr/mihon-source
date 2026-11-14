@@ -216,7 +216,7 @@ class Application(
                         StoresApi(stores),
                         JobsApi(jobs),
                         ClientsApi(clients),
-                        IntegrationsApi(integrations, resolver, secrets) { extensions.sources().map { it.id } },
+                        IntegrationsApi(integrations, resolver, secrets, { extensions.sources().map { it.id } }, webView),
                         // Lets tools such as grpcurl discover the API. Needs the admin scope.
                         ProtoReflectionServiceV1.newInstance(),
                     ),
